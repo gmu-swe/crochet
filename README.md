@@ -1,4 +1,5 @@
 # Checkpoint ROllbaCk via lightweight HEap Traversal (CROCHET)
+[![Build Status](https://travis-ci.org/gmu-swe/crochet.svg?branch=master)](https://travis-ci.org/gmu-swe/crochet)
 
 Checkpoint/rollback mechanisms create snapshots of the state of a running application, allowing it to later be restored to that checkpointed snapshot. CROCHET is a system for performing lightweight checkpoint and rollback inside of the JVM. CROCHET works entirely through bytecode rewriting and standard debug APIs, utilizing special proxy objects to perform a lazy heap traversal that starts at the root references and traverses the heap as objects are accessed, copying or restoring state as needed and removing each proxy immediately after it is used. 
 
