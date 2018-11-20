@@ -13,6 +13,14 @@ Building
 -------
 CROCHET is a maven project. Build and install it with `mvn install`. This script will also run built-in integration tests, and create a CROCHET-instrumented JVM.
 
+It is recommended to set the following variables before proceeding with the build process:
+ * `JAVA_HOME`: pointing to the JVM you intent to adopt
+ * `_JAVA_OPTIONS`: set as following --> `"-Xmx2048m -Xms512m"`
+
+Also, in case of errors, it may result convenient to split the build process in the following steps:
+ * `mvn clean install -DskipTests=true -Dmaven.javadoc.skip=true -B -V`
+ * `mvn -X verify`
+ 
 Running
 --------
 CROCHET works by modifying your application's bytecode. To be complete, CROCHET also modifies the bytecode of JRE-provided classes, too. The first step to using CROCHET is generating an instrumented version of your runtime environment. We have tested CROCHET with both Oracle's HotSpot JVM and OpenJDK's IcedTea JVM (version 8). Running `mvn install` will create an instrumented JVM in the directory `target/jre-inst`.
