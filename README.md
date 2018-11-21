@@ -15,7 +15,6 @@ CROCHET is a maven project. Build and install it with `mvn install`. This script
 
 It is recommended to set the following variables before proceeding with the build process:
  * `JAVA_HOME`: pointing to the JVM you intent to adopt
- * `_JAVA_OPTIONS`: set as following --> `"-Xmx2048m -Xms512m"`
 
 Also, in case of errors, it may result convenient to split the build process in the following steps:
  * `mvn clean install -DskipTests=true -Dmaven.javadoc.skip=true -B -V`
