@@ -11,14 +11,7 @@ The authors of this software are [Jonathan Bell](http://jonbell.net) and [Luís 
 
 Building
 -------
-CROCHET is a maven project. Build and install it with `mvn install`. This script will also run built-in integration tests, and create a CROCHET-instrumented JVM.
-
-It is recommended to set the following variables before proceeding with the build process:
- * `JAVA_HOME`: pointing to the JVM you intent to adopt
-
-Also, in case of errors, it may result convenient to split the build process in the following steps:
- * `mvn clean install -DskipTests=true -Dmaven.javadoc.skip=true -B -V`
- * `mvn -X verify`
+CROCHET is a maven project. Build and install it with `mvn install`. This script will also run built-in integration tests, and create a CROCHET-instrumented JVM. If you have multiple JVMs available, note that (as with other Java projects), the JVM located at `JAVA_HOME` will be the one used.
  
 Running
 --------
