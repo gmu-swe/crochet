@@ -7,13 +7,14 @@
 	<packaging>jar</packaging>
 	<build>
 		<plugins>
-<plugin>
-			    <groupId>org.apache.maven.plugins</groupId>
-			    <artifactId>maven-surefire-plugin</artifactId>
-			    <version>2.22.1</version>
-			    <configuration>
-			    	<argLine>-Djdk.net.URLClassPath.disableClassPathURLCheck=true</argLine>
-          <useSystemClassLoader>false</useSystemClassLoader>			    </configuration>
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-surefire-plugin</artifactId>
+				<version>2.22.1</version>
+				<configuration>
+					<argLine>-Djdk.net.URLClassPath.disableClassPathURLCheck=true</argLine>
+					<useSystemClassLoader>false</useSystemClassLoader>
+				</configuration>
 			</plugin>
 			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>
@@ -40,11 +41,9 @@
 			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>
 				<artifactId>maven-failsafe-plugin</artifactId>
-<!--			        <version>2.18.1</version>
-
-			        <version>2.19.1</version>
-                                <version>2.22.1</version>
--->    
+				<!-- <version>2.18.1</version> -->
+				<!-- <version>2.19.1</version> -->
+				<!-- <version>2.22.1</version> -->
 				<executions>
 					<execution>
 						<goals>
@@ -56,10 +55,12 @@
 				<configuration>
 					<reuseForks>false</reuseForks>
 					<jvm>${project.build.directory}/jre-inst/bin/java</jvm>
-					<!--  <jvm>${project.build.directory}/jre-inst/opt/obuildfactory/jdk-1.8.0-openjdk-x86_64-fastdebug/bin/java</jvm> -->
-					<argLine> <!--   -XX:+TraceExceptions -->  <!-- -Xrunhprof:format=b,file=/tmp/xx.hprof --> -Xbootclasspath/p:${project.build.directory}/${project.build.finalName}.jar
+					<!-- <jvm>${project.build.directory}/jre-inst/opt/obuildfactory/jdk-1.8.0-openjdk-x86_64-fastdebug/bin/java</jvm> -->
+					<argLine> <!-- -XX:+TraceExceptions -->  <!-- -Xrunhprof:format=b,file=/tmp/xx.hprof -->
+						-Xbootclasspath/p:${project.build.directory}/${project.build.finalName}.jar
 						-agentpath:${project.build.directory}/libtagging.so
-						"-javaagent:${project.build.directory}/${project.build.finalName}.jar=withStackRollback,checkpointAt=net/jonbell/crij/test/SimpleStackModeAutoCPITCase.testRBInSameMethod#7,rollbackAt=net/jonbell/crij/test/SimpleStackModeAutoCPITCase.testRBInSameMethod#37,checkpointAt=net/jonbell/crij/test/SimpleStackModeAutoCPITCase.testRBInOtherMethod#7,rollbackAt=net/jonbell/crij/test/SimpleStackModeAutoCPITCase.foo#0,checkpointAt=net/jonbell/crij/test/SimpleStackModeAutoCPITCase.testRBInOtherStaticMethod#7,rollbackAt=net/jonbell/crij/test/SimpleStackModeAutoCPITCase.foos#0,checkpointAt=net/jonbell/crij/test/SimpleStackModeAutoCPITCase.doStaticTest#7,rollbackAt=net/jonbell/crij/test/SimpleStackModeAutoCPITCase.doStaticTest#37"</argLine>
+						"-javaagent:${project.build.directory}/${project.build.finalName}.jar=withStackRollback,checkpointAt=net/jonbell/crij/test/SimpleStackModeAutoCPITCase.testRBInSameMethod#7,rollbackAt=net/jonbell/crij/test/SimpleStackModeAutoCPITCase.testRBInSameMethod#37,checkpointAt=net/jonbell/crij/test/SimpleStackModeAutoCPITCase.testRBInOtherMethod#7,rollbackAt=net/jonbell/crij/test/SimpleStackModeAutoCPITCase.foo#0,checkpointAt=net/jonbell/crij/test/SimpleStackModeAutoCPITCase.testRBInOtherStaticMethod#7,rollbackAt=net/jonbell/crij/test/SimpleStackModeAutoCPITCase.foos#0,checkpointAt=net/jonbell/crij/test/SimpleStackModeAutoCPITCase.doStaticTest#7,rollbackAt=net/jonbell/crij/test/SimpleStackModeAutoCPITCase.doStaticTest#37"
+					</argLine>
 				</configuration>
 			</plugin>
 			<plugin>
@@ -132,7 +133,7 @@
 			<groupId>org.mockito</groupId>
 			<artifactId>mockito-all</artifactId>
 			<version>1.8.5</version>
- 			<scope>test</scope> 
+			<scope>test</scope>
 		</dependency>
 		<dependency>
 			<groupId>junit</groupId>
@@ -151,37 +152,37 @@
 			<version>5.0.3</version>
 		</dependency>
 	</dependencies>
- <distributionManagement>
-    <snapshotRepository>
-      <id>jb.snapshots</id>
-      <url>https://maven.jonbell.net/repository/privatesnaps/</url>
-    </snapshotRepository>
-  </distributionManagement>
+	<distributionManagement>
+		<snapshotRepository>
+			<id>jb.snapshots</id>
+			<url>https://maven.jonbell.net/repository/privatesnaps/</url>
+		</snapshotRepository>
+	</distributionManagement>
 
-  <repositories>
-    <repository>
-      <id>privatesnaps</id>
-      <name>privatesnaps</name>
-      <url>https://maven.jonbell.net/repository/privatesnaps/</url>
-      <releases>
-        <enabled>false</enabled>
-      </releases>
-      <snapshots>
-        <enabled>true</enabled>
-      </snapshots>
-    </repository>
-  </repositories>
-  <pluginRepositories>
-    <pluginRepository>
-      <id>privatesnaps</id>
-      <name>privatesnaps</name>
-      <url>https://maven.jonbell.net/repository/privatesnaps/</url>
-      <releases>
-        <enabled>false</enabled>
-      </releases>
-      <snapshots>
-        <enabled>true</enabled>
-      </snapshots>
-    </pluginRepository>
-  </pluginRepositories>
+	<repositories>
+		<repository>
+			<id>privatesnaps</id>
+			<name>privatesnaps</name>
+			<url>https://maven.jonbell.net/repository/privatesnaps/</url>
+			<releases>
+				<enabled>false</enabled>
+			</releases>
+			<snapshots>
+				<enabled>true</enabled>
+			</snapshots>
+		</repository>
+	</repositories>
+	<pluginRepositories>
+		<pluginRepository>
+			<id>privatesnaps</id>
+			<name>privatesnaps</name>
+			<url>https://maven.jonbell.net/repository/privatesnaps/</url>
+			<releases>
+				<enabled>false</enabled>
+			</releases>
+			<snapshots>
+				<enabled>true</enabled>
+			</snapshots>
+		</pluginRepository>
+	</pluginRepositories>
 </project>
