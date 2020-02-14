@@ -11,8 +11,7 @@ The authors of this software are [Jonathan Bell](http://jonbell.net) and [Luís 
 
 Building
 -------
-Before building you must install JDK 8.<sup>1</sup>
-You must also set the environment variable `JAVA_HOME` to point to your JDK 8 installation, so that the build script knows where the the JDK header files are.
+Before building you must install Java 8. You must also set the environment variable `JAVA_HOME` to point to your Java 8 installation.
 
 CROCHET is a maven project. Build and install it with `mvn install`. This script will also run built-in integration tests, and create a CROCHET-instrumented JVM. If you have multiple JVMs available, note that (as with other Java projects), the JVM located at `JAVA_HOME` will be the one used.
  
@@ -34,9 +33,3 @@ Permission is hereby granted, free of charge, to any person obtaining a copy of 
 The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
 
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-
-
-Notes
------
-
-1. Newer JDKs no longer have the methods `monitorEnter`, `monitorExit`, and `tryMonitorEnter` (https://bugs.openjdk.java.net/browse/JDK-8054494).
