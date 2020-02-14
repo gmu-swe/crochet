@@ -11,6 +11,8 @@ The authors of this software are [Jonathan Bell](http://jonbell.net) and [Luís 
 
 Building
 -------
+Before building you must install Java 8. You must also set the environment variable `JAVA_HOME` to point to your Java 8 installation.
+
 CROCHET is a maven project. Build and install it with `mvn install`. This script will also run built-in integration tests, and create a CROCHET-instrumented JVM. If you have multiple JVMs available, note that (as with other Java projects), the JVM located at `JAVA_HOME` will be the one used.
  
 Running
