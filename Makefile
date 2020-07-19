@@ -1,6 +1,7 @@
 UNAME := $(shell uname)
 CCFLAGS = -I${JAVA_HOME}/include -c -fPIC -fpermissive -g -O0 #-std=c++11 -g -O0
 ifeq ($(UNAME), Linux)
+	CCFLAGS += -I${JAVA_HOME}/include
 	CCFLAGS += -I${JAVA_HOME}/include/linux
 	LINKFLAGS = -z defs -static-libgcc -shared -lc
 endif
