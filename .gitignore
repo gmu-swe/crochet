@@ -1,4 +1,10 @@
 target/
+build/
+*.class
+*.so
+
+# Reference clone of Galette (FSE 2025); kept untracked, see fse25-galette.pdf and PORT_NOTES.md
+galette/
 .vagrant
 experiments/
 pom.xml.tag

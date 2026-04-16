@@ -1,0 +1,23 @@
+# java -version
+openjdk version "21.0.10" 2026-01-20
+OpenJDK Runtime Environment (build 21.0.10+7-Ubuntu-124.04)
+OpenJDK 64-Bit Server VM (build 21.0.10+7-Ubuntu-124.04, mixed mode, sharing)
+
+# config=base
+config=base iters=5000 ns/iter mean=8919 ci95=+/-52 median=8776 min=8766 max=94779 events=0 sink=0
+
+# config=loaded
+[spike-agent] loaded (capability requested, callback installed)
+config=loaded iters=5000 ns/iter mean=9093 ci95=+/-67 median=8777 min=8776 max=125687 events=0 sink=0
+[spike-agent] unloaded; events=0
+
+# config=always
+[spike-agent] loaded (capability requested, callback installed)
+config=always iters=5000 ns/iter mean=20704748 ci95=+/-10474 median=20682235 min=20060174 max=28448626 events=675990058 sink=0
+[spike-agent] unloaded; events=675990250
+
+# config=region
+[spike-agent] loaded (capability requested, callback installed)
+config=region iters=5000 ns/iter mean=350016 ci95=+/-74107 median=8796 min=8786 max=22089373 events=10814991 sink=0
+[spike-agent] unloaded; events=10814991
+
