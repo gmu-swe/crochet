@@ -2,6 +2,11 @@ package net.jonbell.crochet.runtime;
 
 import java.lang.invoke.MethodHandles;
 import java.lang.reflect.Field;
+import java.lang.reflect.Modifier;
+import java.util.Collections;
+import java.util.IdentityHashMap;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import net.jonbell.crochet.transform.ProxyTemplate;
@@ -193,6 +198,100 @@ public final class CheckpointRollbackAgent {
             }
             throw new RollbackException(RollbackException.POISON_VERSION, thrown);
         }
+    }
+
+    /* ---------- Gap 3: reflective static-field checkpoint ---------- */
+
+    /**
+     * Per-class snapshot of non-final, non-synthetic static fields, keyed on
+     * {@link Class}. V1: eager reflective snapshot; {@link #checkpointStatics}
+     * reads every static into the cache, {@link #rollbackStatics} writes them
+     * back. No bytecode rewriting — mutations to the statics happen on the
+     * real field slots, no redirection.
+     */
+    private static final Map<Class<?>, Map<String, Object>> STATIC_SNAPS =
+            Collections.synchronizedMap(new IdentityHashMap<>());
+
+    /**
+     * Captures a snapshot of all non-final static fields of {@code c} (and
+     * nothing inherited). Returns a checkpoint version id.
+     */
+    public static int checkpointStatics(Class<?> c) {
+        int v = nextCheckpointVersion();
+        Map<String, Object> snap = new LinkedHashMap<>();
+        for (Field f : c.getDeclaredFields()) {
+            if (!Modifier.isStatic(f.getModifiers())
+                    || Modifier.isFinal(f.getModifiers())
+                    || f.isSynthetic()
+                    || f.getName().startsWith("$$crochet")) {
+                continue;
+            }
+            try {
+                f.setAccessible(true);
+                snap.put(f.getName(), f.get(null));
+            } catch (ReflectiveOperationException e) {
+                throw new IllegalStateException("checkpointStatics read failed: " + c.getName() + "." + f.getName(), e);
+            }
+        }
+        STATIC_SNAPS.put(c, snap);
+        return v;
+    }
+
+    /** Restores the statics captured by the matching {@link #checkpointStatics}. */
+    public static void rollbackStatics(Class<?> c, int v) {
+        nextRollbackVersion();
+        Map<String, Object> snap = STATIC_SNAPS.remove(c);
+        if (snap == null) {
+            return;
+        }
+        for (Map.Entry<String, Object> e : snap.entrySet()) {
+            try {
+                Field f = c.getDeclaredField(e.getKey());
+                f.setAccessible(true);
+                f.set(null, e.getValue());
+            } catch (ReflectiveOperationException ex) {
+                throw new IllegalStateException("rollbackStatics write failed: " + c.getName() + "." + e.getKey(), ex);
+            }
+        }
+    }
+
+    /* ---------- Gap 4: reflective array checkpoint ---------- */
+
+    /**
+     * Per-array snapshot keyed by identity. {@code checkpointArray} records a
+     * deep copy; {@code rollbackArray} writes it back into the same array
+     * instance so all references remain valid.
+     *
+     * <p>V1 is single-level only — nested arrays or CRIJInstrumented element
+     * propagation is driven explicitly by the caller. Moving to a version
+     * that propagates through element refs is straightforward once we have
+     * the array-visitor pass working.
+     */
+    private static final Map<Object, Object> ARRAY_SNAPS =
+            Collections.synchronizedMap(new IdentityHashMap<>());
+
+    public static int checkpointArray(Object array) {
+        if (array == null || !array.getClass().isArray()) {
+            throw new IllegalArgumentException("checkpointArray requires a non-null array, got "
+                    + (array == null ? "null" : array.getClass()));
+        }
+        int v = nextCheckpointVersion();
+        int len = java.lang.reflect.Array.getLength(array);
+        Class<?> componentType = array.getClass().getComponentType();
+        Object copy = java.lang.reflect.Array.newInstance(componentType, len);
+        System.arraycopy(array, 0, copy, 0, len);
+        ARRAY_SNAPS.put(array, copy);
+        return v;
+    }
+
+    public static void rollbackArray(Object array, int v) {
+        nextRollbackVersion();
+        Object snap = ARRAY_SNAPS.remove(array);
+        if (snap == null) {
+            return;
+        }
+        int len = java.lang.reflect.Array.getLength(snap);
+        System.arraycopy(snap, 0, array, 0, len);
     }
 
     public static Object allocateShadow(Class<?> c) {
