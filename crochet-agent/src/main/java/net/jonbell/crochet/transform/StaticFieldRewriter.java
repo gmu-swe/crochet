@@ -4,11 +4,16 @@ import org.objectweb.asm.ClassVisitor;
 import org.objectweb.asm.MethodVisitor;
 import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.Type;
-import org.objectweb.asm.commons.LocalVariablesSorter;
 
 /**
  * Gap 3 (bytecode): inserts a runtime registration pre-hook before every
  * GETSTATIC / PUTSTATIC targeting an instrumented user class.
+ *
+ * <p>Pre-hook emits {@code sfHelperFor(owner.class).$$crochetAccess()} — net
+ * stack delta of zero (1-slot helper ref pushed then consumed). Works without
+ * any scratch local, so this visitor doesn't need the
+ * {@link SharedLocalsProvider}. PUTSTATIC's existing 1- or 2-slot value sits
+ * below the transient helper-ref and stays intact for the wrapped PUTSTATIC.
  */
 public final class StaticFieldRewriter extends ClassVisitor {
 

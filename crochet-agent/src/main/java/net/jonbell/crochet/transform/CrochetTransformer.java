@@ -53,67 +53,51 @@ public class CrochetTransformer {
             // preserves the existing bytes.
             return null;
         }
-        // Pre-Java-6 class files (major < 50) use JSR/RET subroutines that
-        // ASM's COMPUTE_FRAMES can't handle cleanly, and the old inference-
-        // based verifier doesn't compose with our injected methods that carry
-        // modern StackMapTable frames. commons-logging 1.x ships at major=45.
-        // Skip them — user code is already not running on Java 1.1.
-        int classFileVersion = readMajorVersion(classFileBuffer);
-        if (classFileVersion < 50) {
-            return null;
-        }
-        // Gap 7: JDK classes go through a minimal pipeline — FieldAccessWrapper
-        // / StaticFieldRewriter / ArrayAccessWrapper emit bytecode that
+        // JDK classes go through a minimal pipeline — FieldAccessWrapper /
+        // StaticFieldRewriter / ArrayAccessWrapper emit bytecode that
         // references ArrayRegistry / CheckpointRollbackAgent before the
         // runtime is wired in during JVM boot, which crashes the instrumented
-        // JDK's early startup (SystemModules$default.moduleDescriptors,
-        // ModuleDescriptor$Exports.hashCode, etc.). The Gap 7 proof-of-concept
-        // needs only the $$crochet surface + CRIJInstrumented interface on
-        // JDK classes; user classes keep the full Gap 2/3/4 treatment.
+        // JDK's early startup. The Gap 7 proof-of-concept needs only the
+        // $$crochet surface + CRIJInstrumented interface on JDK classes;
+        // user classes keep the full Gap 2/3/4 treatment.
         boolean isJdkClass = name != null
                 && (name.startsWith("java/") || name.startsWith("jdk/")
                     || name.startsWith("sun/") || name.startsWith("com/sun/"));
+        int classFileVersion = readMajorVersion(classFileBuffer);
+        // Pre-Java-6 class files (major < 50) may use JSR/RET subroutines for
+        // try/finally. COMPUTE_FRAMES can't process those directly, but
+        // JSRInlinerAdapter rewrites them into straight-line control flow.
+        // Apply only where needed — on modern bytecode the adapter still
+        // buffers into a MethodNode, which is pure overhead.
+        boolean needsJsrInlining = classFileVersion < Opcodes.V1_6;
 
         ClassWriter writer = new SafeClassWriter(reader,
                 ClassWriter.COMPUTE_MAXS | ClassWriter.COMPUTE_FRAMES, loader);
+        // Chain (bottom → top). A single SharedLocalsProvider owns the lone
+        // LocalVariablesSorter for the whole chain; every wrapper above it
+        // that needs scratch locals delegates via SharedLocalsProvider.newLocal
+        // instead of instantiating its own LVS. Stacking multiple LVS
+        // instances produced cumulative local-index rewrites that broke
+        // COMPUTE_FRAMES on large methods.
         ClassVisitor chain = writer;
         chain = new AnnotationStamper(Opcodes.ASM9, chain);
         chain = new LookupInjector(Opcodes.ASM9, chain);
-        if (!isJdkClass) {
-            chain = new FieldAccessWrapper(Opcodes.ASM9, chain);
-            chain = new ArrayCopyInterceptor(Opcodes.ASM9, chain);
-            // StaticFieldRewriter and ArrayAccessWrapper each wrap the chain
-            // in their own LocalVariablesSorter. Stacking multiple LVS
-            // instances in one chain causes cumulative local-index rewrites
-            // that confuse COMPUTE_FRAMES — seen as VerifyError "Bad local
-            // variable type" on large DaCapo methods (fop's FObj, h2's
-            // Parser). Disable by default; opt in via
-            // -Dcrochet.enableStaticFieldRewriter=true / .enableArrayWrapper.
-            // Re-enabled by default now that both visitors are LVS-free.
-            chain = maybeWrap(chain, "net.jonbell.crochet.transform.StaticFieldRewriter");
-            chain = maybeWrap(chain, "net.jonbell.crochet.transform.ArrayAccessWrapper");
-        }
         chain = new FieldAdder(Opcodes.ASM9, chain);
-        // EXPAND_FRAMES: required by LocalVariablesSorter, used by visitors
-        // that spill 2-slot values (long/double) via scratch locals.
+        if (!isJdkClass) {
+            SharedLocalsProvider locals = new SharedLocalsProvider(Opcodes.ASM9, chain);
+            chain = locals;
+            chain = new ArrayAccessWrapper(Opcodes.ASM9, chain, locals);
+            chain = new StaticFieldRewriter(Opcodes.ASM9, chain);
+            chain = new ArrayCopyInterceptor(Opcodes.ASM9, chain);
+            chain = new FieldAccessWrapper(Opcodes.ASM9, chain, locals);
+        }
+        if (needsJsrInlining) {
+            chain = new JsrInliner(Opcodes.ASM9, chain);
+        }
+        // EXPAND_FRAMES: required by LocalVariablesSorter, used by any
+        // visitor that spills 2-slot values (long/double) via scratch locals.
         reader.accept(chain, ClassReader.EXPAND_FRAMES);
         return writer.toByteArray();
-    }
-
-    /**
-     * Reflectively construct a ClassVisitor subclass by name if it is on the
-     * classpath. Returns the given {@code chain} unchanged if the class is
-     * absent, so the baseline transform pipeline keeps working even when the
-     * Gap 3/4 visitors aren't in this build.
-     */
-    private static ClassVisitor maybeWrap(ClassVisitor chain, String className) {
-        try {
-            Class<?> c = Class.forName(className, true, CrochetTransformer.class.getClassLoader());
-            return (ClassVisitor) c.getDeclaredConstructor(int.class, ClassVisitor.class)
-                    .newInstance(Opcodes.ASM9, chain);
-        } catch (Throwable t) {
-            return chain;
-        }
     }
 
     /**
@@ -258,6 +242,41 @@ public class CrochetTransformer {
         if (internalName.contains("$$crochet")) {
             return true;
         }
+        // Jython compiles .py files to JVM classes named "<module>$py" at
+        // runtime. Their methods return PyObject-family types whose super
+        // chain SafeClassWriter can't resolve via resource lookup (the types
+        // live in the Python script's classloader), so frame computation
+        // widens ARETURN targets to java/lang/Object and the verifier rejects
+        // them with VerifyError.
+        if (internalName.endsWith("$py")) {
+            return true;
+        }
+        // ByteBuddy auxiliary classes (name contains "$ByteBuddy$") are
+        // generated at runtime and frequently inherit from already-instrumented
+        // user classes. We'd re-emit the $$crochet* methods they inherited,
+        // producing ClassFormatError: Duplicate method.
+        if (internalName.contains("$ByteBuddy$")) {
+            return true;
+        }
+        // Hibernate runtime proxies (e.g. Pet$HibernateProxy$FyMglsPZ) extend
+        // instrumented entity classes and inherit our $$crochetCopyFieldsTo;
+        // instrumenting the subclass re-emits the method and the class loader
+        // rejects the duplicate.
+        if (internalName.contains("$HibernateProxy$")) {
+            return true;
+        }
+        // JFR validates that every event class has a native mirror matching
+        // the declared instance-field list exactly. Adding our $$crochet*
+        // fields to any class the JFR runtime touches — jdk.jfr.Event itself,
+        // its jdk.jfr.events.* subclasses, the jdk.internal.event.* family
+        // (ThreadSleepEvent etc.), or the jdk.jfr.consumer.* readers — makes
+        // JFR abort at VM startup with "Found additional fields in mirror
+        // class". We broadly skip both JFR trees; these are event-recording
+        // classes with no interesting mutable state for our purposes anyway.
+        if (internalName.startsWith("jdk/internal/event/")
+                || internalName.startsWith("jdk/jfr/")) {
+            return true;
+        }
         return false;
     }
 
@@ -287,4 +306,5 @@ public class CrochetTransformer {
             return null;
         }
     }
+
 }

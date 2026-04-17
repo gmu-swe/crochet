@@ -3,25 +3,30 @@ package net.jonbell.crochet.transform;
 import org.objectweb.asm.ClassVisitor;
 import org.objectweb.asm.MethodVisitor;
 import org.objectweb.asm.Opcodes;
+import org.objectweb.asm.Type;
 
 /**
  * Gap 4 (bytecode): wraps every typed xASTORE with a pre-hook that calls
  * {@link net.jonbell.crochet.runtime.ArrayRegistry#beforeStore(Object)} so
  * lazy snapshot of checkpointed arrays is triggered on the first write.
  *
- * <p>Implementation is LVS-free — stacking multiple LocalVariablesSorters
- * (one per visitor that wanted scratch locals) produced cumulative index
- * rewrites that confused COMPUTE_FRAMES on large methods. Pure stack
- * gymnastics work for 1-slot value stores; 2-slot stores (LASTORE, DASTORE)
- * fall through unwrapped for now, matching the FieldAccessWrapper policy.
+ * <p>Implementation uses a scratch local pulled from the chain-wide
+ * {@link SharedLocalsProvider} to stash the value (1-slot or 2-slot) while
+ * the array reference is duplicated for the hook. Uniform across all typed
+ * stores (IASTORE/BASTORE/CASTORE/SASTORE/FASTORE/AASTORE/LASTORE/DASTORE) —
+ * prior pure-stack implementation left LASTORE/DASTORE unwrapped because the
+ * [arr, idx, v_hi, v_lo] shape has no clean DUP_X/POP permutation.
  */
 public final class ArrayAccessWrapper extends ClassVisitor {
 
     private static final String REGISTRY_INTERNAL = "net/jonbell/crochet/runtime/ArrayRegistry";
     private static final String BEFORE_STORE_DESC = "(Ljava/lang/Object;)V";
 
-    public ArrayAccessWrapper(int api, ClassVisitor delegate) {
+    private final SharedLocalsProvider locals;
+
+    public ArrayAccessWrapper(int api, ClassVisitor delegate, SharedLocalsProvider locals) {
         super(api, delegate);
+        this.locals = locals;
     }
 
     @Override
@@ -36,42 +41,62 @@ public final class ArrayAccessWrapper extends ClassVisitor {
                 || "<clinit>".equals(name)) {
             return base;
         }
-        return new WrapStoresMV(api, base);
+        return new WrapStoresMV(api, base, locals);
     }
 
     private static final class WrapStoresMV extends MethodVisitor {
+        private final SharedLocalsProvider locals;
 
-        WrapStoresMV(int api, MethodVisitor delegate) {
+        WrapStoresMV(int api, MethodVisitor delegate, SharedLocalsProvider locals) {
             super(api, delegate);
+            this.locals = locals;
         }
 
         @Override
         public void visitInsn(int opcode) {
-            if (!isOneSlotArrayStore(opcode)) {
+            Type vt = valueTypeFor(opcode);
+            if (vt == null) {
                 super.visitInsn(opcode);
                 return;
             }
-            // stack: [..., arr, idx, val]   (val is 1-slot)
-            super.visitInsn(Opcodes.DUP2_X1);
-            // stack: [..., idx, val, arr, idx, val]
-            super.visitInsn(Opcodes.POP2);
-            // stack: [..., idx, val, arr]
+            int slot = locals.sharedScratch(vt);
+            int storeOp = vt.getOpcode(Opcodes.ISTORE);
+            int loadOp = vt.getOpcode(Opcodes.ILOAD);
+            // Scratch store/load emitted via locals.emitVarInsn — bypasses
+            // the LVS remap table so the slot lands at its allocated index
+            // rather than being aliased with an original local of the same
+            // numeric index (LVS keys remap by var+size, not by type).
+            // stack: [..., arr, idx, val]    (val is 1 or 2 slots)
+            locals.emitVarInsn(storeOp, slot);
+            // stack: [..., arr, idx]
+            super.visitInsn(Opcodes.SWAP);
+            // stack: [..., idx, arr]
             super.visitInsn(Opcodes.DUP);
-            // stack: [..., idx, val, arr, arr]
+            // stack: [..., idx, arr, arr]
             super.visitMethodInsn(Opcodes.INVOKESTATIC, REGISTRY_INTERNAL,
                     "beforeStore", BEFORE_STORE_DESC, false);
-            // stack: [..., idx, val, arr]
-            super.visitInsn(Opcodes.DUP_X2);
-            // stack: [..., arr, idx, val, arr]
-            super.visitInsn(Opcodes.POP);
+            // stack: [..., idx, arr]
+            super.visitInsn(Opcodes.SWAP);
+            // stack: [..., arr, idx]
+            locals.emitVarInsn(loadOp, slot);
             // stack: [..., arr, idx, val]
             super.visitInsn(opcode);
         }
 
-        private static boolean isOneSlotArrayStore(int opcode) {
-            return opcode == Opcodes.IASTORE || opcode == Opcodes.FASTORE
-                    || opcode == Opcodes.AASTORE || opcode == Opcodes.BASTORE
-                    || opcode == Opcodes.CASTORE || opcode == Opcodes.SASTORE;
+        private static Type valueTypeFor(int opcode) {
+            switch (opcode) {
+                case Opcodes.IASTORE: return Type.INT_TYPE;
+                case Opcodes.FASTORE: return Type.FLOAT_TYPE;
+                case Opcodes.AASTORE: return OBJECT_TYPE;
+                case Opcodes.BASTORE: return Type.BYTE_TYPE;
+                case Opcodes.CASTORE: return Type.CHAR_TYPE;
+                case Opcodes.SASTORE: return Type.SHORT_TYPE;
+                case Opcodes.LASTORE: return Type.LONG_TYPE;
+                case Opcodes.DASTORE: return Type.DOUBLE_TYPE;
+                default: return null;
+            }
         }
+
+        private static final Type OBJECT_TYPE = Type.getObjectType("java/lang/Object");
     }
 }

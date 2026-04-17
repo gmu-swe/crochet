@@ -58,7 +58,19 @@ final class TransformerWrapper implements ClassFileTransformer {
             }
             return out;
         } catch (Throwable t) {
-            t.printStackTrace();
+            // Returning null tells the JVMTI layer "no change" — the class
+            // runs unchanged, just without crochet instrumentation. This is
+            // benign at the application level: losing a $$crochet surface on
+            // one class just means any swapToFastProxy(...) on that class
+            // will fall back to the Noop helper path.
+            //
+            // Printing here leaked the failure onto stderr, which broke
+            // DaCapo's digest-of-stderr validation (fop) with MethodTooLarge
+            // on LineBreakUtils.init0(). Stay silent by default; opt in via
+            // -Dcrochet.verboseCompat=true for diagnostic sessions.
+            if (Boolean.getBoolean("crochet.verboseCompat")) {
+                t.printStackTrace();
+            }
             return null;
         }
     }

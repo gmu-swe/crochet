@@ -4,19 +4,21 @@ import org.objectweb.asm.ClassVisitor;
 import org.objectweb.asm.MethodVisitor;
 import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.Type;
-import org.objectweb.asm.commons.LocalVariablesSorter;
 
 /**
  * Wraps GETFIELD/PUTFIELD instructions whose owner is an instrumented user
  * class with a preceding call to {@code ownerRef.$$crochetAccess()}. When the
- * ownerRef is of a user-class type, this runs the no-op base implementation;
+ * ownerRef is of a user-class type this runs the no-op base implementation;
  * when the ownerRef's klass has been swapped to the Fast proxy, this triggers
- * the lazy snapshot/restore in {@link net.jonbell.crochet.runtime.CheckpointRollbackAgent#fastAccess}.
+ * the lazy snapshot/restore in
+ * {@link net.jonbell.crochet.runtime.CheckpointRollbackAgent#fastAccess}.
  *
- * <p>Handles both 1-slot (Z, B, C, S, I, F, L, [) and 2-slot (J, D) field
- * descriptors. 1-slot is handled with a pure SWAP/DUP dance; 2-slot uses a
- * fresh local variable (allocated by {@link LocalVariablesSorter}) to stash
- * the value while we poke the object reference.
+ * <p>1-slot (Z, B, C, S, I, F, L, [) descriptors wrap via pure SWAP/DUP/SWAP.
+ * 2-slot (J, D) descriptors stash the value in a scratch local allocated from
+ * the chain-wide {@link SharedLocalsProvider} — the visitor never extends a
+ * {@link org.objectweb.asm.commons.LocalVariablesSorter} of its own; multiple
+ * stacked LVS instances produced cumulative index rewrites that confused
+ * {@code COMPUTE_FRAMES} on large methods (fop's FObj, h2's Parser).
  *
  * <p>Skips synthetic CROCHET methods ({@code $$crochet*}) and initializers
  * ({@code <init>}, {@code <clinit>}) to avoid recursion and pre-super access
@@ -24,8 +26,11 @@ import org.objectweb.asm.commons.LocalVariablesSorter;
  */
 public final class FieldAccessWrapper extends ClassVisitor {
 
-    public FieldAccessWrapper(int api, ClassVisitor delegate) {
+    private final SharedLocalsProvider locals;
+
+    public FieldAccessWrapper(int api, ClassVisitor delegate, SharedLocalsProvider locals) {
         super(api, delegate);
+        this.locals = locals;
     }
 
     @Override
@@ -38,21 +43,15 @@ public final class FieldAccessWrapper extends ClassVisitor {
         if (name.startsWith("$$crochet") || "<init>".equals(name) || "<clinit>".equals(name)) {
             return base;
         }
-        // We wrap 2-slot PUTFIELD by stashing the value in a synthesized local
-        // variable. LocalVariablesSorter gives us a fresh slot and fixes up
-        // maxLocals; wiring it between the base MV and our visitor ensures our
-        // visitVarInsn(Opcodes.LSTORE/DSTORE, -1) calls are remapped correctly.
-        LocalVariablesSorter lvs = new LocalVariablesSorter(access, descriptor, base);
-        WrapAccessesMV wrap = new WrapAccessesMV(api, lvs, lvs);
-        return wrap;
+        return new WrapAccessesMV(api, base, locals);
     }
 
     private static final class WrapAccessesMV extends MethodVisitor {
-        private final LocalVariablesSorter lvs;
+        private final SharedLocalsProvider locals;
 
-        WrapAccessesMV(int api, MethodVisitor delegate, LocalVariablesSorter lvs) {
+        WrapAccessesMV(int api, MethodVisitor delegate, SharedLocalsProvider locals) {
             super(api, delegate);
-            this.lvs = lvs;
+            this.locals = locals;
         }
 
         @Override
@@ -61,13 +60,7 @@ public final class FieldAccessWrapper extends ClassVisitor {
                 super.visitFieldInsn(opcode, owner, name, descriptor);
                 return;
             }
-            boolean twoSlot = "J".equals(descriptor) || "D".equals(descriptor);
             if (opcode == Opcodes.GETFIELD) {
-                // GETFIELD consumes [objref] and pushes [value]. The returned
-                // value width (1 vs 2 slots) doesn't matter here because the
-                // hook runs BEFORE we execute the actual GETFIELD — we only
-                // duplicate the 1-slot objref on the stack.
-                //
                 // stack: [..., objref]
                 super.visitInsn(Opcodes.DUP);
                 // stack: [..., objref, objref]
@@ -75,14 +68,11 @@ public final class FieldAccessWrapper extends ClassVisitor {
                         "$$crochetAccess", "()V", false);
                 // stack: [..., objref]
                 super.visitFieldInsn(opcode, owner, name, descriptor);
-                // stack: [..., value]  (value is 1 or 2 slots depending on descriptor)
                 return;
             }
-            // PUTFIELD: consumes [objref, value]. For 1-slot we keep the old
-            // stack dance; for 2-slot we stash via a synthesized local.
             if (opcode == Opcodes.PUTFIELD) {
+                boolean twoSlot = "J".equals(descriptor) || "D".equals(descriptor);
                 if (!twoSlot) {
-                    // --- 1-slot PUTFIELD (unchanged from V1) ---
                     // stack: [..., objref, value]
                     super.visitInsn(Opcodes.SWAP);
                     // stack: [..., value, objref]
@@ -96,31 +86,31 @@ public final class FieldAccessWrapper extends ClassVisitor {
                     super.visitFieldInsn(opcode, owner, name, descriptor);
                     return;
                 }
-
-                // --- 2-slot PUTFIELD via pure stack gymnastics ---
-                // Using LocalVariablesSorter.newLocal here appeared clean but
-                // interacts poorly with ClassWriter.COMPUTE_FRAMES on large
-                // methods (h2's Parser.parseCreate, fop's FObj): the frame
-                // computation reports local slots as "top" at downstream
-                // joins, producing VerifyError "Bad local variable type".
-                // Stack-only rearrangement avoids the scratch-local problem
-                // entirely.
-                //
-                // stack: [..., objref, v_hi, v_lo]    (v is 2-slot; objref is 1-slot)
-                super.visitInsn(Opcodes.DUP2_X1);
-                // stack: [..., v_hi, v_lo, objref, v_hi, v_lo]
-                super.visitInsn(Opcodes.POP2);
-                // stack: [..., v_hi, v_lo, objref]
-                super.visitInsn(Opcodes.DUP_X2);
-                // stack: [..., objref, v_hi, v_lo, objref]
+                // 2-slot PUTFIELD: stash the wide value in a scratch local
+                // pulled from the chain-wide LVS, leaving objref on top so we
+                // can duplicate it for the hook. Scratch store/load are
+                // emitted via locals.emitVarInsn so they bypass the LVS's
+                // remap table — that table keys on (var, size) not type, and
+                // would otherwise alias our scratch with an original slot
+                // that happens to share the numeric index.
+                Type vt = "J".equals(descriptor) ? Type.LONG_TYPE : Type.DOUBLE_TYPE;
+                int slot = locals.sharedScratch(vt);
+                int storeOp = vt.getOpcode(Opcodes.ISTORE);
+                int loadOp = vt.getOpcode(Opcodes.ILOAD);
+                // stack: [..., objref, v_hi, v_lo]
+                locals.emitVarInsn(storeOp, slot);
+                // stack: [..., objref]
+                super.visitInsn(Opcodes.DUP);
+                // stack: [..., objref, objref]
                 super.visitMethodInsn(Opcodes.INVOKEVIRTUAL, owner,
                         "$$crochetAccess", "()V", false);
+                // stack: [..., objref]
+                locals.emitVarInsn(loadOp, slot);
                 // stack: [..., objref, v_hi, v_lo]
                 super.visitFieldInsn(opcode, owner, name, descriptor);
                 return;
             }
-            // Defensive: other field opcodes (GETSTATIC/PUTSTATIC) fall through
-            // unchanged — shouldWrap() already filtered them.
+            // GETSTATIC/PUTSTATIC filtered out by shouldWrap; defensive pass-through.
             super.visitFieldInsn(opcode, owner, name, descriptor);
         }
 
@@ -138,8 +128,6 @@ public final class FieldAccessWrapper extends ClassVisitor {
             if (owner.startsWith("net/jonbell/crochet/")) {
                 return false;
             }
-            // All valid field descriptors are now handled: Z/B/C/S/I/F/L/[ via
-            // the 1-slot path, J/D via the 2-slot path.
             return true;
         }
     }

@@ -204,20 +204,57 @@ public final class CheckpointRollbackAgent {
 
     /**
      * Invoked by the Fast proxy's overridden {@code $$crochetAccess}. Gap 6
-     * race-winner pattern: we CAS the klass from fast-proxy back to user at the
-     * <em>top</em> of the method, so exactly one thread enters the
-     * snapshot/restore body. Peers whose CAS fails return immediately.
+     * race-winner pattern driven by three CASes:
+     * <ol>
+     *   <li>The klass CAS in {@link #swapKlassProxyToUser} (proxy &rarr; user)
+     *       is the race winner — exactly one thread flips the header and
+     *       therefore exactly one thread ran the snap/restore body under the
+     *       stripe lock.
+     *   <li>Version install (sentinel {@code -v}) is a CAS done by the emitted
+     *       {@code $$crochetCheckpoint} / {@code $$crochetRollback} bodies
+     *       (see {@code FieldAdder.emitVersionGuardedEntry}).
+     *   <li>Version finalize ({@code -v} &rarr; {@code v}) is a second CAS in
+     *       the same emitted bodies, also independent of this method.
+     * </ol>
      *
-     * <p>The winner's work is wrapped in try/catch for gap 8: an exception
-     * mid-snapshot leaves the klass at user (already swapped), and we zero
-     * version+snap so the object is in a consistent "no active checkpoint"
-     * state before raising {@link RollbackException}.
+     * <p><b>Fast paths taken without locking</b>:
+     * <ul>
+     *   <li>If the observed klass is already the user class, a peer finished
+     *       the work — return immediately. Zero locks, zero atomics.
+     *   <li>If the object's {@code $$crochetVersion} is {@code 0} (no active
+     *       checkpoint), straight CAS the klass back to user and return.
+     *   <li>A contended path that falls through the stripe lock and finds
+     *       klass already user also returns without doing any snap work.
+     * </ul>
+     *
+     * <p><b>Contended (cold) path</b>: when the version is non-zero the
+     * winner still needs to install a snap (checkpoint) or restore from snap
+     * (rollback), which is a multi-word write that requires mutual exclusion
+     * against concurrent winners for the <em>same</em> object. We use a
+     * stripe-lock bank ({@link FastAccessCoordinator}) keyed by
+     * {@code identityHashCode(obj) & 0xff} — with 256 stripes, distinct
+     * objects almost never collide, so the effective critical section is
+     * per-object rather than the old per-class. See that class for the
+     * invariant-preservation argument.
+     *
+     * <p><b>Gap 8 (exception safety)</b>: the winner's work is wrapped in
+     * try/catch. On throw we zero the version + snap and swap klass to user
+     * before raising {@link RollbackException}, leaving the object in a
+     * consistent "no active checkpoint" state even under partial failure.
+     *
+     * <p><b>Sentinel {@code -v}</b>: the sentinel closes the "version bumped
+     * but klass not yet swapped" window for <em>readers of the version</em>.
+     * fastAccess itself decodes {@code realV = |v|} so it sees the same
+     * parity/branch regardless of whether the caller observed mid-update or
+     * finalized state. I1 (unique v) and I2 (monotone) are preserved because
+     * the only bumping paths are still {@link #nextCheckpointVersion} /
+     * {@link #nextRollbackVersion} CAS loops.
      */
     public static void fastAccess(CRIJInstrumented obj) {
         Class<?> observedClass = obj.getClass();
-        // Quick exit: klass may have already been CAS'd back to the user class
-        // by a peer that completed the work. If so, we can proceed to the
-        // caller's field access without any hook overhead.
+        // Uncontended fast path: klass is already user (a peer finished the
+        // work, or we're here via a reentrant call that already did it).
+        // Zero atomics, zero locks.
         if (!CRIJFast.class.isAssignableFrom(observedClass)) {
             return;
         }
@@ -236,33 +273,32 @@ public final class CheckpointRollbackAgent {
         // between sentinel install and finalize; treat realV = |v|.
         int realV = (v < 0) ? -v : v;
 
-        // Gap 6/8 resolution: serialize all fastAccess entrants for a given
-        // object via a single per-class lock (the user {@link Class} object).
-        // This ensures:
-        //   * only one thread runs the snapshot/restore body at a time per
-        //     class, so "winner published klass=user but work still in flight"
-        //     cannot occur;
-        //   * all peers see a consistent happens-before via the SAME monitor
-        //     (we considered using the $$crochetSnap slot as the lock for
-        //     per-object granularity, but a thread that observes snap == null
-        //     while a peer still holds the old snap monitor would lock on a
-        //     different monitor and miss the happens-before).
-        //
-        // Using the user Class as the lock is coarse but correct. Contention
-        // is bounded by concurrent checkpoint/rollback cycles (rare) rather
-        // than application field-access frequency (high) — once klass is
-        // swapped back to user, subsequent accesses never enter this block.
-        //
-        // We intentionally do NOT synchronize on {@code obj} itself to avoid
-        // contending with user code that might lock on the object.
-        synchronized (userClass) {
-            // Re-check under the lock: a peer that we were blocked behind may
-            // already have finished the work and CAS'd klass to user.
+        // Fast path (no snap work needed): version is zero — no active
+        // checkpoint — so just flip klass back to user and return. Multiple
+        // threads racing here all succeed or observe the post-CAS state;
+        // CAS failure just means a peer beat us, also benign.
+        if (realV == 0) {
+            swapKlassProxyToUser(obj, userClass);
+            return;
+        }
+
+        // Cold path: snap install / restore is a multi-word operation that
+        // requires mutual exclusion per object against concurrent winners.
+        // Use a stripe-lock keyed by identityHashCode — finer-grained than
+        // the previous synchronized(userClass) which serialized across all
+        // instances of the same class. See FastAccessCoordinator javadoc for
+        // the invariant-preservation argument (I1, I2, sentinel handling).
+        Object stripe = FastAccessCoordinator.lockFor(obj);
+        synchronized (stripe) {
+            // Re-check under the lock: a peer may have won the klass CAS
+            // while we were blocked acquiring the stripe, in which case the
+            // work is done and we just return. Happens-before is established
+            // by the stripe monitor's release-acquire.
             if (!CRIJFast.class.isAssignableFrom(obj.getClass())) {
                 return;
             }
             // Re-read the version with volatile semantics in case a peer
-            // completed (and CAS'd a new finalized value) while we blocked.
+            // finalized while we blocked.
             v = U.getIntVolatile(obj, versionOff);
             realV = (v < 0) ? -v : v;
             if (realV == 0) {
@@ -303,8 +339,9 @@ public final class CheckpointRollbackAgent {
                 }
                 throw new RollbackException(RollbackException.POISON_VERSION, t);
             }
-            // Work is done; swap klass from proxy to user. Any peer that
-            // blocked on our lock will re-check CRIJFast and return cheaply.
+            // Work done: CAS klass proxy→user. This is the race-winner
+            // transition — any peer still blocked on the stripe monitor will
+            // re-check CRIJFast after release and return cheaply.
             swapKlassProxyToUser(obj, userClass);
         }
     }
@@ -453,33 +490,62 @@ public final class CheckpointRollbackAgent {
 
     /* ---------- Gap 3 (bytecode): static-field helper lookup ---------- */
 
+    /**
+     * ClassValue-backed cache of per-user-class static-field helpers. The
+     * legacy path used {@code synchronized(meta) + DCL} on a
+     * {@link ClassMeta#sfHelper} field, which serialized ALL first-access
+     * callers per class. {@link ClassValue#get} does one-shot lock-free
+     * materialisation via a CAS-based internal table, so subsequent lookups
+     * are a fast hash-table read without any monitor acquisition.
+     *
+     * <p>Classes our transformer skips (enums, annotations, classes without
+     * {@code $$crochetLookup}) fall through to {@link NoopSFHelper#INSTANCE}
+     * so the user's GETSTATIC/PUTSTATIC still hits the real static field —
+     * checkpoint/rollback silently skip these statics, matching the final-
+     * class proxy policy.
+     *
+     * <p>The ClassValue instance is stored on {@link ClassMeta} (a cached
+     * per-class object) so the hot-path lookup is a direct field load of
+     * {@code ClassMeta.sfHelper} and hits the DCL-style fast path without
+     * traversing the ClassValue cache on every call. The ClassValue only
+     * participates in first-access materialisation; after that the helper
+     * is pinned on the ClassMeta.
+     */
     public static CRIJInstrumented sfHelperFor(Class<?> userClass) {
         ClassMeta meta = ClassMeta.of(userClass);
         CRIJInstrumented h = meta.sfHelper;
         if (h != null) {
             return h;
         }
-        synchronized (meta) {
-            h = meta.sfHelper;
-            if (h != null) {
-                return h;
-            }
-            // Classes our transformer skips (enums, annotations, already-
-            // instrumented classes from another tool, JDK classes the agent
-            // runtime-skips) won't have $$crochetLookup. In that case, return
-            // a no-op helper so the user's GETSTATIC/PUTSTATIC continues to
-            // hit the real static field. Checkpoint/rollback silently skip
-            // these statics — matches the final-class proxy policy.
-            if (!hasLookup(userClass)) {
-                h = NoopSFHelper.INSTANCE;
-                meta.sfHelper = h;
-                return h;
-            }
-            h = generateSFHelper(userClass, meta);
-            meta.sfHelper = h;
-            return h;
-        }
+        // Cold path: delegate to ClassValue for lock-free one-shot
+        // materialisation. concurrent callers observe the same helper
+        // without any synchronized() block. Once assigned, meta.sfHelper
+        // is stable for the lifetime of the ClassMeta and the fast path
+        // above covers all subsequent calls.
+        return SF_HELPERS.get(userClass);
     }
+
+    private static final ClassValue<CRIJInstrumented> SF_HELPERS = new ClassValue<>() {
+        @Override
+        protected CRIJInstrumented computeValue(Class<?> userClass) {
+            // ClassValue serializes computeValue per key internally using a
+            // CAS-based one-shot, so concurrent callers observe the same
+            // helper without us doing any additional locking.
+            CRIJInstrumented helper;
+            if (!hasLookup(userClass)) {
+                helper = NoopSFHelper.INSTANCE;
+            } else {
+                ClassMeta meta = ClassMeta.of(userClass);
+                helper = generateSFHelper(userClass, meta);
+            }
+            // Back-compat + fast-path pin: populate the ClassMeta.sfHelper
+            // volatile so subsequent sfHelperFor calls hit a single-load
+            // DCL-style fast path (see sfHelperFor). Also readable by
+            // rollbackClassAtVersion directly.
+            ClassMeta.of(userClass).sfHelper = helper;
+            return helper;
+        }
+    };
 
     private static boolean hasLookup(Class<?> userClass) {
         try {
