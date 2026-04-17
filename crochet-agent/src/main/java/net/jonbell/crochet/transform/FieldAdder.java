@@ -49,70 +49,126 @@ public final class FieldAdder extends ClassVisitor {
     private static final String AGENT = "net/jonbell/crochet/runtime/CheckpointRollbackAgent";
 
     /**
-     * Emits the body of {@code $$crochetCheckpoint} / {@code $$crochetRollback}:
+     * Emits a sentinel-aware body for {@code $$crochetCheckpoint} /
+     * {@code $$crochetRollback} per paper Listing 3:
      * <pre>
-     *   int priorVersion = this.$$crochetVersion;
-     *   if (priorVersion >= v) return;
-     *   this.$$crochetVersion = v;
+     *   int cur   = Agent.versionVolatileGet(this, ThisClass.class);
+     *   int realV = (cur &lt; 0) ? -cur : cur;
+     *   if (realV &gt;= v) return;                                        // I2 guard
+     *   if (!Agent.versionCas(this, ThisClass.class, cur, -v)) return;   // peer won
      *   try {
-     *       swapToFastProxy(this, ThisClass.class, priorVersion);
+     *       Agent.swapToFastProxy(this, ThisClass.class);
      *   } catch (Throwable t) {
-     *       this.$$crochetVersion = priorVersion;
-     *       throw t;
+     *       Agent.versionCas(this, ThisClass.class, -v, cur);            // best-effort restore
+     *       throw new RollbackException(POISON_VERSION, t);
      *   }
+     *   Agent.versionCas(this, ThisClass.class, -v, v);                  // finalize
      * </pre>
-     * The guard enforces flat-nested-checkpoint semantics (paper §3.1) and
-     * terminates cyclic propagation. The try/catch restores the pre-bump
-     * version so a proxy-generation failure doesn't leave the object in a
-     * half-checkpointed state.
+     *
+     * <p>Sentinel value {@code -v} closes the "version bumped but klass not
+     * yet swapped" race window: a concurrent reader that observes {@code -v}
+     * decodes {@code realV = v} and sees the same parity/branch decision it
+     * would observe after the finalize. All CAS failures are benign — they
+     * mean a peer advanced past us, so paper invariants I1 (unique v) and I2
+     * (monotone) continue to hold.
+     *
+     * <p>Gap 8 integration: a throw from {@code swapToFastProxy} (i.e., proxy
+     * class generation failed) restores the pre-sentinel version via CAS so
+     * no other thread observes a stuck sentinel, and raises a
+     * {@link net.jonbell.crochet.runtime.RollbackException#POISON_VERSION}
+     * carrying the cause.
      *
      * <p>Local layout: slot 0 is {@code this}, slot 1 is {@code v}, slot 2 is
-     * {@code priorVersion}, slot 3 is the caught {@code Throwable}.
+     * {@code cur}, slot 3 is {@code realV}, slot 4 is the caught throwable.
      */
     private void emitVersionGuardedEntry(MethodVisitor mv) {
-        Label proceed = new Label();
-        Label tryStart = new Label();
-        Label tryEnd = new Label();
-        Label handler = new Label();
+        Label proceed      = new Label();
+        Label gotSentinel  = new Label();
+        Label tryStart     = new Label();
+        Label tryEnd       = new Label();
+        Label handler      = new Label();
         Label afterHandler = new Label();
 
-        // priorVersion = this.$$crochetVersion
+        // ---- cur = Agent.versionVolatileGet(this, ThisClass.class)
         mv.visitVarInsn(Opcodes.ALOAD, 0);
-        mv.visitFieldInsn(Opcodes.GETFIELD, className, VERSION_FIELD, "I");
-        mv.visitInsn(Opcodes.DUP);
-        mv.visitVarInsn(Opcodes.ISTORE, 2);
+        mv.visitLdcInsn(Type.getObjectType(className));
+        mv.visitMethodInsn(Opcodes.INVOKESTATIC, AGENT, "versionVolatileGet",
+                "(Ljava/lang/Object;Ljava/lang/Class;)I", false);
+        mv.visitVarInsn(Opcodes.ISTORE, 2);                        // cur -> slot 2
 
-        // if (priorVersion >= v) return;
+        // ---- realV = (cur < 0) ? -cur : cur
+        Label neg = new Label();
+        Label absDone = new Label();
+        mv.visitVarInsn(Opcodes.ILOAD, 2);
+        mv.visitJumpInsn(Opcodes.IFLT, neg);
+        mv.visitVarInsn(Opcodes.ILOAD, 2);
+        mv.visitJumpInsn(Opcodes.GOTO, absDone);
+        mv.visitLabel(neg);
+        mv.visitVarInsn(Opcodes.ILOAD, 2);
+        mv.visitInsn(Opcodes.INEG);
+        mv.visitLabel(absDone);
+        mv.visitVarInsn(Opcodes.ISTORE, 3);                        // realV -> slot 3
+
+        // ---- if (realV >= v) return;  (I2 guard + cycle termination)
+        mv.visitVarInsn(Opcodes.ILOAD, 3);
         mv.visitVarInsn(Opcodes.ILOAD, 1);
         mv.visitJumpInsn(Opcodes.IF_ICMPLT, proceed);
         mv.visitInsn(Opcodes.RETURN);
         mv.visitLabel(proceed);
 
-        // this.$$crochetVersion = v
+        // ---- if (!Agent.versionCas(this, ThisClass.class, cur, -v)) return;
         mv.visitVarInsn(Opcodes.ALOAD, 0);
-        mv.visitVarInsn(Opcodes.ILOAD, 1);
-        mv.visitFieldInsn(Opcodes.PUTFIELD, className, VERSION_FIELD, "I");
+        mv.visitLdcInsn(Type.getObjectType(className));
+        mv.visitVarInsn(Opcodes.ILOAD, 2);                          // expect = cur
+        mv.visitVarInsn(Opcodes.ILOAD, 1);                          // v
+        mv.visitInsn(Opcodes.INEG);                                  // -v
+        mv.visitMethodInsn(Opcodes.INVOKESTATIC, AGENT, "versionCas",
+                "(Ljava/lang/Object;Ljava/lang/Class;II)Z", false);
+        mv.visitJumpInsn(Opcodes.IFNE, gotSentinel);
+        mv.visitInsn(Opcodes.RETURN);
+        mv.visitLabel(gotSentinel);
 
-        // try { swapToFastProxy(this, ThisClass.class, priorVersion); }
+        // ---- try { Agent.swapToFastProxy(this, ThisClass.class); }
         mv.visitLabel(tryStart);
         mv.visitVarInsn(Opcodes.ALOAD, 0);
         mv.visitLdcInsn(Type.getObjectType(className));
-        mv.visitVarInsn(Opcodes.ILOAD, 2);
         mv.visitMethodInsn(Opcodes.INVOKESTATIC, AGENT, "swapToFastProxy",
-                "(Ljava/lang/Object;Ljava/lang/Class;I)V", false);
+                "(Ljava/lang/Object;Ljava/lang/Class;)V", false);
         mv.visitLabel(tryEnd);
         mv.visitJumpInsn(Opcodes.GOTO, afterHandler);
 
-        // catch (Throwable t): restore version; rethrow.
+        // ---- catch (Throwable t):
+        //      Agent.versionCas(this, ThisClass.class, -v, cur);  // best-effort restore
+        //      throw new RollbackException(POISON_VERSION, t);
         mv.visitLabel(handler);
-        mv.visitVarInsn(Opcodes.ASTORE, 3);
+        mv.visitVarInsn(Opcodes.ASTORE, 4);
         mv.visitVarInsn(Opcodes.ALOAD, 0);
-        mv.visitVarInsn(Opcodes.ILOAD, 2);
-        mv.visitFieldInsn(Opcodes.PUTFIELD, className, VERSION_FIELD, "I");
-        mv.visitVarInsn(Opcodes.ALOAD, 3);
+        mv.visitLdcInsn(Type.getObjectType(className));
+        mv.visitVarInsn(Opcodes.ILOAD, 1);
+        mv.visitInsn(Opcodes.INEG);                                  // expect = -v
+        mv.visitVarInsn(Opcodes.ILOAD, 2);                           // update = cur
+        mv.visitMethodInsn(Opcodes.INVOKESTATIC, AGENT, "versionCas",
+                "(Ljava/lang/Object;Ljava/lang/Class;II)Z", false);
+        mv.visitInsn(Opcodes.POP);
+        mv.visitTypeInsn(Opcodes.NEW, "net/jonbell/crochet/runtime/RollbackException");
+        mv.visitInsn(Opcodes.DUP);
+        mv.visitLdcInsn(-1);                                         // POISON_VERSION
+        mv.visitVarInsn(Opcodes.ALOAD, 4);
+        mv.visitMethodInsn(Opcodes.INVOKESPECIAL,
+                "net/jonbell/crochet/runtime/RollbackException",
+                "<init>", "(ILjava/lang/Throwable;)V", false);
         mv.visitInsn(Opcodes.ATHROW);
 
+        // ---- finalize: Agent.versionCas(this, ThisClass.class, -v, v); return;
         mv.visitLabel(afterHandler);
+        mv.visitVarInsn(Opcodes.ALOAD, 0);
+        mv.visitLdcInsn(Type.getObjectType(className));
+        mv.visitVarInsn(Opcodes.ILOAD, 1);
+        mv.visitInsn(Opcodes.INEG);                                  // expect = -v
+        mv.visitVarInsn(Opcodes.ILOAD, 1);                           // update = v
+        mv.visitMethodInsn(Opcodes.INVOKESTATIC, AGENT, "versionCas",
+                "(Ljava/lang/Object;Ljava/lang/Class;II)Z", false);
+        mv.visitInsn(Opcodes.POP);
         mv.visitInsn(Opcodes.RETURN);
         mv.visitTryCatchBlock(tryStart, tryEnd, handler, "java/lang/Throwable");
     }
@@ -361,23 +417,40 @@ public final class FieldAdder extends ClassVisitor {
                 Opcodes.ACC_PUBLIC | Opcodes.ACC_SYNTHETIC,
                 "$$crochetIsRollbackState", "()Z", null, null);
         mv.visitCode();
-        // return (version != 0) && (version % 2 == 0)
+        // Decode the sentinel, then test rollback parity:
+        //   int v  = this.$$crochetVersion;
+        //   int rv = (v < 0) ? -v : v;
+        //   return (rv != 0) && ((rv & 1) == 0);
+        Label neg = new Label();
+        Label abs = new Label();
         Label notRollback = new Label();
         Label done = new Label();
-        mv.visitVarInsn(Opcodes.ALOAD, 0);
-        mv.visitFieldInsn(Opcodes.GETFIELD, className, VERSION_FIELD, "I");
-        mv.visitJumpInsn(Opcodes.IFEQ, notRollback);
 
         mv.visitVarInsn(Opcodes.ALOAD, 0);
         mv.visitFieldInsn(Opcodes.GETFIELD, className, VERSION_FIELD, "I");
-        mv.visitInsn(Opcodes.ICONST_2);
-        mv.visitInsn(Opcodes.IREM);
+        mv.visitInsn(Opcodes.DUP);
+        mv.visitJumpInsn(Opcodes.IFLT, neg);
+        mv.visitJumpInsn(Opcodes.GOTO, abs);
+        mv.visitLabel(neg);
+        mv.visitInsn(Opcodes.INEG);
+        mv.visitLabel(abs);
+        // stack: [rv]
+        mv.visitVarInsn(Opcodes.ISTORE, 1);
+
+        mv.visitVarInsn(Opcodes.ILOAD, 1);
+        mv.visitJumpInsn(Opcodes.IFEQ, notRollback);
+
+        mv.visitVarInsn(Opcodes.ILOAD, 1);
+        mv.visitInsn(Opcodes.ICONST_1);
+        mv.visitInsn(Opcodes.IAND);
         mv.visitJumpInsn(Opcodes.IFNE, notRollback);
 
         mv.visitInsn(Opcodes.ICONST_1);
         mv.visitJumpInsn(Opcodes.GOTO, done);
+
         mv.visitLabel(notRollback);
         mv.visitInsn(Opcodes.ICONST_0);
+
         mv.visitLabel(done);
         mv.visitInsn(Opcodes.IRETURN);
         mv.visitMaxs(0, 0);

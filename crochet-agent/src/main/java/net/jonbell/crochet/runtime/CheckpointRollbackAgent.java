@@ -138,6 +138,9 @@ public final class CheckpointRollbackAgent {
      * the sentinel version is what drives fastAccess regardless.
      */
     public static void swapToFastProxy(Object target, Class<?> userClass) {
+        if (isUnproxyable(userClass)) {
+            return;
+        }
         Class<?> fastProxy = fastProxyFor(userClass);
         changeClass(target, userClass, fastProxy);
     }
@@ -149,6 +152,9 @@ public final class CheckpointRollbackAgent {
      * instrumentation still links.
      */
     public static void swapToFastProxy(Object target, Class<?> userClass, int priorVersion) {
+        if (isUnproxyable(userClass)) {
+            return;
+        }
         try {
             Class<?> fastProxy = fastProxyFor(userClass);
             changeClass(target, userClass, fastProxy);
@@ -156,6 +162,25 @@ public final class CheckpointRollbackAgent {
             ((CRIJInstrumented) target).$$crochetSetVersion(priorVersion);
             throw new RollbackException(RollbackException.POISON_VERSION, e);
         }
+    }
+
+    /**
+     * True if {@code userClass} cannot host a hidden Fast proxy. Final classes
+     * (String, Integer, Long, ...) can't be subclassed; record classes are
+     * implicitly final; enums are ACC_ENUM which we skip at instrumentation
+     * time anyway.
+     *
+     * <p>For these classes $$crochetCheckpoint records the version bump but
+     * no klass swap happens. fastAccess will never fire because the klass
+     * never transitions to the proxy. User-visible effect: checkpoint and
+     * rollback are no-ops on instances of final classes.
+     *
+     * <p>This is semantically correct for immutable finals (String etc.) —
+     * there's nothing to roll back. For the rare mutable final class, the
+     * user has to opt in via explicit checkpoint() on the referent.
+     */
+    public static boolean isUnproxyable(Class<?> userClass) {
+        return userClass == null || Modifier.isFinal(userClass.getModifiers());
     }
 
     /**
@@ -188,24 +213,26 @@ public final class CheckpointRollbackAgent {
         // between sentinel install and finalize; treat realV = |v|.
         int realV = (v < 0) ? -v : v;
 
-        // Gap 6/8 resolution: we serialize ALL fastAccess entrants for this
-        // object via a lock derived from the object's user class, so there is
-        // no "winner publishes user-class but work still in flight" window.
-        // Work runs to completion while klass is still proxy; klass CAS happens
-        // at the END of the critical section. Non-winners that wait on the
-        // same lock observe klass == user on re-check and return cheaply.
+        // Gap 6/8 resolution: serialize all fastAccess entrants for a given
+        // object via a single per-class lock (the user {@link Class} object).
+        // This ensures:
+        //   * only one thread runs the snapshot/restore body at a time per
+        //     class, so "winner published klass=user but work still in flight"
+        //     cannot occur;
+        //   * all peers see a consistent happens-before via the SAME monitor
+        //     (we considered using the $$crochetSnap slot as the lock for
+        //     per-object granularity, but a thread that observes snap == null
+        //     while a peer still holds the old snap monitor would lock on a
+        //     different monitor and miss the happens-before).
+        //
+        // Using the user Class as the lock is coarse but correct. Contention
+        // is bounded by concurrent checkpoint/rollback cycles (rare) rather
+        // than application field-access frequency (high) — once klass is
+        // swapped back to user, subsequent accesses never enter this block.
         //
         // We intentionally do NOT synchronize on {@code obj} itself to avoid
-        // contending with user code that might lock on the object. Instead we
-        // use the object's $$crochetSnap slot when present (rollback path) or
-        // the user-class {@link Class} object as a class-wide lock (checkpoint
-        // path when no snap exists yet).
-        Object lock = obj.$$crochetGetSnap();
-        if (lock == null) {
-            // Checkpoint-before-first-access: no snap exists yet, sync on class.
-            lock = userClass;
-        }
-        synchronized (lock) {
+        // contending with user code that might lock on the object.
+        synchronized (userClass) {
             // Re-check under the lock: a peer that we were blocked behind may
             // already have finished the work and CAS'd klass to user.
             if (!CRIJFast.class.isAssignableFrom(obj.getClass())) {
