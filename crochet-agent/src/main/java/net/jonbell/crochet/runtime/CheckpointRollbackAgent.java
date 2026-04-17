@@ -553,6 +553,25 @@ public final class CheckpointRollbackAgent {
         if (RuntimeTracer.ENABLED) {
             RuntimeTracer.bumpSfHelper(userClass);
         }
+        // No-checkpoint fast path. Before any thread has ever called
+        // checkpoint* / rollback*, {@link #VERSION_COUNTER} stays at its
+        // initial 0 and there is nothing to snapshot. Gate the whole pre-hook
+        // on this read — once inlined, the fast path collapses to one
+        // volatile-int load + branch. Telemetry on tradebeans startup showed
+        // 3.2M wasted calls on a single class ({@code org.h2.value.ValueNull})
+        // before any checkpoint ever fires; this gate elides all of them.
+        //
+        // Safety: helper materialisation is also done on-demand by
+        // {@link #checkpointClassAtVersion} (via {@link #sfHelperFor}), so a
+        // pre-hook skipped under VERSION_COUNTER==0 cannot leave a checkpoint
+        // without its helper — the checkpoint path is self-sufficient.
+        //
+        // Once VERSION_COUNTER becomes non-zero (any checkpoint or rollback),
+        // we fall through to the DCL-style materialisation check below, which
+        // matches the pre-gate semantics.
+        if (VERSION_COUNTER.get() == 0) {
+            return;
+        }
         ClassMeta meta = ClassMeta.of(userClass);
         if (meta.sfHelper != null) {
             return;

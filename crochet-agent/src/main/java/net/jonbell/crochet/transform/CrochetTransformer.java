@@ -117,6 +117,30 @@ public class CrochetTransformer {
      * the verifier accepts the looser (Object-typed) frame entries.
      */
     private static final class SafeClassWriter extends ClassWriter {
+        /**
+         * Process-wide cache of {@code internalName → superInternalName} from
+         * the resource-stream walker. JFR on tradebeans showed
+         * {@code SafeClassWriter.superOf} + its transitive
+         * {@code getResourceAsStream} / {@link ClassReader} parsing in ~5% of
+         * startup samples. With caching, each unique class is probed at most
+         * once across the whole agent lifetime.
+         *
+         * <p>Kept cross-loader (keyed by type name only): a given internal
+         * name almost always maps to the same supername regardless of which
+         * loader we asked. In the rare case of same-named classes in
+         * different loaders, the only consequence is a slightly less precise
+         * common-super result — and the existing {@code "java/lang/Object"}
+         * fallback was already imprecise, so this is strictly no worse.
+         *
+         * <p>{@link #SUPER_NONE} sentinel distinguishes "looked up, truly
+         * unresolvable" (caches it) from "not yet looked up" (absent from
+         * map). {@link java.util.concurrent.ConcurrentHashMap} rejects null
+         * values, so we need a sentinel.
+         */
+        private static final java.util.concurrent.ConcurrentHashMap<String, String>
+                SUPER_CACHE = new java.util.concurrent.ConcurrentHashMap<>();
+        private static final String SUPER_NONE = "";
+
         private final ClassLoader loader;
 
         SafeClassWriter(ClassReader reader, int flags, ClassLoader loader) {
@@ -165,6 +189,16 @@ public class CrochetTransformer {
         }
 
         private String superOf(String type) {
+            String cached = SUPER_CACHE.get(type);
+            if (cached != null) {
+                return cached == SUPER_NONE ? null : cached;
+            }
+            String result = superOfUncached(type);
+            SUPER_CACHE.putIfAbsent(type, result != null ? result : SUPER_NONE);
+            return result;
+        }
+
+        private String superOfUncached(String type) {
             ClassLoader effective = loader != null ? loader
                     : SafeClassWriter.class.getClassLoader();
             // Walk the loader chain so user-jar classes and JDK classes both
