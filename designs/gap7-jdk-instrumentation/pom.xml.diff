@@ -1,0 +1,153 @@
+# Proposed pom.xml changes for crochet-instrument.
+# Apply in the implementation commit, NOT here.
+#
+# Two deltas:
+#   1. Drop the maven.compiler.* overrides — once module-info.java exists,
+#      javac resolves jdk.tools.jlink.plugin via `requires jdk.jlink` and the
+#      parent's release=17 is sufficient. The compilerArgs block ceases to
+#      be needed.
+#   2. Add maven-shade-plugin and moditect-maven-plugin executions that
+#      bundle ASM + JaCoCo under a relocated package and re-attach the
+#      module descriptor post-shade.
+#
+# Mirrors galette/galette-instrument/pom.xml, changed only for:
+#   - package prefix  edu.neu.ccs.prl.galette.instrument -> net.jonbell.crochet.instrument
+#   - artifactSet inclusion  edu.neu.ccs.prl.galette:* -> net.jonbell.crochet:*
+
+diff --git a/crochet-instrument/pom.xml b/crochet-instrument/pom.xml
+--- a/crochet-instrument/pom.xml
++++ b/crochet-instrument/pom.xml
+@@ -15,15 +15,6 @@
+
+     <description>Produces a Crochet-instrumented JDK. jlink plugins for Java 9+, bulk rewriter for Java 8.</description>
+
+-    <properties>
+-        <!-- This module references jdk.tools.jlink.plugin (JDK-internal); javac rejects
+-             add-exports to system modules in release mode, so we fall back to source/target
+-             to let the add-exports compiler arg below take effect. -->
+-
+-        <maven.compiler.release></maven.compiler.release>
+-        <maven.compiler.source>17</maven.compiler.source>
+-        <maven.compiler.target>17</maven.compiler.target>
+-    </properties>
+-
+     <dependencies>
+         <dependency>
+             <groupId>net.jonbell.crochet</groupId>
+@@ -57,16 +48,6 @@
+
+     <build>
+         <plugins>
+-            <plugin>
+-                <artifactId>maven-compiler-plugin</artifactId>
+-                <configuration>
+-                    <compilerArgs>
+-                        <arg>--add-modules</arg>
+-                        <arg>jdk.jlink</arg>
+-                        <arg>--add-exports</arg>
+-                        <arg>jdk.jlink/jdk.tools.jlink.plugin=ALL-UNNAMED</arg>
+-                    </compilerArgs>
+-                </configuration>
+-            </plugin>
+             <plugin>
+                 <artifactId>maven-jar-plugin</artifactId>
+                 <configuration>
+@@ -77,6 +58,72 @@
+                     </archive>
+                 </configuration>
+             </plugin>
++            <plugin>
++                <artifactId>maven-shade-plugin</artifactId>
++                <executions>
++                    <execution>
++                        <phase>package</phase>
++                        <goals>
++                            <goal>shade</goal>
++                        </goals>
++                        <configuration>
++                            <createDependencyReducedPom>false</createDependencyReducedPom>
++                            <relocations>
++                                <relocation>
++                                    <pattern>org.jacoco.core</pattern>
++                                    <shadedPattern>
++                                        net.jonbell.crochet.instrument.shaded.jacoco
++                                    </shadedPattern>
++                                </relocation>
++                                <relocation>
++                                    <pattern>org.objectweb.asm</pattern>
++                                    <shadedPattern>
++                                        net.jonbell.crochet.instrument.shaded.asm
++                                    </shadedPattern>
++                                </relocation>
++                            </relocations>
++                            <artifactSet>
++                                <includes>
++                                    <!-- Pull the agent's classes (transformer + runtime) into
++                                         this jar so CrochetInstrumentation.configure does not
++                                         need the agent jar on the classpath separately. Exclude
++                                         nothing: the agent jar is already small. -->
++                                    <include>net.jonbell.crochet:*</include>
++                                    <include>org.jacoco:*</include>
++                                    <include>org.ow2.asm:*</include>
++                                </includes>
++                            </artifactSet>
++                            <!-- Preserve CrochetInstrumented annotation class files. -->
++                            <filters>
++                                <filter>
++                                    <artifact>*:*</artifact>
++                                    <excludes>
++                                        <exclude>META-INF/MANIFEST.MF</exclude>
++                                        <exclude>META-INF/*.SF</exclude>
++                                        <exclude>META-INF/*.DSA</exclude>
++                                        <exclude>META-INF/*.RSA</exclude>
++                                    </excludes>
++                                </filter>
++                            </filters>
++                        </configuration>
++                    </execution>
++                </executions>
++            </plugin>
++            <plugin>
++                <groupId>org.moditect</groupId>
++                <artifactId>moditect-maven-plugin</artifactId>
++                <executions>
++                    <execution>
++                        <id>add-module-info</id>
++                        <phase>package</phase>
++                        <goals>
++                            <goal>add-module-info</goal>
++                        </goals>
++                        <configuration>
++                            <overwriteExistingFiles>true</overwriteExistingFiles>
++                            <module>
++                                <moduleInfoFile>
++                                    ${project.build.sourceDirectory}/module-info.java
++                                </moduleInfoFile>
++                            </module>
++                        </configuration>
++                    </execution>
++                </executions>
++            </plugin>
+         </plugins>
+     </build>
+ </project>
+
+# Notes for the parent pom (/home/jon/crochet/pom.xml) — NOT part of this diff
+# but called out here so the implementer remembers:
+#
+#   - Add a <pluginManagement> entry for moditect-maven-plugin pinning its
+#     version (galette uses 1.0.0.RC2; 1.2.2.Final is current and works on
+#     Java 17+). Without this the build resolves whatever is latest.
+#   - Consider declaring `org.jacoco:org.jacoco.core:0.8.12` in
+#     dependencyManagement so the version is not duplicated in
+#     crochet-instrument/pom.xml (it currently is at line 49).
+
+# Also, since moditect has to read source module-info.java, the tree needs:
+#
+#   crochet-instrument/
+#     src/main/java/
+#       module-info.java              <-- new file (see module-info.java in
+#                                          this design directory for content)
+#       net/jonbell/crochet/instrument/
+#         CrochetInstrumentation.java  (unchanged)
+#         ...
