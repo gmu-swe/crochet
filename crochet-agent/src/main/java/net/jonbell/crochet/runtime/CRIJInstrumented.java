@@ -23,6 +23,10 @@ public interface CRIJInstrumented {
 
     void $$crochetSetVersion(int version);
 
+    Object $$crochetGetSnap();
+
+    void $$crochetSetSnap(Object snap);
+
     void $$crochetAccess();
 
     boolean $$crochetIsRollbackState();

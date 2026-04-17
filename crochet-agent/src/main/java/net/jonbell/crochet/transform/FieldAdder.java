@@ -116,6 +116,8 @@ public final class FieldAdder extends ClassVisitor {
             emitRollback();
             emitGetVersion();
             emitSetVersion();
+            emitGetSnap();
+            emitSetSnap();
             emitPropagateCheckpoint();
             emitPropagateRollback();
             emitAccess();
@@ -161,65 +163,64 @@ public final class FieldAdder extends ClassVisitor {
     }
 
     private void emitCheckpoint() {
+        // V1 body: set version = v; swapToFastProxy(this, ThisClass.class)
+        // The actual snapshot happens lazily in the proxy's $$crochetAccess hook.
         MethodVisitor mv = super.visitMethod(
                 Opcodes.ACC_PUBLIC | Opcodes.ACC_SYNTHETIC,
                 "$$crochetCheckpoint", "(I)V", null, null);
         mv.visitCode();
-        // if (this.$$crochetSnap == null) { snap = allocateShadow(ThisClass.class); copyFieldsTo(snap); }
-        Label snapExists = new Label();
-        mv.visitVarInsn(Opcodes.ALOAD, 0);
-        mv.visitFieldInsn(Opcodes.GETFIELD, className, SNAP_FIELD, "Ljava/lang/Object;");
-        mv.visitJumpInsn(Opcodes.IFNONNULL, snapExists);
-
-        // snap = CheckpointRollbackAgent.allocateShadow(ThisClass.class)
-        mv.visitVarInsn(Opcodes.ALOAD, 0);
-        mv.visitLdcInsn(Type.getObjectType(className));
-        mv.visitMethodInsn(Opcodes.INVOKESTATIC, AGENT, "allocateShadow",
-                "(Ljava/lang/Class;)Ljava/lang/Object;", false);
-        mv.visitInsn(Opcodes.DUP_X1); // stack: snap, this, snap
-        mv.visitFieldInsn(Opcodes.PUTFIELD, className, SNAP_FIELD, "Ljava/lang/Object;");
-        // stack: snap ; invoke copyFieldsTo(snap)
-        mv.visitVarInsn(Opcodes.ALOAD, 0);
-        mv.visitInsn(Opcodes.SWAP);
-        mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, className, "$$crochetCopyFieldsTo",
-                "(Ljava/lang/Object;)V", false);
-
-        mv.visitLabel(snapExists);
-        // this.$$crochetVersion = v
         mv.visitVarInsn(Opcodes.ALOAD, 0);
         mv.visitVarInsn(Opcodes.ILOAD, 1);
         mv.visitFieldInsn(Opcodes.PUTFIELD, className, VERSION_FIELD, "I");
+        mv.visitVarInsn(Opcodes.ALOAD, 0);
+        mv.visitLdcInsn(Type.getObjectType(className));
+        mv.visitMethodInsn(Opcodes.INVOKESTATIC, AGENT, "swapToFastProxy",
+                "(Ljava/lang/Object;Ljava/lang/Class;)V", false);
         mv.visitInsn(Opcodes.RETURN);
         mv.visitMaxs(0, 0);
         mv.visitEnd();
     }
 
     private void emitRollback() {
+        // V1 body: symmetric to checkpoint — swap into the same Fast proxy;
+        // the proxy decides rollback vs checkpoint by version parity on the
+        // first access.
         MethodVisitor mv = super.visitMethod(
                 Opcodes.ACC_PUBLIC | Opcodes.ACC_SYNTHETIC,
                 "$$crochetRollback", "(I)V", null, null);
         mv.visitCode();
-        // if (snap != null) { copyFieldsFrom(snap); snap = null; }
-        Label snapNull = new Label();
-        mv.visitVarInsn(Opcodes.ALOAD, 0);
-        mv.visitFieldInsn(Opcodes.GETFIELD, className, SNAP_FIELD, "Ljava/lang/Object;");
-        mv.visitJumpInsn(Opcodes.IFNULL, snapNull);
-
-        mv.visitVarInsn(Opcodes.ALOAD, 0);
-        mv.visitVarInsn(Opcodes.ALOAD, 0);
-        mv.visitFieldInsn(Opcodes.GETFIELD, className, SNAP_FIELD, "Ljava/lang/Object;");
-        mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, className, "$$crochetCopyFieldsFrom",
-                "(Ljava/lang/Object;)V", false);
-
-        mv.visitVarInsn(Opcodes.ALOAD, 0);
-        mv.visitInsn(Opcodes.ACONST_NULL);
-        mv.visitFieldInsn(Opcodes.PUTFIELD, className, SNAP_FIELD, "Ljava/lang/Object;");
-
-        mv.visitLabel(snapNull);
-        // version = v
         mv.visitVarInsn(Opcodes.ALOAD, 0);
         mv.visitVarInsn(Opcodes.ILOAD, 1);
         mv.visitFieldInsn(Opcodes.PUTFIELD, className, VERSION_FIELD, "I");
+        mv.visitVarInsn(Opcodes.ALOAD, 0);
+        mv.visitLdcInsn(Type.getObjectType(className));
+        mv.visitMethodInsn(Opcodes.INVOKESTATIC, AGENT, "swapToFastProxy",
+                "(Ljava/lang/Object;Ljava/lang/Class;)V", false);
+        mv.visitInsn(Opcodes.RETURN);
+        mv.visitMaxs(0, 0);
+        mv.visitEnd();
+    }
+
+    private void emitGetSnap() {
+        MethodVisitor mv = super.visitMethod(
+                Opcodes.ACC_PUBLIC | Opcodes.ACC_SYNTHETIC,
+                "$$crochetGetSnap", "()Ljava/lang/Object;", null, null);
+        mv.visitCode();
+        mv.visitVarInsn(Opcodes.ALOAD, 0);
+        mv.visitFieldInsn(Opcodes.GETFIELD, className, SNAP_FIELD, "Ljava/lang/Object;");
+        mv.visitInsn(Opcodes.ARETURN);
+        mv.visitMaxs(0, 0);
+        mv.visitEnd();
+    }
+
+    private void emitSetSnap() {
+        MethodVisitor mv = super.visitMethod(
+                Opcodes.ACC_PUBLIC | Opcodes.ACC_SYNTHETIC,
+                "$$crochetSetSnap", "(Ljava/lang/Object;)V", null, null);
+        mv.visitCode();
+        mv.visitVarInsn(Opcodes.ALOAD, 0);
+        mv.visitVarInsn(Opcodes.ALOAD, 1);
+        mv.visitFieldInsn(Opcodes.PUTFIELD, className, SNAP_FIELD, "Ljava/lang/Object;");
         mv.visitInsn(Opcodes.RETURN);
         mv.visitMaxs(0, 0);
         mv.visitEnd();

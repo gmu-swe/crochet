@@ -27,6 +27,7 @@ public class CrochetTransformer {
         ClassWriter writer = new ClassWriter(reader, ClassWriter.COMPUTE_MAXS | ClassWriter.COMPUTE_FRAMES);
         ClassVisitor chain = writer;
         chain = new LookupInjector(Opcodes.ASM9, chain);
+        chain = new FieldAccessWrapper(Opcodes.ASM9, chain);
         chain = new FieldAdder(Opcodes.ASM9, chain);
         reader.accept(chain, 0);
         return writer.toByteArray();
