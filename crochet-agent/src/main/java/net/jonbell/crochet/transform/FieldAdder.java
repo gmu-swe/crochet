@@ -39,6 +39,13 @@ import org.objectweb.asm.Type;
  *       <li>{@code $$crochetIsRollbackState()} — returns {@code (version % 2) == 0 && version != 0}
  *     </ul>
  * </ul>
+ *
+ * <p>Bodies for the simple CRIJ surface methods (get/set version + snap,
+ * copy-fields, propagate, access, is-rollback-state) live in
+ * {@link InstrumentedSurfaceEmitter} and are shared with
+ * {@link StaticFieldHelperTemplate}. The version-guarded checkpoint/rollback
+ * entry ({@link #emitVersionGuardedEntry}) is user-class-specific and stays
+ * here.
  */
 public final class FieldAdder extends ClassVisitor {
 
@@ -176,7 +183,7 @@ public final class FieldAdder extends ClassVisitor {
     }
 
     private String className;
-    private final List<FieldRecord> instanceFields = new ArrayList<>();
+    private final List<InstrumentedSurfaceEmitter.FieldRef> instanceFields = new ArrayList<>();
     private boolean alreadyInstrumented;
     private boolean hasVersionField;
     private boolean hasSnapField;
@@ -229,7 +236,7 @@ public final class FieldAdder extends ClassVisitor {
             hasSnapField = true;
         } else if ((access & Opcodes.ACC_STATIC) == 0
                 && !name.startsWith("$$crochet")) {
-            instanceFields.add(new FieldRecord(name, descriptor));
+            instanceFields.add(new InstrumentedSurfaceEmitter.FieldRef(name, descriptor));
         }
         return super.visitField(access, name, descriptor, signature, value);
     }
@@ -266,56 +273,26 @@ public final class FieldAdder extends ClassVisitor {
                         Opcodes.ACC_PRIVATE | Opcodes.ACC_SYNTHETIC | Opcodes.ACC_TRANSIENT,
                         SNAP_FIELD, "Ljava/lang/Object;", null, null).visitEnd();
             }
-            emitCopyFieldsTo();
-            emitCopyFieldsFrom();
+            // Pass `this` (i.e. the outer ClassVisitor) so emit calls thread
+            // through the FieldAdder's own visitMethod -> ClassVisitor.cv
+            // delegation chain, identical to the previous super.visitMethod
+            // calls inlined into this file.
+            InstrumentedSurfaceEmitter.emitCopyFieldsTo(this, className, instanceFields);
+            InstrumentedSurfaceEmitter.emitCopyFieldsFrom(this, className, instanceFields);
             emitCheckpoint();
             emitRollback();
-            emitGetVersion();
-            emitSetVersion();
-            emitGetSnap();
-            emitSetSnap();
-            emitPropagateCheckpoint();
-            emitPropagateRollback();
-            emitAccess();
-            emitIsRollbackState();
+            InstrumentedSurfaceEmitter.emitGetVersion(this, className);
+            InstrumentedSurfaceEmitter.emitSetVersion(this, className);
+            InstrumentedSurfaceEmitter.emitGetSnap(this, className);
+            InstrumentedSurfaceEmitter.emitSetSnap(this, className);
+            InstrumentedSurfaceEmitter.emitPropagateRefFields(this, className,
+                    "$$crochetPropagateCheckpoint", "$$crochetCheckpoint", instanceFields);
+            InstrumentedSurfaceEmitter.emitPropagateRefFields(this, className,
+                    "$$crochetPropagateRollback", "$$crochetRollback", instanceFields);
+            InstrumentedSurfaceEmitter.emitAccessNoop(this);
+            InstrumentedSurfaceEmitter.emitIsRollbackStateSentinel(this, className);
         }
         super.visitEnd();
-    }
-
-    private void emitCopyFieldsTo() {
-        MethodVisitor mv = super.visitMethod(
-                Opcodes.ACC_PUBLIC | Opcodes.ACC_SYNTHETIC,
-                "$$crochetCopyFieldsTo", "(Ljava/lang/Object;)V", null, null);
-        mv.visitCode();
-        // ((ThisClass) arg).field_i = this.field_i    for each instance field
-        for (FieldRecord f : instanceFields) {
-            mv.visitVarInsn(Opcodes.ALOAD, 1);
-            mv.visitTypeInsn(Opcodes.CHECKCAST, className);
-            mv.visitVarInsn(Opcodes.ALOAD, 0);
-            mv.visitFieldInsn(Opcodes.GETFIELD, className, f.name, f.descriptor);
-            mv.visitFieldInsn(Opcodes.PUTFIELD, className, f.name, f.descriptor);
-        }
-        mv.visitInsn(Opcodes.RETURN);
-        mv.visitMaxs(0, 0);
-        mv.visitEnd();
-    }
-
-    private void emitCopyFieldsFrom() {
-        MethodVisitor mv = super.visitMethod(
-                Opcodes.ACC_PUBLIC | Opcodes.ACC_SYNTHETIC,
-                "$$crochetCopyFieldsFrom", "(Ljava/lang/Object;)V", null, null);
-        mv.visitCode();
-        // this.field_i = ((ThisClass) arg).field_i    for each instance field
-        for (FieldRecord f : instanceFields) {
-            mv.visitVarInsn(Opcodes.ALOAD, 0);
-            mv.visitVarInsn(Opcodes.ALOAD, 1);
-            mv.visitTypeInsn(Opcodes.CHECKCAST, className);
-            mv.visitFieldInsn(Opcodes.GETFIELD, className, f.name, f.descriptor);
-            mv.visitFieldInsn(Opcodes.PUTFIELD, className, f.name, f.descriptor);
-        }
-        mv.visitInsn(Opcodes.RETURN);
-        mv.visitMaxs(0, 0);
-        mv.visitEnd();
     }
 
     private void emitCheckpoint() {
@@ -336,161 +313,5 @@ public final class FieldAdder extends ClassVisitor {
         emitVersionGuardedEntry(mv);
         mv.visitMaxs(0, 0);
         mv.visitEnd();
-    }
-
-    private void emitGetSnap() {
-        MethodVisitor mv = super.visitMethod(
-                Opcodes.ACC_PUBLIC | Opcodes.ACC_SYNTHETIC,
-                "$$crochetGetSnap", "()Ljava/lang/Object;", null, null);
-        mv.visitCode();
-        mv.visitVarInsn(Opcodes.ALOAD, 0);
-        mv.visitFieldInsn(Opcodes.GETFIELD, className, SNAP_FIELD, "Ljava/lang/Object;");
-        mv.visitInsn(Opcodes.ARETURN);
-        mv.visitMaxs(0, 0);
-        mv.visitEnd();
-    }
-
-    private void emitSetSnap() {
-        MethodVisitor mv = super.visitMethod(
-                Opcodes.ACC_PUBLIC | Opcodes.ACC_SYNTHETIC,
-                "$$crochetSetSnap", "(Ljava/lang/Object;)V", null, null);
-        mv.visitCode();
-        mv.visitVarInsn(Opcodes.ALOAD, 0);
-        mv.visitVarInsn(Opcodes.ALOAD, 1);
-        mv.visitFieldInsn(Opcodes.PUTFIELD, className, SNAP_FIELD, "Ljava/lang/Object;");
-        mv.visitInsn(Opcodes.RETURN);
-        mv.visitMaxs(0, 0);
-        mv.visitEnd();
-    }
-
-    private void emitGetVersion() {
-        MethodVisitor mv = super.visitMethod(
-                Opcodes.ACC_PUBLIC | Opcodes.ACC_SYNTHETIC,
-                "$$crochetGetVersion", "()I", null, null);
-        mv.visitCode();
-        mv.visitVarInsn(Opcodes.ALOAD, 0);
-        mv.visitFieldInsn(Opcodes.GETFIELD, className, VERSION_FIELD, "I");
-        mv.visitInsn(Opcodes.IRETURN);
-        mv.visitMaxs(0, 0);
-        mv.visitEnd();
-    }
-
-    private void emitSetVersion() {
-        MethodVisitor mv = super.visitMethod(
-                Opcodes.ACC_PUBLIC | Opcodes.ACC_SYNTHETIC,
-                "$$crochetSetVersion", "(I)V", null, null);
-        mv.visitCode();
-        mv.visitVarInsn(Opcodes.ALOAD, 0);
-        mv.visitVarInsn(Opcodes.ILOAD, 1);
-        mv.visitFieldInsn(Opcodes.PUTFIELD, className, VERSION_FIELD, "I");
-        mv.visitInsn(Opcodes.RETURN);
-        mv.visitMaxs(0, 0);
-        mv.visitEnd();
-    }
-
-    private void emitPropagateCheckpoint() {
-        emitPropagate("$$crochetPropagateCheckpoint", "$$crochetCheckpoint");
-    }
-
-    private void emitPropagateRollback() {
-        emitPropagate("$$crochetPropagateRollback", "$$crochetRollback");
-    }
-
-    /**
-     * Emits the one-step lazy heap traversal for reference fields: for every
-     * non-static reference field of the declaring class, {@code if (f instanceof
-     * CRIJInstrumented) ((CRIJInstrumented) f).$$crochet{Checkpoint,Rollback}(version)}.
-     * The {@code instanceof} check handles {@code null} and non-instrumented
-     * referents uniformly. Cycle termination comes from the version guard on
-     * the target method, not from a traversed-set here.
-     */
-    private void emitPropagate(String methodName, String iMethodName) {
-        MethodVisitor mv = super.visitMethod(
-                Opcodes.ACC_PUBLIC | Opcodes.ACC_SYNTHETIC,
-                methodName, "(I)V", null, null);
-        mv.visitCode();
-        for (FieldRecord f : instanceFields) {
-            if (!f.descriptor.startsWith("L")) {
-                continue;
-            }
-            Label skip = new Label();
-            Label after = new Label();
-            mv.visitVarInsn(Opcodes.ALOAD, 0);
-            mv.visitFieldInsn(Opcodes.GETFIELD, className, f.name, f.descriptor);
-            mv.visitInsn(Opcodes.DUP);
-            mv.visitTypeInsn(Opcodes.INSTANCEOF, INSTRUMENTED);
-            mv.visitJumpInsn(Opcodes.IFEQ, skip);
-            mv.visitTypeInsn(Opcodes.CHECKCAST, INSTRUMENTED);
-            mv.visitVarInsn(Opcodes.ILOAD, 1);
-            mv.visitMethodInsn(Opcodes.INVOKEINTERFACE, INSTRUMENTED, iMethodName, "(I)V", true);
-            mv.visitJumpInsn(Opcodes.GOTO, after);
-            mv.visitLabel(skip);
-            mv.visitInsn(Opcodes.POP);
-            mv.visitLabel(after);
-        }
-        mv.visitInsn(Opcodes.RETURN);
-        mv.visitMaxs(0, 0);
-        mv.visitEnd();
-    }
-
-    private void emitAccess() {
-        MethodVisitor mv = super.visitMethod(
-                Opcodes.ACC_PUBLIC | Opcodes.ACC_SYNTHETIC,
-                "$$crochetAccess", "()V", null, null);
-        mv.visitCode();
-        mv.visitInsn(Opcodes.RETURN);
-        mv.visitMaxs(0, 0);
-        mv.visitEnd();
-    }
-
-    private void emitIsRollbackState() {
-        MethodVisitor mv = super.visitMethod(
-                Opcodes.ACC_PUBLIC | Opcodes.ACC_SYNTHETIC,
-                "$$crochetIsRollbackState", "()Z", null, null);
-        mv.visitCode();
-        // Decode the sentinel, then test rollback parity:
-        //   int v  = this.$$crochetVersion;
-        //   int rv = Math.abs(v);
-        //   return (rv != 0) && ((rv & 1) == 0);
-        // Math.abs intrinsifies to a branchless CMOV on HotSpot; same
-        // overflow caveat as emitVersionGuardedEntry applies (benign).
-        Label notRollback = new Label();
-        Label done = new Label();
-
-        mv.visitVarInsn(Opcodes.ALOAD, 0);
-        mv.visitFieldInsn(Opcodes.GETFIELD, className, VERSION_FIELD, "I");
-        mv.visitMethodInsn(Opcodes.INVOKESTATIC, "java/lang/Math", "abs",
-                "(I)I", false);
-        // stack: [rv]
-        mv.visitVarInsn(Opcodes.ISTORE, 1);
-
-        mv.visitVarInsn(Opcodes.ILOAD, 1);
-        mv.visitJumpInsn(Opcodes.IFEQ, notRollback);
-
-        mv.visitVarInsn(Opcodes.ILOAD, 1);
-        mv.visitInsn(Opcodes.ICONST_1);
-        mv.visitInsn(Opcodes.IAND);
-        mv.visitJumpInsn(Opcodes.IFNE, notRollback);
-
-        mv.visitInsn(Opcodes.ICONST_1);
-        mv.visitJumpInsn(Opcodes.GOTO, done);
-
-        mv.visitLabel(notRollback);
-        mv.visitInsn(Opcodes.ICONST_0);
-
-        mv.visitLabel(done);
-        mv.visitInsn(Opcodes.IRETURN);
-        mv.visitMaxs(0, 0);
-        mv.visitEnd();
-    }
-
-    private static final class FieldRecord {
-        final String name;
-        final String descriptor;
-
-        FieldRecord(String name, String descriptor) {
-            this.name = name;
-            this.descriptor = descriptor;
-        }
     }
 }

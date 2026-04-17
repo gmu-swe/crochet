@@ -1,5 +1,6 @@
 package net.jonbell.crochet.transform;
 
+import java.util.ArrayList;
 import java.util.List;
 
 import org.objectweb.asm.ClassWriter;
@@ -33,6 +34,12 @@ import org.objectweb.asm.Opcodes;
  *       checkpoint time so no per-access work is needed.
  *   <li>Propagate methods are no-ops.
  * </ul>
+ *
+ * <p>The CRIJ surface methods that are byte-for-byte identical with what
+ * {@link FieldAdder} emits on the user class — get/set version + snap,
+ * copy-fields, access no-op — are shared via {@link InstrumentedSurfaceEmitter}.
+ * The eager checkpoint/rollback and simple-parity is-rollback-state stay here
+ * because they differ from the user-class bodies.
  */
 public final class StaticFieldHelperTemplate {
 
@@ -71,19 +78,27 @@ public final class StaticFieldHelperTemplate {
         cw.visitField(Opcodes.ACC_PUBLIC | Opcodes.ACC_SYNTHETIC,
                 "$$crochetSnap", "Ljava/lang/Object;", null, null).visitEnd();
 
+        // Adapt our public FieldRecord list into the shared emitter's
+        // internal FieldRef list for the copy-fields loops (same name +
+        // descriptor; the twoSlot flag is irrelevant to those emitters).
+        List<InstrumentedSurfaceEmitter.FieldRef> mirrors = new ArrayList<>(statics.size());
+        for (FieldRecord f : statics) {
+            mirrors.add(new InstrumentedSurfaceEmitter.FieldRef(f.name, f.descriptor));
+        }
+
         emitCtor(cw);
-        emitCopyFieldsTo(cw, helperInternal, statics);
-        emitCopyFieldsFrom(cw, helperInternal, statics);
+        InstrumentedSurfaceEmitter.emitCopyFieldsTo(cw, helperInternal, mirrors);
+        InstrumentedSurfaceEmitter.emitCopyFieldsFrom(cw, helperInternal, mirrors);
         emitCheckpoint(cw, userInternal, helperInternal, statics);
         emitRollback(cw, userInternal, helperInternal, statics);
-        emitGetVersion(cw, helperInternal);
-        emitSetVersion(cw, helperInternal);
-        emitGetSnap(cw, helperInternal);
-        emitSetSnap(cw, helperInternal);
-        emitPropagateNoop(cw, "$$crochetPropagateCheckpoint");
-        emitPropagateNoop(cw, "$$crochetPropagateRollback");
-        emitAccess(cw);
-        emitIsRollbackState(cw, helperInternal);
+        InstrumentedSurfaceEmitter.emitGetVersion(cw, helperInternal);
+        InstrumentedSurfaceEmitter.emitSetVersion(cw, helperInternal);
+        InstrumentedSurfaceEmitter.emitGetSnap(cw, helperInternal);
+        InstrumentedSurfaceEmitter.emitSetSnap(cw, helperInternal);
+        InstrumentedSurfaceEmitter.emitPropagateNoop(cw, "$$crochetPropagateCheckpoint");
+        InstrumentedSurfaceEmitter.emitPropagateNoop(cw, "$$crochetPropagateRollback");
+        InstrumentedSurfaceEmitter.emitAccessNoop(cw);
+        InstrumentedSurfaceEmitter.emitIsRollbackStateSimple(cw, helperInternal);
         cw.visitEnd();
         return cw.toByteArray();
     }
@@ -93,42 +108,6 @@ public final class StaticFieldHelperTemplate {
         mv.visitCode();
         mv.visitVarInsn(Opcodes.ALOAD, 0);
         mv.visitMethodInsn(Opcodes.INVOKESPECIAL, "java/lang/Object", "<init>", "()V", false);
-        mv.visitInsn(Opcodes.RETURN);
-        mv.visitMaxs(0, 0);
-        mv.visitEnd();
-    }
-
-    private static void emitCopyFieldsTo(ClassWriter cw, String helperInternal,
-                                         List<FieldRecord> statics) {
-        MethodVisitor mv = cw.visitMethod(
-                Opcodes.ACC_PUBLIC | Opcodes.ACC_SYNTHETIC,
-                "$$crochetCopyFieldsTo", "(Ljava/lang/Object;)V", null, null);
-        mv.visitCode();
-        for (FieldRecord f : statics) {
-            mv.visitVarInsn(Opcodes.ALOAD, 1);
-            mv.visitTypeInsn(Opcodes.CHECKCAST, helperInternal);
-            mv.visitVarInsn(Opcodes.ALOAD, 0);
-            mv.visitFieldInsn(Opcodes.GETFIELD, helperInternal, f.name, f.descriptor);
-            mv.visitFieldInsn(Opcodes.PUTFIELD, helperInternal, f.name, f.descriptor);
-        }
-        mv.visitInsn(Opcodes.RETURN);
-        mv.visitMaxs(0, 0);
-        mv.visitEnd();
-    }
-
-    private static void emitCopyFieldsFrom(ClassWriter cw, String helperInternal,
-                                           List<FieldRecord> statics) {
-        MethodVisitor mv = cw.visitMethod(
-                Opcodes.ACC_PUBLIC | Opcodes.ACC_SYNTHETIC,
-                "$$crochetCopyFieldsFrom", "(Ljava/lang/Object;)V", null, null);
-        mv.visitCode();
-        for (FieldRecord f : statics) {
-            mv.visitVarInsn(Opcodes.ALOAD, 0);
-            mv.visitVarInsn(Opcodes.ALOAD, 1);
-            mv.visitTypeInsn(Opcodes.CHECKCAST, helperInternal);
-            mv.visitFieldInsn(Opcodes.GETFIELD, helperInternal, f.name, f.descriptor);
-            mv.visitFieldInsn(Opcodes.PUTFIELD, helperInternal, f.name, f.descriptor);
-        }
         mv.visitInsn(Opcodes.RETURN);
         mv.visitMaxs(0, 0);
         mv.visitEnd();
@@ -182,102 +161,5 @@ public final class StaticFieldHelperTemplate {
         mv.visitVarInsn(Opcodes.ALOAD, 0);
         mv.visitVarInsn(Opcodes.ILOAD, 1);
         mv.visitFieldInsn(Opcodes.PUTFIELD, helperInternal, "$$crochetVersion", "I");
-    }
-
-    private static void emitGetVersion(ClassWriter cw, String helperInternal) {
-        MethodVisitor mv = cw.visitMethod(
-                Opcodes.ACC_PUBLIC | Opcodes.ACC_SYNTHETIC,
-                "$$crochetGetVersion", "()I", null, null);
-        mv.visitCode();
-        mv.visitVarInsn(Opcodes.ALOAD, 0);
-        mv.visitFieldInsn(Opcodes.GETFIELD, helperInternal, "$$crochetVersion", "I");
-        mv.visitInsn(Opcodes.IRETURN);
-        mv.visitMaxs(0, 0);
-        mv.visitEnd();
-    }
-
-    private static void emitSetVersion(ClassWriter cw, String helperInternal) {
-        MethodVisitor mv = cw.visitMethod(
-                Opcodes.ACC_PUBLIC | Opcodes.ACC_SYNTHETIC,
-                "$$crochetSetVersion", "(I)V", null, null);
-        mv.visitCode();
-        mv.visitVarInsn(Opcodes.ALOAD, 0);
-        mv.visitVarInsn(Opcodes.ILOAD, 1);
-        mv.visitFieldInsn(Opcodes.PUTFIELD, helperInternal, "$$crochetVersion", "I");
-        mv.visitInsn(Opcodes.RETURN);
-        mv.visitMaxs(0, 0);
-        mv.visitEnd();
-    }
-
-    private static void emitGetSnap(ClassWriter cw, String helperInternal) {
-        MethodVisitor mv = cw.visitMethod(
-                Opcodes.ACC_PUBLIC | Opcodes.ACC_SYNTHETIC,
-                "$$crochetGetSnap", "()Ljava/lang/Object;", null, null);
-        mv.visitCode();
-        mv.visitVarInsn(Opcodes.ALOAD, 0);
-        mv.visitFieldInsn(Opcodes.GETFIELD, helperInternal, "$$crochetSnap", "Ljava/lang/Object;");
-        mv.visitInsn(Opcodes.ARETURN);
-        mv.visitMaxs(0, 0);
-        mv.visitEnd();
-    }
-
-    private static void emitSetSnap(ClassWriter cw, String helperInternal) {
-        MethodVisitor mv = cw.visitMethod(
-                Opcodes.ACC_PUBLIC | Opcodes.ACC_SYNTHETIC,
-                "$$crochetSetSnap", "(Ljava/lang/Object;)V", null, null);
-        mv.visitCode();
-        mv.visitVarInsn(Opcodes.ALOAD, 0);
-        mv.visitVarInsn(Opcodes.ALOAD, 1);
-        mv.visitFieldInsn(Opcodes.PUTFIELD, helperInternal, "$$crochetSnap", "Ljava/lang/Object;");
-        mv.visitInsn(Opcodes.RETURN);
-        mv.visitMaxs(0, 0);
-        mv.visitEnd();
-    }
-
-    private static void emitPropagateNoop(ClassWriter cw, String methodName) {
-        MethodVisitor mv = cw.visitMethod(
-                Opcodes.ACC_PUBLIC | Opcodes.ACC_SYNTHETIC,
-                methodName, "(I)V", null, null);
-        mv.visitCode();
-        mv.visitInsn(Opcodes.RETURN);
-        mv.visitMaxs(0, 0);
-        mv.visitEnd();
-    }
-
-    private static void emitAccess(ClassWriter cw) {
-        MethodVisitor mv = cw.visitMethod(
-                Opcodes.ACC_PUBLIC | Opcodes.ACC_SYNTHETIC,
-                "$$crochetAccess", "()V", null, null);
-        mv.visitCode();
-        mv.visitInsn(Opcodes.RETURN);
-        mv.visitMaxs(0, 0);
-        mv.visitEnd();
-    }
-
-    private static void emitIsRollbackState(ClassWriter cw, String helperInternal) {
-        MethodVisitor mv = cw.visitMethod(
-                Opcodes.ACC_PUBLIC | Opcodes.ACC_SYNTHETIC,
-                "$$crochetIsRollbackState", "()Z", null, null);
-        mv.visitCode();
-        Label notRollback = new Label();
-        Label done = new Label();
-        mv.visitVarInsn(Opcodes.ALOAD, 0);
-        mv.visitFieldInsn(Opcodes.GETFIELD, helperInternal, "$$crochetVersion", "I");
-        mv.visitJumpInsn(Opcodes.IFEQ, notRollback);
-
-        mv.visitVarInsn(Opcodes.ALOAD, 0);
-        mv.visitFieldInsn(Opcodes.GETFIELD, helperInternal, "$$crochetVersion", "I");
-        mv.visitInsn(Opcodes.ICONST_2);
-        mv.visitInsn(Opcodes.IREM);
-        mv.visitJumpInsn(Opcodes.IFNE, notRollback);
-
-        mv.visitInsn(Opcodes.ICONST_1);
-        mv.visitJumpInsn(Opcodes.GOTO, done);
-        mv.visitLabel(notRollback);
-        mv.visitInsn(Opcodes.ICONST_0);
-        mv.visitLabel(done);
-        mv.visitInsn(Opcodes.IRETURN);
-        mv.visitMaxs(0, 0);
-        mv.visitEnd();
     }
 }
