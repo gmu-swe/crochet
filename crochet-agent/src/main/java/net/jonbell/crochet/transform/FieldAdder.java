@@ -235,12 +235,33 @@ public final class FieldAdder extends ClassVisitor {
     @Override
     public void visitEnd() {
         if (!alreadyInstrumented) {
+            // ACC_TRANSIENT is important for two reasons:
+            //  (1) hides our fields from Java serialization — we never want
+            //      instrumentation bookkeeping to leak into serialized forms
+            //      of user objects;
+            //  (2) h2o's water.api.Schema.fillFromParms walks every declared
+            //      field of every Schema subclass up to water.Iced and
+            //      requires each one to carry an @API annotation unless
+            //      Modifier.isTransient(field.getModifiers()) is true.
+            //      Marking our fields transient makes that reflection pass
+            //      skip them (the check is at h2o Schema.java #692, caught
+            //      as "Missing annotation for API field: $$crochetSnap").
+            // ACC_PRIVATE, not ACC_PUBLIC: JBoss Weld rejects CDI-managed
+            // beans with public non-annotated fields
+            // ({@code WELD-000075: Normal scoped managed bean implementation
+            // class has a public field}), and Weld extensions get a
+            // validation warning ({@code WELD-001552}). All read/write sites
+            // live inside the emitted $$crochet* methods on the same class,
+            // so private visibility is sufficient. Unsafe-based offset
+            // access from the agent bypasses access control.
             if (!hasVersionField) {
-                super.visitField(Opcodes.ACC_PUBLIC | Opcodes.ACC_SYNTHETIC,
+                super.visitField(
+                        Opcodes.ACC_PRIVATE | Opcodes.ACC_SYNTHETIC | Opcodes.ACC_TRANSIENT,
                         VERSION_FIELD, "I", null, null).visitEnd();
             }
             if (!hasSnapField) {
-                super.visitField(Opcodes.ACC_PUBLIC | Opcodes.ACC_SYNTHETIC,
+                super.visitField(
+                        Opcodes.ACC_PRIVATE | Opcodes.ACC_SYNTHETIC | Opcodes.ACC_TRANSIENT,
                         SNAP_FIELD, "Ljava/lang/Object;", null, null).visitEnd();
             }
             emitCopyFieldsTo();

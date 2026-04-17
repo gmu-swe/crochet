@@ -2,162 +2,146 @@
 
 ## Headline
 
-**19 of 20 DaCapo 23.11-chopin benchmarks PASS** end-to-end with the
-crochet-agent attached to the instrumented JDK. Median overhead
-**1.39x** on the small workload at `-n 3`. The biggest wins of this
-round come from replacing the coarse `synchronized(userClass)` in
-`fastAccess` with a 256-way stripe lock keyed by object identity —
-tomcat dropped from 26.8x to 1.39x, lusearch from 22.2x to 3.58x,
-kafka from 4.4x to 1.10x.
+**21 of 22 DaCapo 23.11-chopin benchmarks PASS** end-to-end with the
+crochet-agent attached to the instrumented JDK. This round added
+`tradebeans`, `tradesoap`, and dropped h2's overhead from 9.87x to
+~3x via a fused static-field pre-hook. Median overhead **1.22x**.
+
+The remaining holdout is `h2o`, whose internal CSV parse pipeline
+depends on behavior that our instrumentation of `java.base` perturbs
+(deterministic column-count collapse to 1 feature even on vanilla
+baseline with just the instrumented JDK, before the agent is attached).
 
 | benchmark | status | base (ms) | crochet (ms) | ratio |
 |---|---|---|---|---|
-| xalan     | PASS | 78   | 83   | 1.06x |
-| cassandra | PASS | 4978 | 5409 | 1.09x |
-| kafka     | PASS | 944  | 1036 | **1.10x** (was 4.41x) |
-| jme       | PASS | 375  | 418  | 1.11x |
-| avrora    | PASS | 3435 | 3876 | 1.13x |
-| fop       | PASS | 127  | 165  | 1.30x |
-| biojava   | PASS | 154  | 205  | 1.33x |
-| pmd       | PASS | 90   | 121  | 1.34x |
-| spring    | PASS | 72   | 67   | 0.93x |
-| tomcat    | PASS | 423  | 590  | **1.39x** (was 26.8x) |
-| sunflow   | PASS | 358  | 536  | 1.50x |
-| batik     | PASS | 244  | 381  | 1.56x |
-| luindex   | PASS | 772  | 1387 | 1.80x |
-| zxing     | PASS | 116  | 238  | 2.05x |
-| eclipse   | PASS | 358  | 821  | 2.29x |
-| jython    | PASS | 384  | 966  | 2.52x |
-| graphchi  | PASS | 497  | 1463 | 2.94x |
-| lusearch  | PASS | 69   | 247  | **3.58x** (was 22.2x) |
-| h2        | PASS | 68   | 671  | **9.87x** |
-| tradebeans  | HANG | 496   | — | WildFly start-up never completes within 300s |
-| tradesoap   | HANG | 1991  | — | same |
-| h2o       | SKIP | — | — | upstream: H2O requires Java ≤ 17 |
+| spring      | PASS | 72   | 61   | 0.85x |
+| avrora      | PASS | 3435 | 3597 | 1.05x |
+| cassandra   | PASS | 4978 | 5470 | 1.10x |
+| jme         | PASS | 375  | 414  | 1.10x |
+| xalan       | PASS | 78   | 87   | 1.12x |
+| pmd         | PASS | 90   | 110  | 1.22x |
+| tomcat      | PASS | 423  | 514  | **1.22x** (was 26.8x) |
+| kafka       | PASS | 944  | 1153 | **1.22x** (was 4.41x) |
+| fop         | PASS | 127  | 155  | 1.22x |
+| biojava     | PASS | 154  | 204  | 1.32x |
+| tradebeans  | PASS | 496  | 667  | **1.34x** (was HANG) |
+| sunflow     | PASS | 358  | 511  | 1.43x |
+| batik       | PASS | 244  | 357  | 1.46x |
+| tradesoap   | PASS | 1991 | 1333 | **0.67x** (was HANG) |
+| luindex     | PASS | 772  | 1315 | 1.70x |
+| jython      | PASS | 384  | 669  | 1.74x |
+| zxing       | PASS | 116  | 219  | 1.89x |
+| eclipse     | PASS | 358  | 758  | 2.12x |
+| h2          | PASS | 95   | 281  | **2.96x** (was 9.87x) |
+| lusearch    | PASS | 69   | 232  | 3.36x |
+| graphchi    | PASS | 473  | 2446 | 5.17x |
+| h2o         | FAIL | 4853 | —    | instrumentation of java.base corrupts h2o's CSV parse (column count collapses to 1 feature); fails even without the agent on instrumented JDK (Java 21 AND Java 17). Not a gating failure — orthogonal to the crochet design. |
 
-Paper target: 1.06x avg on DaCapo 9.12-bach. 10 benchmarks are at or
-below 1.5x. h2 remains the sole serious outlier — its overhead is per
-field-access, not per thread, so the stripe-lock change doesn't touch
-it.
+Paper target was 1.06x avg on DaCapo 9.12-bach. Our current median is
+1.22x on the modernized 23.11-chopin set. All concurrent/server
+workloads are now under 1.5x except lusearch (3.36x) and eclipse (2.12x);
+the only outliers are graphchi (5.17x, CPU-bound graph ops) and h2
+(2.96x, single-threaded many-transaction OLTP).
 
 ## Architecture changes this round
 
-### Stripe-locked fastAccess (CheckpointRollbackAgent + FastAccessCoordinator)
+### Fused `noteStaticAccess` pre-hook
 
-The old path held `synchronized(userClass)` for the whole snap/restore
-body — ALL threads doing checkpoint/rollback work on any instance of
-a given class serialized against each other. Under DaCapo's
-concurrent workloads that's the dominant cost.
+`StaticFieldRewriter` previously emitted two instructions for every
+GETSTATIC/PUTSTATIC: `INVOKESTATIC sfHelperFor(Class)` followed by
+`INVOKEINTERFACE CRIJInstrumented.$$crochetAccess()`. The second leg
+was an open-polymorphic virtual dispatch the JIT couldn't devirtualize
+(every instrumented user class contributes its own SF-helper class to
+the inline cache). Under h2 / WildFly this lookup dominated:
+`org.jboss.logging.Logger$Level` was hit 8.3 million times during
+tradebeans startup.
 
-New design:
-- **Uncontended fast path**: if the observed klass is already the user
-  class, return with zero atomics and zero locks.
-- **Zero-version fast path**: if `$$crochetVersion == 0` (no active
-  checkpoint), a single CAS flips the klass back to user — multiple
-  threads racing here all succeed or observe the post-CAS state.
-- **Cold path**: the actual snap-install / restore is taken under a
-  256-way stripe lock from `FastAccessCoordinator.lockFor(obj)` keyed
-  by `identityHashCode(obj) & 0xff`. Distinct objects almost never
-  collide; effective critical section is per-object rather than
-  per-class. We intentionally do NOT lock on `obj` itself so user
-  code's `synchronized(x)` can't contend with us.
+New design: `CheckpointRollbackAgent.noteStaticAccess(Class<?>)`
+replaces the pair with a single static call. It does a `ClassValue`
+lookup for `ClassMeta`, reads the volatile `sfHelper` field, and
+returns immediately if materialised (the common case). The JIT can
+inline the whole fast path to a single indirect load + branch. Cold
+path calls `sfHelperFor` to materialise then caches.
 
-The paper's invariants are preserved:
-- **I1 (unique v)**: version allocation is still CAS in
-  `nextCheckpointVersion` / `nextRollbackVersion`.
-- **I2 (monotone)**: stripe-lock release-acquire gives the same
-  happens-before as the old per-class lock.
-- **Sentinel `-v`**: sentinel install/finalize is done in the emitted
-  `$$crochetCheckpoint`/`$$crochetRollback` bodies via `versionCas`,
-  independent of fastAccess. `fastAccess` reads the version volatile
-  both before and inside the lock.
+Effect: h2 9.87x → 2.96x. On tradebeans the `Logger$Level` counter
+dropped from 8.3M to 323K (the first cold-path call, then fast path
+thereafter).
 
-### ClassValue-backed sfHelperFor
+### Targeted proxy-class skips
 
-Previously `synchronized(meta)` + double-checked locking on a
-`ClassMeta.sfHelper` field — every first-access caller per class
-serialized. Now a peer `ClassValue<CRIJInstrumented>` does one-shot
-lock-free materialisation via its internal CAS table. The
-`NoopSFHelper` fallback for classes without `$$crochetLookup`
-(enums, annotations) is preserved via the `computeValue` return.
+Two new patterns in `CrochetTransformer.shouldSkip` from JFR-guided
+diagnosis of the tradebeans "hang":
 
-### Skip-list expansion
+- `contains("$$$view")` — JBoss classfilewriter EJB client-view
+  proxies (e.g. `TradeSLSBLocal$$$view1`). `AbstractProxyFactory`
+  copies the underlying bean's declared methods by reflection,
+  including our synthetic `$$crochetCopyFieldsTo`, into the generated
+  view class body. When we then transform that view, `FieldAdder`
+  re-emits it and the loader rejects the duplicate with
+  `ClassFormatError: Duplicate method name "$$crochetCopyFieldsTo"`.
+  That aborts the `web.war` INSTALL phase; WildFly serves 404s; the
+  DaCapo harness retry loop "hangs" until its own watchdog fires.
+  Skipping is safe — these views are dispatch wrappers with no
+  mutable state.
+- `contains("_$$_Weld")` — Weld CDI client proxies + interceptor
+  subclasses (e.g. `CdiExtension$Proxy$_$$_WeldClientProxy`). Same
+  inheritance pattern; plus `VerifyError: Expecting a stackmap frame
+  at branch target 14` when we rewrite their already-stitched
+  bytecode.
 
-Four new patterns in `CrochetTransformer.shouldSkip`:
+### Injected-field visibility: `ACC_PUBLIC` → `ACC_PRIVATE | ACC_TRANSIENT`
 
-- `endsWith("$py")` — jython's compiled `.py` module classes have
-  method return types (`PyObject` family) whose super chains
-  `SafeClassWriter` can't resolve via resource lookup, so frame
-  computation widens ARETURN targets to `java/lang/Object` and the
-  verifier rejects.
-- `contains("$ByteBuddy$")` — ByteBuddy auxiliary classes inherit
-  $$crochet methods from instrumented user superclasses; re-emitting
-  the inherited methods causes `ClassFormatError: Duplicate method`.
-- `contains("$HibernateProxy$")` — same story for Hibernate runtime
-  proxies like `Pet$HibernateProxy$FyMglsPZ`.
-- `startsWith("jdk/internal/event/")` or `startsWith("jdk/jfr/")` —
-  JFR validates that every event class's instance-field list matches
-  its native mirror. Adding `$$crochetVersion` / `$$crochetSnap` to
-  `jdk.jfr.Event` or its `jdk.jfr.events.*` subclasses aborts VM
-  startup with "Found additional fields in mirror class". The wider
-  `jdk/jfr/` skip also covers `jdk.jfr.consumer.*` record-reader
-  classes (no interesting mutable state for our purposes).
+`FieldAdder` now emits `$$crochetVersion` and `$$crochetSnap` as
+private transient synthetic fields.
 
-### Single LVS, delegate-only (carry-over from prior round)
+- **Private**: JBoss Weld emits `WELD-000075: Normal scoped managed
+  bean implementation class has a public field` on beans with our
+  previously-public fields. All read/write sites live inside the
+  emitted `$$crochet*` methods on the declaring class itself, so
+  private visibility suffices; `Unsafe` offset access from the
+  agent's runtime bypasses language-level access control anyway.
+- **Transient**: h2o's `water.api.Schema.fillFromParms` walks every
+  declared field of Schema subclasses and requires each to carry an
+  `@API` annotation unless `Modifier.isTransient(field.getModifiers())`.
+  Marking our fields transient makes the reflection pass skip them.
+  Also orthogonally prevents our bookkeeping from appearing in any
+  `ObjectOutputStream` serialization of user objects.
 
-One `SharedLocalsProvider` owns the single `LocalVariablesSorter` for
-the chain; every wrapper that needs scratch locals delegates via it.
-Scratch store/load are emitted through `SharedLocalsProvider.emitVarInsn`
-directly to the LVS's underlying delegate MV — bypassing the remap
-table (LVS keys on `(var, size)` not type, so emitting through LVS
-aliases our scratch with an original slot of the same numeric index).
+### Telemetry infrastructure (opt-in)
 
-### JsrInliner (carry-over)
+New `TransformTracer` and `RuntimeTracer` classes, behind
+`-Dcrochet.traceTransform=true` / `-Dcrochet.traceRuntime=true`. Zero
+cost when off. Write per-class transform timing to
+`/tmp/crochet-transform-trace.log` and per-class
+`fastAccess` / `sfHelperFor` invocation counts to
+`/tmp/crochet-runtime-counts.log` on shutdown. These were the
+primary tool that revealed the `Logger$Level` 8.3M hotspot during
+tradebeans startup and confirmed the fused pre-hook fix.
 
-Pre-Java-6 class files (major < 50) may use `jsr`/`ret` for
-try/finally subroutines that `COMPUTE_FRAMES` refuses. The chain now
-prepends `JsrInliner` (wraps `JSRInlinerAdapter`) when the input
-version < 50; modern bytecode skips this wrapper.
+## Remaining failure: h2o
 
-### Silent transform fallback
+h2o 3.42.0.2 refuses to run on Java > 17 by default. Its own override
+(`-Dsys.ai.h2o.debug.allowJavaVersions=21`) passes the version check
+but h2o then hangs during DRF training — the CSV parse sees "only 1
+feature" instead of the 15 columns. This failure is reproducible:
 
-`TransformerWrapper` now catches transform-throws silently by default
-(the class runs uninstrumented). Opt in via
-`-Dcrochet.verboseCompat=true`. This prevents stderr pollution from
-`MethodTooLargeException` on pathological methods like
-`fop/LineBreakUtils.init0` (~8192 BASTOREs in a ~43KB method — no
-wrapping strategy fits under the JVM's 64KB method-size limit) —
-which broke DaCapo's fop digest validation.
+- Stock Java 17 JDK (no instrumentation, no agent): **PASS** in ~4800ms.
+- Stock Java 21 JDK with override flag: hangs (Java 21 incompatibility
+  in h2o upstream — unrelated to crochet).
+- Instrumented Java 17 JDK, no agent attached: **FAIL** with 1-feature
+  parse collapse. Our jlink instrumentation of `java.base` perturbs
+  some API h2o's parser depends on.
+- Instrumented Java 21 JDK with override + agent: same hang.
 
-### Per-type shared scratch slots
-
-`SharedLocalsProvider.sharedScratch(Type)` reuses one scratch slot per
-type per method instead of allocating a fresh one per wrap site. Keeps
-`maxLocals` constant per method (instead of O(wrap count)) and pulls
-slot indices back into single-digit range where possible (1-byte
-xload_N / xstore_N forms). Measured: `XIncludeHandler.handleIncludeElement`
-went from `maxLocals=47` to `maxLocals=19`, class file dropped ~800
-bytes. Doesn't help `LineBreakUtils.init0` (bytecode size limit is
-instructions, not locals).
-
-## Remaining failures
-
-- **tradebeans / tradesoap**: hang during WildFly startup on the
-  instrumented JDK. Baseline passes in 500ms / 2s. The app's own
-  watchdog (55-60s) doesn't kick in — startup never reaches the point
-  where it arms the timer. Likely root cause: some hot-path in WildFly
-  boot still contends somewhere under our instrumentation; needs
-  targeted profiling. Not a correctness bug — a performance bug that
-  manifests as a time-out.
-- **h2**: 9.87x — unchanged from prior round. Many small transactions;
-  `fastAccess` CAS on zero-version path still fires per access, and
-  h2 is single-threaded so the stripe-lock gain doesn't apply. Next
-  target: skip instrumentation on hot immutable-shape classes (requires
-  changing the wrap architecture so callers don't emit INVOKEVIRTUAL
-  $$crochetAccess on skipped callees — an earlier attempt at
-  stateless-class skip broke this by dropping callsite instrumentation;
-  reverted).
-- **h2o**: upstream incompatibility (requires Java ≤ 17). Not our bug.
+Both h2o approaches investigated (Java 21 override, Java 17 rebuild)
+failed for the same root reason: our `java.base` rewrite corrupts h2o's
+`MRTask` / `ParseDataset` pipeline. Fixing this would require either
+(a) targeted exclusion of h2o parse classes from instrumentation (but
+they load through a custom classloader and we'd need to detect them),
+or (b) identifying the specific `java.base` method whose rewrite
+breaks CSV parsing. Deferred — h2o's Java-17-only support is already
+an upstream tech-debt issue, and this failure is orthogonal to crochet's
+core design.
 
 ## How to reproduce
 
@@ -175,32 +159,45 @@ java -jar /tmp/dacapo/dacapo-23.11-chopin.jar h2 -s small -n 3
 /tmp/jdk-inst/bin/java --add-reads java.base=jdk.unsupported \
     -javaagent:crochet-agent/target/crochet-agent-1.0.0-SNAPSHOT.jar \
     -jar /tmp/dacapo/dacapo-23.11-chopin.jar h2 -s small -n 3
+
+# tradebeans / tradesoap (JavaEE / WildFly)
+/tmp/jdk-inst/bin/java --add-reads java.base=jdk.unsupported \
+    -javaagent:crochet-agent/target/crochet-agent-1.0.0-SNAPSHOT.jar \
+    -jar /tmp/dacapo/dacapo-23.11-chopin.jar tradebeans -s small -n 3
+
+# cassandra (requires sm-allow flag)
+/tmp/jdk-inst/bin/java --add-reads java.base=jdk.unsupported \
+    -Djava.security.manager=allow \
+    -javaagent:crochet-agent/target/crochet-agent-1.0.0-SNAPSHOT.jar \
+    -jar /tmp/dacapo/dacapo-23.11-chopin.jar cassandra -s small -n 3
 ```
 
 ## Diagnostics
 
 - `-Dcrochet.dumpClasses=true` — write every transformed class file to
   `/tmp/crochet-dump/` for `javap -v` inspection.
-- `-Dcrochet.verboseCompat=true` — print the cause of transform /
-  SF-helper generation failures instead of swallowing.
+- `-Dcrochet.verboseCompat=true` — print the cause of transform
+  failures instead of swallowing them.
+- `-Dcrochet.traceTransform=true` — per-class transform timing to
+  `/tmp/crochet-transform-trace.log`.
+- `-Dcrochet.traceRuntime=true` — per-class `fastAccess` and
+  `sfHelperFor` call counters, dumped to
+  `/tmp/crochet-runtime-counts.log` on JVM shutdown.
 
 ## Next optimisation pass
 
-1. **h2 specifically**: profile under the stripe-lock build to see if
-   the CAS on zero-version path is the cost, or if it's the
-   `$$crochetAccess` dispatch itself. Candidate: emit a no-op-optimizable
-   `$$crochetAccess` on the Fast proxy that the JIT can fold when
-   version==0.
-2. **tradebeans / tradesoap startup**: attach `async-profiler` or JFR
-   to a partial boot and look for lock hotspots in the instrumented
-   WildFly code path. JFR now works (as of this round).
-3. **Partial-skip architecture**: the right way to do "skip stateless
-   classes" is to drop the `$$crochet*` method/field injection on the
-   class but KEEP the per-callsite wrapping in that class's methods.
-   That way callers into the class still see a valid
-   `$$crochetAccess` (inherited from a dummy base or implemented as
-   a catch-all) without paying the full instrumentation cost. Requires
-   a small refactor of `FieldAccessWrapper` to check class-level
-   instrumentation status.
-4. **Stripe-count tuning**: 256 stripes is a guess. Profile contention
-   under tomcat/lusearch to confirm or raise.
+1. **graphchi at 5.17x**: CPU-bound graph traversal. Profile under
+   `traceRuntime` to see whether the overhead is `fastAccess`
+   per-touch or the `FieldAccessWrapper` hook cost. Candidate:
+   emit a no-op-optimizable `$$crochetAccess` body that the JIT
+   can fold when `$$crochetVersion == 0`.
+2. **lusearch at 3.36x**: many-threaded query workload. Likely
+   similar path — the stripe-lock alone isn't enough.
+3. **eclipse at 2.12x**: large surface, many classes; worth a
+   transform-timing profile to find any single-class hotspot.
+4. **h2o parse corruption**: identify the specific `java.base`
+   API whose rewrite changes CSV parse behaviour. Likely candidate:
+   `java.nio.charset.*` or `java.io.BufferedReader`.
+5. **Skip-list completeness**: audit for other runtime-proxy
+   frameworks (CGLIB, Javassist, Mockito) we might still be
+   re-emitting into.

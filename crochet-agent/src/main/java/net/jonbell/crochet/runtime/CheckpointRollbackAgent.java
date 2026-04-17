@@ -252,6 +252,9 @@ public final class CheckpointRollbackAgent {
      */
     public static void fastAccess(CRIJInstrumented obj) {
         Class<?> observedClass = obj.getClass();
+        if (RuntimeTracer.ENABLED) {
+            RuntimeTracer.bumpFastAccess(observedClass);
+        }
         // Uncontended fast path: klass is already user (a peer finished the
         // work, or we're here via a reentrant call that already did it).
         // Zero atomics, zero locks.
@@ -512,6 +515,9 @@ public final class CheckpointRollbackAgent {
      * is pinned on the ClassMeta.
      */
     public static CRIJInstrumented sfHelperFor(Class<?> userClass) {
+        if (RuntimeTracer.ENABLED) {
+            RuntimeTracer.bumpSfHelper(userClass);
+        }
         ClassMeta meta = ClassMeta.of(userClass);
         CRIJInstrumented h = meta.sfHelper;
         if (h != null) {
@@ -523,6 +529,39 @@ public final class CheckpointRollbackAgent {
         // is stable for the lifetime of the ClassMeta and the fast path
         // above covers all subsequent calls.
         return SF_HELPERS.get(userClass);
+    }
+
+    /**
+     * Fused {@code sfHelperFor(owner).$$crochetAccess()} pre-hook emitted by
+     * {@link net.jonbell.crochet.transform.StaticFieldRewriter}. The legacy
+     * two-call pattern was a pure no-op for classes the agent chose not to
+     * instrument (enums, interfaces, annotations, and classes whose
+     * $$crochetLookup throws) — but the {@code $$crochetAccess} leg was an
+     * {@code INVOKEINTERFACE} against an open polymorphic world (every
+     * instrumented user class can contribute its own SF helper class to the
+     * inline cache), which the JIT couldn't devirtualize. On WildFly
+     * startup with {@code org.jboss.logging.Logger$Level} hit &gt;8M times,
+     * the wasted itable lookup dominated.
+     *
+     * <p>Fusing into a single {@code INVOKESTATIC} lets the JIT inline the
+     * entire fast path: a ClassValue read (into {@link ClassMeta}) + volatile
+     * field load. If {@code meta.sfHelper} is already materialised we
+     * return immediately — the original {@code $$crochetAccess} was a no-op
+     * anyway, so nothing on the helper is actually exercised here.
+     */
+    public static void noteStaticAccess(Class<?> userClass) {
+        if (RuntimeTracer.ENABLED) {
+            RuntimeTracer.bumpSfHelper(userClass);
+        }
+        ClassMeta meta = ClassMeta.of(userClass);
+        if (meta.sfHelper != null) {
+            return;
+        }
+        // Cold path: force helper materialisation so subsequent calls take
+        // the inlined fast path above. {@link #sfHelperFor} is the single
+        // entry point that populates meta.sfHelper via the ClassValue
+        // computeValue path.
+        sfHelperFor(userClass);
     }
 
     private static final ClassValue<CRIJInstrumented> SF_HELPERS = new ClassValue<>() {

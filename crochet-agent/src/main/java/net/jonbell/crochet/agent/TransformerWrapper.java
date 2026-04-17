@@ -52,7 +52,11 @@ final class TransformerWrapper implements ClassFileTransformer {
             return null;
         }
         try {
+            long start = TransformTracer.ENABLED ? System.nanoTime() : 0L;
             byte[] out = delegate.transform(classfileBuffer, false, loader);
+            if (TransformTracer.ENABLED) {
+                TransformTracer.record(className, System.nanoTime() - start, loader);
+            }
             if (out != null && Boolean.getBoolean("crochet.dumpClasses")) {
                 dumpClass(className, out);
             }

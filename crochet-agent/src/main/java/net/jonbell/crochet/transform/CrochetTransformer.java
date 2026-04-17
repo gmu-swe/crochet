@@ -265,6 +265,28 @@ public class CrochetTransformer {
         if (internalName.contains("$HibernateProxy$")) {
             return true;
         }
+        // JBoss Weld / WildFly EJB3 generate runtime "view" proxy classes
+        // named like {@code TradeSLSBLocal$$$view1} for each EJB bean. They
+        // extend the instrumented user class and inherit its $$crochet*
+        // members; re-emitting them on the subclass produces
+        // {@code ClassFormatError: Duplicate method name "$$crochetCopyFieldsTo"}
+        // during deployment. The suffix is {@code $$$view<n>} — three
+        // dollars, then "view", then a decimal.
+        if (internalName.contains("$$$view")) {
+            return true;
+        }
+        // JBoss Weld runtime proxies (client-proxy / interceptor subclass):
+        // generated names carry the {@code _$$_Weld} infix, e.g.
+        // {@code X$Proxy$_$$_WeldClientProxy} or
+        // {@code X$Proxy$_$$_WeldSubclass}. They subclass the instrumented
+        // bean and inherit its $$crochet* methods already; running them
+        // through our bytecode chain emits bad stack maps
+        // ({@code VerifyError: Expecting a stackmap frame at branch
+        // target 14} on com/sun/faces/cdi/CdiExtension$Proxy$_$$_WeldClientProxy
+        // during tradebeans startup).
+        if (internalName.contains("_$$_Weld")) {
+            return true;
+        }
         // JFR validates that every event class has a native mirror matching
         // the declared instance-field list exactly. Adding our $$crochet*
         // fields to any class the JFR runtime touches — jdk.jfr.Event itself,

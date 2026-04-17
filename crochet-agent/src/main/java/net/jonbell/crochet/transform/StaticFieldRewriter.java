@@ -18,8 +18,17 @@ import org.objectweb.asm.Type;
 public final class StaticFieldRewriter extends ClassVisitor {
 
     private static final String AGENT_INTERNAL = "net/jonbell/crochet/runtime/CheckpointRollbackAgent";
-    private static final String SF_HELPER_FOR_DESC =
-            "(Ljava/lang/Class;)Lnet/jonbell/crochet/runtime/CRIJInstrumented;";
+    /**
+     * Descriptor of the fused pre-hook. The agent-side implementation does the
+     * {@code sfHelperFor(C).$$crochetAccess()} job in a single static call so
+     * the JIT can inline the fast path; previously the emitted two-call
+     * pattern ({@code INVOKESTATIC sfHelperFor} + {@code INVOKEINTERFACE
+     * $$crochetAccess}) forced the JIT to itable-lookup through an open
+     * polymorphic world of generated SF-helper classes, which dominated
+     * WildFly startup (see Logger$Level @ 8.3M hits in
+     * {@code /tmp/crochet-runtime-counts.log}).
+     */
+    private static final String NOTE_STATIC_ACCESS_DESC = "(Ljava/lang/Class;)V";
 
     public StaticFieldRewriter(int api, ClassVisitor delegate) {
         super(api, delegate);
@@ -80,10 +89,7 @@ public final class StaticFieldRewriter extends ClassVisitor {
         private void emitPreHook(String owner) {
             super.visitLdcInsn(Type.getObjectType(owner));
             super.visitMethodInsn(Opcodes.INVOKESTATIC, AGENT_INTERNAL,
-                    "sfHelperFor", SF_HELPER_FOR_DESC, false);
-            super.visitMethodInsn(Opcodes.INVOKEINTERFACE,
-                    "net/jonbell/crochet/runtime/CRIJInstrumented",
-                    "$$crochetAccess", "()V", true);
+                    "noteStaticAccess", NOTE_STATIC_ACCESS_DESC, false);
         }
 
         private static boolean shouldWrap(int opcode, String owner, String name) {
