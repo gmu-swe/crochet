@@ -48,6 +48,32 @@ public final class FieldAdder extends ClassVisitor {
     private static final String INSTRUMENTED = "net/jonbell/crochet/runtime/CRIJInstrumented";
     private static final String AGENT = "net/jonbell/crochet/runtime/CheckpointRollbackAgent";
 
+    /**
+     * Emits the guarded entry sequence for {@code $$crochetCheckpoint} /
+     * {@code $$crochetRollback}: {@code if (this.$$crochetVersion >= v) return;}
+     * This is both the flat-nested-checkpoint protection (per the paper) and
+     * the cycle-termination guarantee during reference-field propagation —
+     * once an object is at or above the propagation version, further
+     * invocations no-op.
+     */
+    private void emitVersionGuardedEntry(MethodVisitor mv) {
+        Label proceed = new Label();
+        mv.visitVarInsn(Opcodes.ALOAD, 0);
+        mv.visitFieldInsn(Opcodes.GETFIELD, className, VERSION_FIELD, "I");
+        mv.visitVarInsn(Opcodes.ILOAD, 1);
+        mv.visitJumpInsn(Opcodes.IF_ICMPLT, proceed);
+        mv.visitInsn(Opcodes.RETURN);
+        mv.visitLabel(proceed);
+        mv.visitVarInsn(Opcodes.ALOAD, 0);
+        mv.visitVarInsn(Opcodes.ILOAD, 1);
+        mv.visitFieldInsn(Opcodes.PUTFIELD, className, VERSION_FIELD, "I");
+        mv.visitVarInsn(Opcodes.ALOAD, 0);
+        mv.visitLdcInsn(Type.getObjectType(className));
+        mv.visitMethodInsn(Opcodes.INVOKESTATIC, AGENT, "swapToFastProxy",
+                "(Ljava/lang/Object;Ljava/lang/Class;)V", false);
+        mv.visitInsn(Opcodes.RETURN);
+    }
+
     private String className;
     private final List<FieldRecord> instanceFields = new ArrayList<>();
     private boolean alreadyInstrumented;
@@ -163,40 +189,21 @@ public final class FieldAdder extends ClassVisitor {
     }
 
     private void emitCheckpoint() {
-        // V1 body: set version = v; swapToFastProxy(this, ThisClass.class)
-        // The actual snapshot happens lazily in the proxy's $$crochetAccess hook.
         MethodVisitor mv = super.visitMethod(
                 Opcodes.ACC_PUBLIC | Opcodes.ACC_SYNTHETIC,
                 "$$crochetCheckpoint", "(I)V", null, null);
         mv.visitCode();
-        mv.visitVarInsn(Opcodes.ALOAD, 0);
-        mv.visitVarInsn(Opcodes.ILOAD, 1);
-        mv.visitFieldInsn(Opcodes.PUTFIELD, className, VERSION_FIELD, "I");
-        mv.visitVarInsn(Opcodes.ALOAD, 0);
-        mv.visitLdcInsn(Type.getObjectType(className));
-        mv.visitMethodInsn(Opcodes.INVOKESTATIC, AGENT, "swapToFastProxy",
-                "(Ljava/lang/Object;Ljava/lang/Class;)V", false);
-        mv.visitInsn(Opcodes.RETURN);
+        emitVersionGuardedEntry(mv);
         mv.visitMaxs(0, 0);
         mv.visitEnd();
     }
 
     private void emitRollback() {
-        // V1 body: symmetric to checkpoint — swap into the same Fast proxy;
-        // the proxy decides rollback vs checkpoint by version parity on the
-        // first access.
         MethodVisitor mv = super.visitMethod(
                 Opcodes.ACC_PUBLIC | Opcodes.ACC_SYNTHETIC,
                 "$$crochetRollback", "(I)V", null, null);
         mv.visitCode();
-        mv.visitVarInsn(Opcodes.ALOAD, 0);
-        mv.visitVarInsn(Opcodes.ILOAD, 1);
-        mv.visitFieldInsn(Opcodes.PUTFIELD, className, VERSION_FIELD, "I");
-        mv.visitVarInsn(Opcodes.ALOAD, 0);
-        mv.visitLdcInsn(Type.getObjectType(className));
-        mv.visitMethodInsn(Opcodes.INVOKESTATIC, AGENT, "swapToFastProxy",
-                "(Ljava/lang/Object;Ljava/lang/Class;)V", false);
-        mv.visitInsn(Opcodes.RETURN);
+        emitVersionGuardedEntry(mv);
         mv.visitMaxs(0, 0);
         mv.visitEnd();
     }
@@ -252,20 +259,45 @@ public final class FieldAdder extends ClassVisitor {
     }
 
     private void emitPropagateCheckpoint() {
-        MethodVisitor mv = super.visitMethod(
-                Opcodes.ACC_PUBLIC | Opcodes.ACC_SYNTHETIC,
-                "$$crochetPropagateCheckpoint", "(I)V", null, null);
-        mv.visitCode();
-        mv.visitInsn(Opcodes.RETURN);
-        mv.visitMaxs(0, 0);
-        mv.visitEnd();
+        emitPropagate("$$crochetPropagateCheckpoint", "$$crochetCheckpoint");
     }
 
     private void emitPropagateRollback() {
+        emitPropagate("$$crochetPropagateRollback", "$$crochetRollback");
+    }
+
+    /**
+     * Emits the one-step lazy heap traversal for reference fields: for every
+     * non-static reference field of the declaring class, {@code if (f instanceof
+     * CRIJInstrumented) ((CRIJInstrumented) f).$$crochet{Checkpoint,Rollback}(version)}.
+     * The {@code instanceof} check handles {@code null} and non-instrumented
+     * referents uniformly. Cycle termination comes from the version guard on
+     * the target method, not from a traversed-set here.
+     */
+    private void emitPropagate(String methodName, String iMethodName) {
         MethodVisitor mv = super.visitMethod(
                 Opcodes.ACC_PUBLIC | Opcodes.ACC_SYNTHETIC,
-                "$$crochetPropagateRollback", "(I)V", null, null);
+                methodName, "(I)V", null, null);
         mv.visitCode();
+        for (FieldRecord f : instanceFields) {
+            if (!f.descriptor.startsWith("L")) {
+                continue;
+            }
+            Label skip = new Label();
+            Label after = new Label();
+            mv.visitVarInsn(Opcodes.ALOAD, 0);
+            mv.visitFieldInsn(Opcodes.GETFIELD, className, f.name, f.descriptor);
+            mv.visitInsn(Opcodes.DUP);
+            mv.visitTypeInsn(Opcodes.INSTANCEOF, INSTRUMENTED);
+            mv.visitJumpInsn(Opcodes.IFEQ, skip);
+            mv.visitTypeInsn(Opcodes.CHECKCAST, INSTRUMENTED);
+            mv.visitVarInsn(Opcodes.ILOAD, 1);
+            mv.visitMethodInsn(Opcodes.INVOKEINTERFACE, INSTRUMENTED, iMethodName, "(I)V", true);
+            mv.visitJumpInsn(Opcodes.GOTO, after);
+            mv.visitLabel(skip);
+            mv.visitInsn(Opcodes.POP);
+            mv.visitLabel(after);
+        }
         mv.visitInsn(Opcodes.RETURN);
         mv.visitMaxs(0, 0);
         mv.visitEnd();

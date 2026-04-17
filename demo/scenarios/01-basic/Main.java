@@ -1,6 +1,6 @@
 import net.jonbell.crochet.runtime.CheckpointRollbackAgent;
 
-public class Hello {
+public class Main {
     public static void main(String[] args) {
         Counter c = new Counter(1, "original");
         System.out.println("before checkpoint : value=" + c.value + " label=" + c.label);
@@ -16,9 +16,9 @@ public class Hello {
         System.out.println("after rollback    : value=" + c.value + " label=" + c.label);
 
         if (c.value == 1 && "original".equals(c.label)) {
-            System.out.println("ROLLBACK OK");
+            System.out.println("SCENARIO OK");
         } else {
-            System.out.println("ROLLBACK FAIL");
+            System.out.println("SCENARIO FAIL");
             System.exit(1);
         }
     }

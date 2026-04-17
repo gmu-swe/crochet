@@ -123,6 +123,9 @@ public final class CheckpointRollbackAgent {
             Object shadow = allocateShadow(userClass);
             obj.$$crochetCopyFieldsTo(shadow);
             obj.$$crochetSetSnap(shadow);
+            // Propagate: transform all directly-referenced CRIJInstrumented
+            // objects into their Fast proxies. Cycle-safe via version guard.
+            obj.$$crochetPropagateCheckpoint(v);
         } else {
             // Even — rollback state. Restore from the snap if we have one.
             Object snap = obj.$$crochetGetSnap();
@@ -130,6 +133,7 @@ public final class CheckpointRollbackAgent {
                 obj.$$crochetCopyFieldsFrom(snap);
                 obj.$$crochetSetSnap(null);
             }
+            obj.$$crochetPropagateRollback(v);
         }
         changeClass(obj, proxyClass, userClass);
     }
