@@ -49,29 +49,72 @@ public final class FieldAdder extends ClassVisitor {
     private static final String AGENT = "net/jonbell/crochet/runtime/CheckpointRollbackAgent";
 
     /**
-     * Emits the guarded entry sequence for {@code $$crochetCheckpoint} /
-     * {@code $$crochetRollback}: {@code if (this.$$crochetVersion >= v) return;}
-     * This is both the flat-nested-checkpoint protection (per the paper) and
-     * the cycle-termination guarantee during reference-field propagation —
-     * once an object is at or above the propagation version, further
-     * invocations no-op.
+     * Emits the body of {@code $$crochetCheckpoint} / {@code $$crochetRollback}:
+     * <pre>
+     *   int priorVersion = this.$$crochetVersion;
+     *   if (priorVersion >= v) return;
+     *   this.$$crochetVersion = v;
+     *   try {
+     *       swapToFastProxy(this, ThisClass.class, priorVersion);
+     *   } catch (Throwable t) {
+     *       this.$$crochetVersion = priorVersion;
+     *       throw t;
+     *   }
+     * </pre>
+     * The guard enforces flat-nested-checkpoint semantics (paper §3.1) and
+     * terminates cyclic propagation. The try/catch restores the pre-bump
+     * version so a proxy-generation failure doesn't leave the object in a
+     * half-checkpointed state.
+     *
+     * <p>Local layout: slot 0 is {@code this}, slot 1 is {@code v}, slot 2 is
+     * {@code priorVersion}, slot 3 is the caught {@code Throwable}.
      */
     private void emitVersionGuardedEntry(MethodVisitor mv) {
         Label proceed = new Label();
+        Label tryStart = new Label();
+        Label tryEnd = new Label();
+        Label handler = new Label();
+        Label afterHandler = new Label();
+
+        // priorVersion = this.$$crochetVersion
         mv.visitVarInsn(Opcodes.ALOAD, 0);
         mv.visitFieldInsn(Opcodes.GETFIELD, className, VERSION_FIELD, "I");
+        mv.visitInsn(Opcodes.DUP);
+        mv.visitVarInsn(Opcodes.ISTORE, 2);
+
+        // if (priorVersion >= v) return;
         mv.visitVarInsn(Opcodes.ILOAD, 1);
         mv.visitJumpInsn(Opcodes.IF_ICMPLT, proceed);
         mv.visitInsn(Opcodes.RETURN);
         mv.visitLabel(proceed);
+
+        // this.$$crochetVersion = v
         mv.visitVarInsn(Opcodes.ALOAD, 0);
         mv.visitVarInsn(Opcodes.ILOAD, 1);
         mv.visitFieldInsn(Opcodes.PUTFIELD, className, VERSION_FIELD, "I");
+
+        // try { swapToFastProxy(this, ThisClass.class, priorVersion); }
+        mv.visitLabel(tryStart);
         mv.visitVarInsn(Opcodes.ALOAD, 0);
         mv.visitLdcInsn(Type.getObjectType(className));
+        mv.visitVarInsn(Opcodes.ILOAD, 2);
         mv.visitMethodInsn(Opcodes.INVOKESTATIC, AGENT, "swapToFastProxy",
-                "(Ljava/lang/Object;Ljava/lang/Class;)V", false);
+                "(Ljava/lang/Object;Ljava/lang/Class;I)V", false);
+        mv.visitLabel(tryEnd);
+        mv.visitJumpInsn(Opcodes.GOTO, afterHandler);
+
+        // catch (Throwable t): restore version; rethrow.
+        mv.visitLabel(handler);
+        mv.visitVarInsn(Opcodes.ASTORE, 3);
+        mv.visitVarInsn(Opcodes.ALOAD, 0);
+        mv.visitVarInsn(Opcodes.ILOAD, 2);
+        mv.visitFieldInsn(Opcodes.PUTFIELD, className, VERSION_FIELD, "I");
+        mv.visitVarInsn(Opcodes.ALOAD, 3);
+        mv.visitInsn(Opcodes.ATHROW);
+
+        mv.visitLabel(afterHandler);
         mv.visitInsn(Opcodes.RETURN);
+        mv.visitTryCatchBlock(tryStart, tryEnd, handler, "java/lang/Throwable");
     }
 
     private String className;

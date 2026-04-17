@@ -96,9 +96,32 @@ public final class CheckpointRollbackAgent {
      * {@link net.jonbell.crochet.transform.FieldAdder}. Lazily generates the
      * Fast proxy for {@code userClass}, then klass-swaps {@code target}.
      */
-    public static void swapToFastProxy(Object target, Class<?> userClass) {
-        Class<?> fastProxy = fastProxyFor(userClass);
+    /**
+     * Called from the emitted {@code $$crochetCheckpoint} / {@code $$crochetRollback}
+     * bodies AFTER the version field has been bumped. If proxy generation or
+     * klass swap fails, the caller's bump must be undone — we do that here.
+     *
+     * @param priorVersion the value of {@code $$crochetVersion} BEFORE the caller
+     *                     bumped it; restored on failure.
+     */
+    public static void swapToFastProxy(Object target, Class<?> userClass, int priorVersion) {
+        Class<?> fastProxy;
+        try {
+            fastProxy = fastProxyFor(userClass);
+        } catch (RuntimeException | Error e) {
+            ((CRIJInstrumented) target).$$crochetSetVersion(priorVersion);
+            throw new RollbackException(RollbackException.POISON_VERSION, e);
+        }
+        // CAS failure is benign: if another thread already swapped us, we're
+        // already in (or past) the target state. The version we just wrote
+        // will be observed by the next fastAccess either way.
         changeClass(target, userClass, fastProxy);
+    }
+
+    /** Backward-compat shim for any bytecode emitted before the 3-arg form. */
+    @Deprecated
+    public static void swapToFastProxy(Object target, Class<?> userClass) {
+        swapToFastProxy(target, userClass, 0);
     }
 
     /**
@@ -111,31 +134,49 @@ public final class CheckpointRollbackAgent {
     public static void fastAccess(CRIJInstrumented obj) {
         Class<?> proxyClass = obj.getClass();
         Class<?> userClass = proxyClass.getSuperclass();
+        if (userClass == null) {
+            throw new RollbackException(RollbackException.POISON_VERSION,
+                    new IllegalStateException("fastAccess: proxy has no superclass"));
+        }
         int v = obj.$$crochetGetVersion();
         if (v == 0) {
-            // No checkpoint in flight — shouldn't happen on a proxy, but be defensive.
             changeClass(obj, proxyClass, userClass);
             return;
         }
-        if ((v & 1) == 1) {
-            // Odd — checkpoint state. Take a fresh snapshot (flat-nested:
-            // a newer checkpoint discards any older snap).
-            Object shadow = allocateShadow(userClass);
-            obj.$$crochetCopyFieldsTo(shadow);
-            obj.$$crochetSetSnap(shadow);
-            // Propagate: transform all directly-referenced CRIJInstrumented
-            // objects into their Fast proxies. Cycle-safe via version guard.
-            obj.$$crochetPropagateCheckpoint(v);
-        } else {
-            // Even — rollback state. Restore from the snap if we have one.
-            Object snap = obj.$$crochetGetSnap();
-            if (snap != null) {
-                obj.$$crochetCopyFieldsFrom(snap);
-                obj.$$crochetSetSnap(null);
+        Throwable thrown = null;
+        boolean rollbackBranch = (v & 1) == 0;
+        try {
+            if (!rollbackBranch) {
+                // Checkpoint state. Shadow allocated first; only published
+                // via setSnap on success. Throws leave snap at its prior
+                // value and obj untouched.
+                Object shadow = allocateShadow(userClass);
+                obj.$$crochetCopyFieldsTo(shadow);
+                obj.$$crochetSetSnap(shadow);
+                obj.$$crochetPropagateCheckpoint(v);
+            } else {
+                // Rollback state. Snap cleared only AFTER successful
+                // copyFieldsFrom — a mid-copy throw preserves the snap so
+                // the caller could retry (if they know the state is recoverable).
+                Object snap = obj.$$crochetGetSnap();
+                if (snap != null) {
+                    obj.$$crochetCopyFieldsFrom(snap);
+                    obj.$$crochetSetSnap(null);
+                }
+                obj.$$crochetPropagateRollback(v);
             }
-            obj.$$crochetPropagateRollback(v);
+        } catch (Throwable t) {
+            thrown = t;
+        } finally {
+            // Always swap klass back to the user class. CAS-race-loss is benign.
+            changeClass(obj, proxyClass, userClass);
         }
-        changeClass(obj, proxyClass, userClass);
+        if (thrown != null) {
+            if (thrown instanceof RollbackException re) {
+                throw re;
+            }
+            throw new RollbackException(RollbackException.POISON_VERSION, thrown);
+        }
     }
 
     public static Object allocateShadow(Class<?> c) {
@@ -148,14 +189,19 @@ public final class CheckpointRollbackAgent {
 
     /* ---------- klass-swap machinery ---------- */
 
+    /**
+     * Atomically flip the (compressed) klass pointer of {@code target} from the
+     * klass of {@code from} to the klass of {@code to}.
+     *
+     * <p>Returns {@code true} if the CAS succeeded, {@code false} if another
+     * thread got there first. Callers that require the swap must check; callers
+     * that just want the target state (e.g. fastAccess's swap-back) can ignore.
+     */
     @SuppressWarnings("deprecation")
-    public static void changeClass(Object target, Class<?> from, Class<?> to) {
+    public static boolean changeClass(Object target, Class<?> from, Class<?> to) {
         int fromKlass = klassOf(from);
         int toKlass = klassOf(to);
-        // CAS — if another thread already flipped the klass, we just proceed;
-        // that other thread got there first and either swapped the same way
-        // or moved it to a state we'll re-observe next time around.
-        U.compareAndSwapInt(target, KLASS_OFFSET, fromKlass, toKlass);
+        return U.compareAndSwapInt(target, KLASS_OFFSET, fromKlass, toKlass);
     }
 
     /** Returns the compressed klass-pointer int for {@code c}, caching it in {@link ClassMeta}. */
