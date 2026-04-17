@@ -244,6 +244,32 @@ public class CrochetTransformer {
         if (internalName.equals("java/lang/Object")) {
             return true;
         }
+        // java.lang.Byte: injecting an int instance field
+        // ({@code $$crochetVersion}) shifts the primitive {@code value} field
+        // from offset 12 (stock) to offset 16. Byte is annotated
+        // {@code @jdk.internal.ValueBased} and its {@code valueOf}/{@code byteValue}
+        // methods are {@code @IntrinsicCandidate}; HotSpot has bytecode-level
+        // assumptions about its layout that we cannot restore from the Java
+        // side. Empirical impact on DaCapo h2o: the CSV parse pipeline still
+        // emits 315 rows and 15 columns, but every numeric value lands as NaN
+        // in the resulting Frame, so DRF sees a one-column (response-only)
+        // training frame and fails with "Training data must have at least 2
+        // features (incl. response)." Bisection on h2o-small narrowed the
+        // instrumentation difference to a single class-file delta:
+        // instrumenting ONLY Byte (everything else stock) reproduces the
+        // failure; skipping ONLY Byte (everything else instrumented) passes.
+        // Further narrowing showed the trigger is the int-typed field
+        // specifically — adding {@code $$crochetSnap} alone (Object ref)
+        // leaves h2o passing, adding {@code $$crochetVersion} alone (int)
+        // reproduces the failure. Other boxed primitives (Short, Character,
+        // Integer, Long, Float, Double, Boolean) don't trip h2o despite
+        // identical instrumentation. Byte is uniquely exposed because
+        // h2o's byte-level CSV parser, water's Iced/Unsafe-offset Icer
+        // generation, and HotSpot's Byte intrinsics compose in a
+        // layout-sensitive way.
+        if (internalName.equals("java/lang/Byte")) {
+            return true;
+        }
         // Our own runtime/transform/agent/patch/annotation code must never
         // recurse — the instrumentation chain uses these classes directly.
         if (internalName.startsWith(RUNTIME_PACKAGE_PREFIX)

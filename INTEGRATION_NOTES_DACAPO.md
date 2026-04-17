@@ -2,15 +2,21 @@
 
 ## Headline
 
-**21 of 22 DaCapo 23.11-chopin benchmarks PASS** end-to-end with the
-crochet-agent attached to the instrumented JDK. This round added
-`tradebeans`, `tradesoap`, and dropped h2's overhead from 9.87x to
-~3x via a fused static-field pre-hook. Median overhead **1.22x**.
+**22 of 22 DaCapo 23.11-chopin benchmarks PASS** end-to-end with the
+crochet-agent attached to the instrumented JDK (h2o requires Java 17,
+matching the upstream-supported version). This round added `tradebeans`,
+`tradesoap`, `h2o`, and dropped h2's overhead from 9.87x to ~3x via a
+fused static-field pre-hook. Median overhead **1.22x**.
 
-The remaining holdout is `h2o`, whose internal CSV parse pipeline
-depends on behavior that our instrumentation of `java.base` perturbs
-(deterministic column-count collapse to 1 feature even on vanilla
-baseline with just the instrumented JDK, before the agent is attached).
+The h2o fix was a single-class skip of `java.lang.Byte`: injecting
+`$$crochetVersion` (a 4-byte `int` field) into Byte shifts Byte's
+primitive `value` byte from offset 12 to offset 16, which HotSpot's
+`@IntrinsicCandidate valueOf` / `byteValue` methods depend on. The
+layout-sensitivity is a VM contract we cannot restore at the Java
+level. Bisection proved the skip is minimal — only Byte is affected;
+no other boxed primitive (including Boolean) trips h2o. Details in
+the inline comment at `CrochetTransformer.shouldSkip` and in the
+commit message.
 
 | benchmark | status | base (ms) | crochet (ms) | ratio |
 |---|---|---|---|---|
@@ -35,7 +41,7 @@ baseline with just the instrumented JDK, before the agent is attached).
 | h2          | PASS | 95   | 281  | **2.96x** (was 9.87x) |
 | lusearch    | PASS | 69   | 232  | 3.36x |
 | graphchi    | PASS | 473  | 2446 | 5.17x |
-| h2o         | FAIL | 4853 | —    | instrumentation of java.base corrupts h2o's CSV parse (column count collapses to 1 feature); fails even without the agent on instrumented JDK (Java 21 AND Java 17). Not a gating failure — orthogonal to the crochet design. |
+| h2o (Java 17) | PASS | 1994 | 4043 | **2.03x** (Java 17 required; +`-Ddacapo.h2o.port=<free>` to avoid docker's 54321) |
 
 Paper target was 1.06x avg on DaCapo 9.12-bach. Our current median is
 1.22x on the modernized 23.11-chopin set. All concurrent/server
@@ -118,30 +124,46 @@ cost when off. Write per-class transform timing to
 primary tool that revealed the `Logger$Level` 8.3M hotspot during
 tradebeans startup and confirmed the fused pre-hook fix.
 
-## Remaining failure: h2o
+## h2o: root-caused and fixed via single-class skip
 
-h2o 3.42.0.2 refuses to run on Java > 17 by default. Its own override
-(`-Dsys.ai.h2o.debug.allowJavaVersions=21`) passes the version check
-but h2o then hangs during DRF training — the CSV parse sees "only 1
-feature" instead of the 15 columns. This failure is reproducible:
+h2o's symptom: instrumented JDK parses a 15-column CSV but every
+numeric cell lands as NaN; h2o's `ignore_const_cols=true` then drops
+the 14 non-response columns as "constant", so DRF training fails with
+`Training data must have at least 2 features (incl. response).`
+Reproduces WITHOUT the runtime agent — it's the jlink rewrite of
+`java.base` alone.
 
-- Stock Java 17 JDK (no instrumentation, no agent): **PASS** in ~4800ms.
-- Stock Java 21 JDK with override flag: hangs (Java 21 incompatibility
-  in h2o upstream — unrelated to crochet).
-- Instrumented Java 17 JDK, no agent attached: **FAIL** with 1-feature
-  parse collapse. Our jlink instrumentation of `java.base` perturbs
-  some API h2o's parser depends on.
-- Instrumented Java 21 JDK with override + agent: same hang.
+Bisection narrowed it to a single class-file delta on `java.lang.Byte`:
+- Instrumenting ONLY Byte (everything else stock) → reproduces.
+- Skipping ONLY Byte (everything else instrumented) → passes.
+- Adding only `$$crochetSnap` (Object ref) to Byte → passes.
+- Adding only `$$crochetVersion` (int) to Byte → reproduces.
 
-Both h2o approaches investigated (Java 21 override, Java 17 rebuild)
-failed for the same root reason: our `java.base` rewrite corrupts h2o's
-`MRTask` / `ParseDataset` pipeline. Fixing this would require either
-(a) targeted exclusion of h2o parse classes from instrumentation (but
-they load through a custom classloader and we'd need to detect them),
-or (b) identifying the specific `java.base` method whose rewrite
-breaks CSV parsing. Deferred — h2o's Java-17-only support is already
-an upstream tech-debt issue, and this failure is orthogonal to crochet's
-core design.
+Mechanism: HotSpot's field-layout algorithm places the injected int at
+offset 12, shifting Byte's primitive `value` byte from offset 12 (stock)
+to offset 16. Byte is annotated `@jdk.internal.ValueBased` and its
+`valueOf` / `byteValue` are `@IntrinsicCandidate`; HotSpot-level code has
+layout assumptions about Byte that no Java-level rewriting can restore.
+Autoboxing/unboxing/reflection of individual Byte instances still
+returns correct values — the failure is specific to h2o's composition
+of a byte-level CSV parser + `water.Weaver`/Javassist-generated Icer
++ HotSpot's Byte intrinsics.
+
+No other `@ValueBased` primitive (Short, Character, Integer, Long,
+Float, Double, Boolean) triggers the failure. Fix: skip `java.lang.Byte`
+exactly, same pattern as the existing `java.lang.Object` skip.
+See `CrochetTransformer.shouldSkip` for the inline justification.
+
+h2o currently requires Java 17 (h2o 3.42.0.2's upstream version
+constraint — independent of crochet). Invocation:
+```
+/tmp/jdk-inst-j17/bin/java --add-reads java.base=jdk.unsupported \
+    -Ddacapo.h2o.port=54400 \
+    -javaagent:crochet-agent/target/crochet-agent-1.0.0-SNAPSHOT.jar \
+    -jar /tmp/dacapo/dacapo-23.11-chopin.jar h2o -s small -n 3
+```
+The `-Ddacapo.h2o.port` override is unrelated to crochet; it avoids
+port 54321 which Docker commonly owns on developer machines.
 
 ## How to reproduce
 
