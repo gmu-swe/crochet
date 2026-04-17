@@ -104,16 +104,74 @@ effort on this — their instrumented-JDK approach (the jlink path we
 already built) is the path forward because packing the runtime into
 `java.base` eliminates the cross-loader-visibility problem entirely.
 
-## Suggested next steps
+## Instrumented-JDK run (hypothesis partially validated)
 
-1. Re-run DaCapo against the **instrumented JDK** (`/tmp/jdk-inst`)
-   produced by `crochet-instrument`, so the runtime lives in
-   `java.base` and is visible from every classloader. The existing
-   scenarios all pass on the instrumented JDK today; the hypothesis
-   is DaCapo will too.
-2. Instrument smaller DaCapo benchmarks first (`fop`, `xalan`,
-   `avrora`) and iterate on compat until each passes.
-3. Only then start measuring steady-state overhead with `-n 5` or
-   `--converge`.
-4. Optimize the hot path in `fastAccess` once we have a benchmark
-   that exercises it.
+Rebuilt the instrumented JDK (`/tmp/jdk-inst`) after the three compat
+fixes above landed, and ran DaCapo against it. Results are mixed and
+non-deterministic — which itself is diagnostic.
+
+### First pass (fresh jdk-inst + fresh agent jar, `-n 1`)
+
+| benchmark | `PASSED`? |
+|---|---|
+| fop     | ✓ 1391 ms |
+| sunflow | ✓ 637 ms |
+| luindex | ✓ 1664 ms |
+| pmd     | ✓ 474 ms |
+| xalan   | ✓ 426 ms |
+| avrora  | ✓ 3989 ms |
+
+6/6 PASSED, with wall-clock ~1.1–1.2× baseline. The instrumented-JDK
+path does clear the classloader-visibility block that killed everything
+on the vanilla JDK — the runtime now lives in `java.base` and is
+reachable from every loader.
+
+### Subsequent passes (same jdk-inst, same agent, no changes)
+
+Re-running the same commands 15 minutes later produced **0/5 PASSED**.
+Each benchmark fails with either:
+
+- `VerifyError: (class: org/apache/commons/logging/LogFactory, method:
+  releaseAll signature: ()V) Illegal type in constant pool` for fop.
+- `ClassNotFoundException` on benchmark-internal classes rendered in
+  internal-name form (`cck/util/Option$Str`, `org/sunflow/system/ui/
+  SilentInterface`, `net/sourceforge/pmd/processor/MultiThreadProcessor`).
+  The `/` separator in the CNFE message is a red flag — something is
+  passing an internal name to `Class.forName` which expects dotted
+  binary names. A likely culprit is `AnnotationStamper` writing a class
+  reference in the wrong form in the `@CrochetInstrumented` marker.
+
+The non-determinism itself is meaningful: it says the bug depends on
+cache state (DaCapo unpacks jars into a scratch directory and reuses
+across runs) and/or on which classes the JIT has already seen. Our
+instrumentation is the variable. I haven't yet isolated which of our
+changes introduced the regression — possible suspects are the
+`NoopSFHelper` fallback, the `setAccessible(true)` in `resolveLookup`,
+or the platform-loader skip widening in `TransformerWrapper`.
+
+## Concrete next steps
+
+1. **Bisect the compat regression.** Scenarios 1-17 still all pass
+   consistently on both JDKs, so the regression only surfaces with
+   DaCapo-scale code. Turn on `-Dcrochet.dumpClasses=true`, dump
+   commons-logging.LogFactory from a fail run, `javap -v` the
+   instrumented class, and compare against a hand-written expectation
+   of what our FieldAdder + AnnotationStamper should have emitted.
+
+2. **Audit `AnnotationStamper`'s class-reference emission.** The
+   `cck/util/Option$Str` ClassNotFoundException with slash-separator
+   suggests we're writing a binary type name as a Utf8 constant where
+   we should be using `Ljava/path/To/Class;` descriptor form. This
+   would be a straightforward fix.
+
+3. **Investigate DaCapo scratch/data handling.** DaCapo caches unpacked
+   benchmark data across runs. If the agent's instrumentation is
+   cached and reloaded, state divergence between runs could explain
+   the non-determinism. `--scratch-directory` gives us a handle to
+   isolate each run.
+
+4. **Only after 1-3 stabilize**: add `-n 5`/`--converge` for real
+   steady-state timing, and start optimizing the `fastAccess` hot
+   path. Expect overhead in the 1.05-1.5× range once compat is clean
+   (the original CROCHET paper reported 1.06× avg on DaCapo 9.12-bach
+   — roughly what we should aim for on Java 21 + DaCapo 23.11).
