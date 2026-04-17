@@ -26,8 +26,17 @@ public final class Specializer {
 
         byte[] rewritten = rewrite(templateBytes, userInternal, specializedInternal);
 
+        // NESTMATE grants access to the nest host's private members; dropped
+        // ClassOption.STRONG so the proxy is only reachable via live instance
+        // klass pointers. The VM retains hidden classes while any live
+        // instance references them, so weak-retention is the correct
+        // semantic — it lets the proxy class be reclaimed after all
+        // instances have been swapped back to the user class and garbage-
+        // collected. A lingering STRONG binding would keep generated proxies
+        // alive for the life of the parent class, bloating class-loader data
+        // proportionally to the number of user classes exercised.
         return userLookup.defineHiddenClass(rewritten, true,
-                        ClassOption.NESTMATE, ClassOption.STRONG)
+                        ClassOption.NESTMATE)
                 .lookupClass();
     }
 

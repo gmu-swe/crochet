@@ -7,6 +7,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 
 /**
@@ -34,6 +35,15 @@ public final class RuntimeTracer {
     /** True iff {@code -Dcrochet.traceRuntime=true} was set at agent load. */
     public static final boolean ENABLED = Boolean.getBoolean("crochet.traceRuntime");
 
+    /**
+     * True iff {@code -Dcrochet.verboseCompat=true} was set at agent load.
+     * Gates user-visible stderr diagnostics that production builds suppress
+     * (e.g., "class X cannot host a Fast proxy, checkpoint/rollback is a no-op").
+     * The DaCapo harness digest-checks stderr output — any inadvertent chatter
+     * would fail every benchmark, so every call site MUST consult this flag.
+     */
+    public static final boolean VERBOSE_COMPAT = Boolean.getBoolean("crochet.verboseCompat");
+
     /** How many classes per category to include in the shutdown dump. */
     private static final int TOP_N = 50;
 
@@ -46,6 +56,21 @@ public final class RuntimeTracer {
     private static final ClassValue<AtomicLong> SF_HELPER = new ClassValue<AtomicLong>() {
         @Override protected AtomicLong computeValue(Class<?> type) { return new AtomicLong(); }
     };
+
+    /**
+     * One-shot guard per final/unproxyable user class. When checkpoint or
+     * rollback is invoked on an instance whose class cannot host a Fast proxy
+     * (most commonly {@code Modifier.isFinal}), the klass-swap silently no-ops;
+     * we want to tell the user once — <em>only if they asked via
+     * {@code -Dcrochet.verboseCompat}</em> — so they don't silently get a
+     * no-op checkpoint on String / Integer / custom final classes.
+     */
+    private static final ClassValue<AtomicBoolean> UNPROXYABLE_WARNED =
+            new ClassValue<AtomicBoolean>() {
+                @Override protected AtomicBoolean computeValue(Class<?> type) {
+                    return new AtomicBoolean(false);
+                }
+            };
 
     /**
      * ClassValue tables don't expose their key set, so we shadow each counter
@@ -80,6 +105,30 @@ public final class RuntimeTracer {
             installHookOnce();
         }
         c.incrementAndGet();
+    }
+
+    /**
+     * Log a one-shot warning that a checkpoint/rollback was requested on an
+     * instance whose class can't host a Fast proxy. The klass-swap silently
+     * becomes a no-op today (final classes, records, etc.); this method is
+     * called from {@link CheckpointRollbackAgent#isUnproxyable} to surface
+     * the fact — but only when {@link #VERBOSE_COMPAT} is enabled so the
+     * stderr output doesn't break DaCapo's digest checks on production runs.
+     * Warns at most once per distinct user class, gated by a
+     * {@link ClassValue ClassValue&lt;AtomicBoolean&gt;} latch.
+     */
+    public static void noteUnproxyableClass(Class<?> userClass) {
+        if (!VERBOSE_COMPAT || userClass == null) {
+            return;
+        }
+        AtomicBoolean warned = UNPROXYABLE_WARNED.get(userClass);
+        if (warned.compareAndSet(false, true)) {
+            System.err.println("[crochet] checkpoint/rollback is a no-op on "
+                    + userClass.getName()
+                    + ": class is final / not proxyable, so klass-swap cannot attach."
+                    + " Instance field state will not be captured."
+                    + " (warning emitted once per class under -Dcrochet.verboseCompat)");
+        }
     }
 
     private static void installHookOnce() {

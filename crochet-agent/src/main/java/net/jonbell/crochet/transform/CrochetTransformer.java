@@ -22,6 +22,26 @@ public class CrochetTransformer {
     public static final String CROCHET_INSTRUMENTED_DESC =
             "Lnet/jonbell/crochet/annotation/CrochetInstrumented;";
 
+    /**
+     * System-property gate for {@link ReflectionRewriter}. Default off
+     * pending a narrow-scope regression fix: with the rewriter enabled,
+     * the Weld CDI bean resolver on tradebeans/tradesoap loses
+     * {@code TransactionManager} discovery (WELD-001408: Unsatisfied
+     * dependencies). The filter semantics themselves (filter-synthetic-
+     * and-$$crochet-prefixed-only) are minimal, so the regression is
+     * surprising; the working theory is that Weld's
+     * {@code AnnotatedType} builder depends on the exact
+     * {@code Class.getMethods()} ordering or count — both of which our
+     * filter preserves except for removed entries. Leaving the code in
+     * place and unit-tested but disabled by default lets us opt-in
+     * ({@code -Dcrochet.reflectionRewriter=true}) on workloads that
+     * actually enumerate our injected members (Hibernate/ByteBuddy
+     * subclass generation, h2o Schema.fillFromParms).
+     */
+    private static final boolean REFLECTION_REWRITER_ENABLED =
+            Boolean.parseBoolean(
+                    System.getProperty("crochet.reflectionRewriter", "false"));
+
     public byte[] transform(byte[] classFileBuffer, boolean hostedAnonymous) {
         return transform(classFileBuffer, hostedAnonymous, null);
     }
@@ -90,6 +110,19 @@ public class CrochetTransformer {
             chain = new StaticFieldRewriter(Opcodes.ASM9, chain);
             chain = new ArrayCopyInterceptor(Opcodes.ASM9, chain);
             chain = new FieldAccessWrapper(Opcodes.ASM9, chain, locals);
+            // ReflectionRewriter sits at the top of the user-class chain.
+            // It only rewrites INVOKEVIRTUAL/INVOKESTATIC on specific
+            // reflection APIs into INVOKESTATIC helpers in ReflectionFilter,
+            // so it neither needs scratch locals nor interacts with frame
+            // computation. Placing it above the field/array wrappers is a
+            // style choice — any position works as long as it runs on the
+            // class's original call sites (i.e., not on the $$crochet* bodies
+            // those wrappers emit). Gated by REFLECTION_REWRITER_ENABLED
+            // (see the property javadoc above for the Weld regression that
+            // keeps the default off for now).
+            if (REFLECTION_REWRITER_ENABLED) {
+                chain = new ReflectionRewriter(Opcodes.ASM9, chain);
+            }
         }
         if (needsJsrInlining) {
             chain = new JsrInliner(Opcodes.ASM9, chain);
@@ -313,15 +346,25 @@ public class CrochetTransformer {
         }
         // ByteBuddy auxiliary classes (name contains "$ByteBuddy$") are
         // generated at runtime and frequently inherit from already-instrumented
-        // user classes. We'd re-emit the $$crochet* methods they inherited,
-        // producing ClassFormatError: Duplicate method.
+        // user classes. The failure mode is "ClassFormatError: Duplicate
+        // method" when ByteBuddy's MemberAccessor scans the parent via
+        // Class.getDeclaredMethods and re-declares our $$crochet* members on
+        // the subclass before our transformer sees it. ReflectionRewriter
+        // closes the reflection bypass that makes this possible (empirically
+        // verified: spring PASSES with this skip removed when the rewriter
+        // is enabled), but we keep this skip until ReflectionRewriter is
+        // default-on across the DaCapo matrix.
         if (internalName.contains("$ByteBuddy$")) {
             return true;
         }
         // Hibernate runtime proxies (e.g. Pet$HibernateProxy$FyMglsPZ) extend
         // instrumented entity classes and inherit our $$crochetCopyFieldsTo;
         // instrumenting the subclass re-emits the method and the class loader
-        // rejects the duplicate.
+        // rejects the duplicate. ReflectionRewriter handles the
+        // reflection-enumeration half of the legacy breakage, but Hibernate's
+        // proxy factory also consumes the parent bytecode directly via an
+        // ASM pass that doesn't go through reflection — keeping this skip
+        // bypasses both code paths with zero runtime cost.
         if (internalName.contains("$HibernateProxy$")) {
             return true;
         }

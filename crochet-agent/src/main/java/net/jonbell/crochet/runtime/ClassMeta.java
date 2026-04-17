@@ -1,6 +1,7 @@
 package net.jonbell.crochet.runtime;
 
 import java.lang.invoke.MethodHandles;
+import java.lang.invoke.VarHandle;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 
@@ -23,7 +24,14 @@ public final class ClassMeta {
     private static final ClassValue<ClassMeta> CACHE = new ClassValue<>() {
         @Override
         protected ClassMeta computeValue(Class<?> userClass) {
-            return new ClassMeta(userClass);
+            ClassMeta m = new ClassMeta(userClass);
+            // Exactly-once registration in TOUCHED_CLASSES: ClassValue
+            // serializes computeValue per key internally, so any further
+            // {@link #of} call for the same class returns the cached
+            // ClassMeta without re-invoking this method. That avoids a CHM
+            // put on every hot-path lookup.
+            CheckpointRollbackAgent.TOUCHED_CLASSES.add(userClass);
+            return m;
         }
     };
 
@@ -65,6 +73,23 @@ public final class ClassMeta {
         }
     }
 
+    /**
+     * Cached {@link VarHandle} accessors for the injected {@code $$crochetVersion}
+     * field. Resolved via the user class's own {@code $$crochetLookup()} so
+     * that the handle carries private-member access — the field is emitted
+     * {@code ACC_PRIVATE | ACC_SYNTHETIC | ACC_TRANSIENT} and is otherwise
+     * unreachable from outside the class. Published via {@code final} fields
+     * on this immutable holder, so any non-null observation of
+     * {@link ClassMeta#versionHandles} guarantees all slots are fully initialised.
+     */
+    public static final class VersionHandles {
+        public final VarHandle version;
+
+        VersionHandles(VarHandle version) {
+            this.version = version;
+        }
+    }
+
     public final Class<?> userClass;
 
     /* ---- Gap 6: immutable bindings (race-safe publication) ---- */
@@ -72,17 +97,10 @@ public final class ClassMeta {
     private volatile KlassBinding userBinding;
     private volatile KlassBinding fastBinding;
     private volatile FieldOffsets fieldOffsets;
+    private volatile VersionHandles versionHandles;
 
-    /* ---- Gap 0/V1 legacy backing fields (still read by callers) ---- */
-
-    public volatile Object preallocInst;
-    public volatile int userKlass;
-    public volatile Class<?> fastProxyClass;
-    public volatile Object fastProxyPreallocInst;
-    public volatile int fastProxyKlass;
-    public volatile long versionOffset;
-    public volatile long snapOffset;
-    public volatile MethodHandles.Lookup lookup;
+    /** Cached bytecode-emitting {@link MethodHandles.Lookup} for this class. */
+    volatile MethodHandles.Lookup lookup;
 
     /* ---- Gap 3 (bytecode): static-field helper fields ---- */
 
@@ -141,8 +159,6 @@ public final class ClassMeta {
             int k = CheckpointRollbackAgent.U.getInt(p, CheckpointRollbackAgent.KLASS_OFFSET);
             b = new KlassBinding(userClass, p, k);
             userBinding = b;
-            preallocInst = p;
-            userKlass = k;
             return b;
         }
     }
@@ -168,9 +184,6 @@ public final class ClassMeta {
             int k = CheckpointRollbackAgent.U.getInt(p, CheckpointRollbackAgent.KLASS_OFFSET);
             b = new KlassBinding(proxy, p, k);
             fastBinding = b;
-            fastProxyClass = proxy;
-            fastProxyPreallocInst = p;
-            fastProxyKlass = k;
             return b;
         }
     }
@@ -197,8 +210,6 @@ public final class ClassMeta {
                 long so = u.objectFieldOffset(sf);
                 fo = new FieldOffsets(vo, so);
                 fieldOffsets = fo;
-                versionOffset = vo;
-                snapOffset = so;
                 return fo;
             } catch (NoSuchFieldException e) {
                 throw new IllegalStateException("User class " + userClass.getName()
@@ -217,5 +228,43 @@ public final class ClassMeta {
             }
         }
         throw new NoSuchFieldException(name);
+    }
+
+    /**
+     * Lazily resolve and cache a {@link VarHandle} for the injected
+     * {@code $$crochetVersion} int field. The handle is obtained via a
+     * {@link MethodHandles.Lookup} returned by the user class's
+     * {@code $$crochetLookup()}; that lookup carries private-member access,
+     * so it can reach the field even though it is emitted {@code ACC_PRIVATE}.
+     *
+     * <p>The handle hides the offset arithmetic behind a name-based API and
+     * lets the JIT specialise on a stable call site rather than an
+     * {@code Unsafe.*} intrinsic. It does not replace the klass-pointer CAS
+     * at {@link CheckpointRollbackAgent#KLASS_OFFSET}, which still uses
+     * {@link Unsafe#compareAndSwapInt} because VarHandles cannot target a
+     * byte-offset in a foreign header.
+     */
+    public VersionHandles versionHandles() {
+        VersionHandles h = versionHandles;
+        if (h != null) {
+            return h;
+        }
+        synchronized (this) {
+            h = versionHandles;
+            if (h != null) {
+                return h;
+            }
+            try {
+                MethodHandles.Lookup lookup = resolveLookup();
+                VarHandle vh = lookup.findVarHandle(userClass, "$$crochetVersion", int.class);
+                h = new VersionHandles(vh);
+                versionHandles = h;
+                return h;
+            } catch (NoSuchFieldException | IllegalAccessException e) {
+                throw new IllegalStateException(
+                        "Failed to resolve VarHandle for $$crochetVersion on "
+                                + userClass.getName() + "; was the Java agent attached?", e);
+            }
+        }
     }
 }

@@ -47,6 +47,8 @@ INST_JDK=/path/to/other-jdk bash run-all.sh --instrumented
 - `-Dcrochet.verboseCompat=true` — print the cause of transform / SF-helper failures instead of swallowing (the `TransformerWrapper` catches `Throwable` silently by default so DaCapo digest-of-stderr checks stay clean).
 - `-Dcrochet.traceTransform=true` — per-class transform timing to `/tmp/crochet-transform-trace.log`.
 - `-Dcrochet.traceRuntime=true` — per-class `fastAccess` and `sfHelperFor` call counts to `/tmp/crochet-runtime-counts.log` on JVM shutdown. Both tracers are zero-cost when off.
+- `-Dcrochet.reflectiveGraphFallback=true` — enable `ArrayRegistry.propagate*`'s reflective graph walk for uninstrumented referents (arrays buried inside JDK objects Gap 7 left alone). Default OFF; enabling it makes propagation more complete but substantially slower.
+- `-Dcrochet.checkpointAll.skipSystem=true` — opt-out of thread-list / system classloader walks in `checkpointAll` / `rollbackAll`, for test frameworks or hosting containers that assume those roots are stable.
 
 ## Module layout
 

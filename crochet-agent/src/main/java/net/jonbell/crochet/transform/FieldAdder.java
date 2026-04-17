@@ -96,17 +96,19 @@ public final class FieldAdder extends ClassVisitor {
                 "(Ljava/lang/Object;Ljava/lang/Class;)I", false);
         mv.visitVarInsn(Opcodes.ISTORE, 2);                        // cur -> slot 2
 
-        // ---- realV = (cur < 0) ? -cur : cur
-        Label neg = new Label();
-        Label absDone = new Label();
+        // ---- realV = Math.abs(cur)
+        // HotSpot compiles Math.abs(int) to a branchless CMOV intrinsic on
+        // x86_64 / AArch64, saving a conditional branch + GOTO and shaving
+        // ~5 bytes of bytecode per checkpoint/rollback entry. Math.abs
+        // returns Integer.MIN_VALUE for Integer.MIN_VALUE (overflow); this
+        // is benign here because the paper's I2 guard below uses the same
+        // decoded value, so both sides of the comparison see identical
+        // overflow behaviour. We'd only wrap past Integer.MIN_VALUE with
+        // ~2^31 checkpoint/rollback cycles, which is not reachable in any
+        // realistic workload.
         mv.visitVarInsn(Opcodes.ILOAD, 2);
-        mv.visitJumpInsn(Opcodes.IFLT, neg);
-        mv.visitVarInsn(Opcodes.ILOAD, 2);
-        mv.visitJumpInsn(Opcodes.GOTO, absDone);
-        mv.visitLabel(neg);
-        mv.visitVarInsn(Opcodes.ILOAD, 2);
-        mv.visitInsn(Opcodes.INEG);
-        mv.visitLabel(absDone);
+        mv.visitMethodInsn(Opcodes.INVOKESTATIC, "java/lang/Math", "abs",
+                "(I)I", false);
         mv.visitVarInsn(Opcodes.ISTORE, 3);                        // realV -> slot 3
 
         // ---- if (realV >= v) return;  (I2 guard + cycle termination)
@@ -448,21 +450,17 @@ public final class FieldAdder extends ClassVisitor {
         mv.visitCode();
         // Decode the sentinel, then test rollback parity:
         //   int v  = this.$$crochetVersion;
-        //   int rv = (v < 0) ? -v : v;
+        //   int rv = Math.abs(v);
         //   return (rv != 0) && ((rv & 1) == 0);
-        Label neg = new Label();
-        Label abs = new Label();
+        // Math.abs intrinsifies to a branchless CMOV on HotSpot; same
+        // overflow caveat as emitVersionGuardedEntry applies (benign).
         Label notRollback = new Label();
         Label done = new Label();
 
         mv.visitVarInsn(Opcodes.ALOAD, 0);
         mv.visitFieldInsn(Opcodes.GETFIELD, className, VERSION_FIELD, "I");
-        mv.visitInsn(Opcodes.DUP);
-        mv.visitJumpInsn(Opcodes.IFLT, neg);
-        mv.visitJumpInsn(Opcodes.GOTO, abs);
-        mv.visitLabel(neg);
-        mv.visitInsn(Opcodes.INEG);
-        mv.visitLabel(abs);
+        mv.visitMethodInsn(Opcodes.INVOKESTATIC, "java/lang/Math", "abs",
+                "(I)I", false);
         // stack: [rv]
         mv.visitVarInsn(Opcodes.ISTORE, 1);
 

@@ -34,8 +34,31 @@
         </dependency>
     </dependencies>
 
+    <properties>
+        <!-- FastAccessCoordinator uses @jdk.internal.vm.annotation.Contended
+             for stripe-lock padding. That package is not exported by
+             java.base by default; expose it at compile time. The runtime is
+             packed into java.base by the jlink pipeline and the @Contended
+             annotation has RetentionPolicy.CLASS, so no runtime flag is
+             required on the instrumented JDK (and for the -javaagent path
+             the annotation has no observable effect; only HotSpot's layout
+             reader honors it when the class is in java.base). -->
+        <maven.compiler.release></maven.compiler.release>
+        <maven.compiler.source>17</maven.compiler.source>
+        <maven.compiler.target>17</maven.compiler.target>
+    </properties>
+
     <build>
         <plugins>
+            <plugin>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <configuration>
+                    <compilerArgs>
+                        <arg>--add-exports</arg>
+                        <arg>java.base/jdk.internal.vm.annotation=ALL-UNNAMED</arg>
+                    </compilerArgs>
+                </configuration>
+            </plugin>
             <plugin>
                 <artifactId>maven-jar-plugin</artifactId>
                 <configuration>

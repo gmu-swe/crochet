@@ -14,6 +14,12 @@ import org.objectweb.asm.Type;
  * any scratch local, so this visitor doesn't need the
  * {@link SharedLocalsProvider}. PUTSTATIC's existing 1- or 2-slot value sits
  * below the transient helper-ref and stays intact for the wrapped PUTSTATIC.
+ *
+ * <p>{@code <clinit>} takes the full skip to avoid recursion into the static
+ * rewriter via our own $$crochet* field initialisers. {@code <init>}
+ * forwards pre-super instructions unchanged via {@link CtorAwareMv} — the
+ * pre-hook only fires post-super so instance construction doesn't pay
+ * noteStaticAccess for statics referenced from super-call arguments.
  */
 public final class StaticFieldRewriter extends ClassVisitor {
 
@@ -30,8 +36,19 @@ public final class StaticFieldRewriter extends ClassVisitor {
      */
     private static final String NOTE_STATIC_ACCESS_DESC = "(Ljava/lang/Class;)V";
 
+    private String className;
+    private String superName;
+
     public StaticFieldRewriter(int api, ClassVisitor delegate) {
         super(api, delegate);
+    }
+
+    @Override
+    public void visit(int version, int access, String name, String signature,
+                      String superName, String[] interfaces) {
+        this.className = name;
+        this.superName = superName;
+        super.visit(version, access, name, signature, superName, interfaces);
     }
 
     @Override
@@ -41,18 +58,17 @@ public final class StaticFieldRewriter extends ClassVisitor {
         if (base == null) {
             return null;
         }
-        if (name.startsWith("$$crochet")
-                || "<init>".equals(name)
-                || "<clinit>".equals(name)) {
+        if (name.startsWith("$$crochet") || "<clinit>".equals(name)) {
             return base;
         }
-        return new WrapStaticsMV(api, base);
+        boolean isCtor = "<init>".equals(name);
+        return new WrapStaticsMV(api, base, className, superName, isCtor);
     }
 
-    private static final class WrapStaticsMV extends MethodVisitor {
+    private static final class WrapStaticsMV extends CtorAwareMv {
 
-        WrapStaticsMV(int api, MethodVisitor delegate) {
-            super(api, delegate);
+        WrapStaticsMV(int api, MethodVisitor delegate, String owner, String superName, boolean isCtor) {
+            super(api, delegate, owner, superName, isCtor);
         }
 
         /**
@@ -62,16 +78,16 @@ public final class StaticFieldRewriter extends ClassVisitor {
          * so any existing 2-slot value for PUTSTATIC stays intact.
          */
         @Override
-        public void visitFieldInsn(int opcode, String owner, String name, String descriptor) {
+        protected void visitFieldInsnPostSuper(int opcode, String owner, String name, String descriptor) {
             if (!shouldWrap(opcode, owner, name)) {
-                super.visitFieldInsn(opcode, owner, name, descriptor);
+                super.visitFieldInsnPostSuper(opcode, owner, name, descriptor);
                 return;
             }
             if (opcode == Opcodes.GETSTATIC) {
                 // stack: [...]
                 emitPreHook(owner);
                 // stack: [...]
-                super.visitFieldInsn(opcode, owner, name, descriptor);
+                mv.visitFieldInsn(opcode, owner, name, descriptor);
                 return;
             }
             if (opcode == Opcodes.PUTSTATIC) {
@@ -80,15 +96,15 @@ public final class StaticFieldRewriter extends ClassVisitor {
                 // value is untouched at the bottom when we hit PUTSTATIC.
                 emitPreHook(owner);
                 // stack: [..., value]
-                super.visitFieldInsn(opcode, owner, name, descriptor);
+                mv.visitFieldInsn(opcode, owner, name, descriptor);
                 return;
             }
-            super.visitFieldInsn(opcode, owner, name, descriptor);
+            super.visitFieldInsnPostSuper(opcode, owner, name, descriptor);
         }
 
         private void emitPreHook(String owner) {
-            super.visitLdcInsn(Type.getObjectType(owner));
-            super.visitMethodInsn(Opcodes.INVOKESTATIC, AGENT_INTERNAL,
+            mv.visitLdcInsn(Type.getObjectType(owner));
+            mv.visitMethodInsn(Opcodes.INVOKESTATIC, AGENT_INTERNAL,
                     "noteStaticAccess", NOTE_STATIC_ACCESS_DESC, false);
         }
 

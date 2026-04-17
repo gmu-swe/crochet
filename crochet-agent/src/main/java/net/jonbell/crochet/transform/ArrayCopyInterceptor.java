@@ -15,8 +15,11 @@ import org.objectweb.asm.Opcodes;
  * <p>Same method descriptor {@code (Object,I,Object,I,I)V} so no stack
  * reshape is needed — we just redirect the INVOKESTATIC target.
  *
- * <p>Skips {@code $$crochet*} methods and initializers, matching the
- * FieldAccessWrapper skip policy.
+ * <p>{@code <clinit>} takes the full skip. {@code <init>} forwards pre-super
+ * arraycopies unchanged via {@link CtorAwareMv}: the destination array can't
+ * be a field of {@code this} before super has initialised, so redirection
+ * would be a no-op (no object is registered); forwarding is cheaper. Post-
+ * super, we redirect as usual.
  */
 public final class ArrayCopyInterceptor extends ClassVisitor {
 
@@ -25,8 +28,19 @@ public final class ArrayCopyInterceptor extends ClassVisitor {
     private static final String AGENT_INTERNAL = "net/jonbell/crochet/runtime/CheckpointRollbackAgent";
     private static final String INTERCEPT_NAME = "interceptedArraycopy";
 
+    private String className;
+    private String superName;
+
     public ArrayCopyInterceptor(int api, ClassVisitor delegate) {
         super(api, delegate);
+    }
+
+    @Override
+    public void visit(int version, int access, String name, String signature,
+                      String superName, String[] interfaces) {
+        this.className = name;
+        this.superName = superName;
+        super.visit(version, access, name, signature, superName, interfaces);
     }
 
     @Override
@@ -36,29 +50,30 @@ public final class ArrayCopyInterceptor extends ClassVisitor {
         if (base == null) {
             return null;
         }
-        if (name.startsWith("$$crochet") || "<init>".equals(name) || "<clinit>".equals(name)) {
+        if (name.startsWith("$$crochet") || "<clinit>".equals(name)) {
             return base;
         }
-        return new RedirectMV(api, base);
+        boolean isCtor = "<init>".equals(name);
+        return new RedirectMV(api, base, className, superName, isCtor);
     }
 
-    private static final class RedirectMV extends MethodVisitor {
-        RedirectMV(int api, MethodVisitor delegate) {
-            super(api, delegate);
+    private static final class RedirectMV extends CtorAwareMv {
+        RedirectMV(int api, MethodVisitor delegate, String owner, String superName, boolean isCtor) {
+            super(api, delegate, owner, superName, isCtor);
         }
 
         @Override
-        public void visitMethodInsn(int opcode, String owner, String name,
-                                    String descriptor, boolean isInterface) {
+        protected void visitMethodInsnPostSuper(int opcode, String mOwner, String name,
+                                                String descriptor, boolean isInterface) {
             if (opcode == Opcodes.INVOKESTATIC
-                    && SYSTEM_INTERNAL.equals(owner)
+                    && SYSTEM_INTERNAL.equals(mOwner)
                     && "arraycopy".equals(name)
                     && ARRAYCOPY_DESC.equals(descriptor)) {
-                super.visitMethodInsn(Opcodes.INVOKESTATIC, AGENT_INTERNAL,
+                mv.visitMethodInsn(Opcodes.INVOKESTATIC, AGENT_INTERNAL,
                         INTERCEPT_NAME, ARRAYCOPY_DESC, false);
                 return;
             }
-            super.visitMethodInsn(opcode, owner, name, descriptor, isInterface);
+            super.visitMethodInsnPostSuper(opcode, mOwner, name, descriptor, isInterface);
         }
     }
 }

@@ -16,6 +16,11 @@ import org.objectweb.asm.Type;
  * stores (IASTORE/BASTORE/CASTORE/SASTORE/FASTORE/AASTORE/LASTORE/DASTORE) —
  * prior pure-stack implementation left LASTORE/DASTORE unwrapped because the
  * [arr, idx, v_hi, v_lo] shape has no clean DUP_X/POP permutation.
+ *
+ * <p>{@code <clinit>} takes the full skip; {@code <init>} forwards pre-super
+ * xASTOREs unchanged via {@link CtorAwareMv} (they can't reach an array
+ * field of {@code this} and any array built for the super-call is its own
+ * transient value). Post-super xASTOREs wrap the same as in any method.
  */
 public final class ArrayAccessWrapper extends ClassVisitor {
 
@@ -23,10 +28,20 @@ public final class ArrayAccessWrapper extends ClassVisitor {
     private static final String BEFORE_STORE_DESC = "(Ljava/lang/Object;)V";
 
     private final SharedLocalsProvider locals;
+    private String className;
+    private String superName;
 
     public ArrayAccessWrapper(int api, ClassVisitor delegate, SharedLocalsProvider locals) {
         super(api, delegate);
         this.locals = locals;
+    }
+
+    @Override
+    public void visit(int version, int access, String name, String signature,
+                      String superName, String[] interfaces) {
+        this.className = name;
+        this.superName = superName;
+        super.visit(version, access, name, signature, superName, interfaces);
     }
 
     @Override
@@ -36,27 +51,27 @@ public final class ArrayAccessWrapper extends ClassVisitor {
         if (base == null) {
             return null;
         }
-        if (name.startsWith("$$crochet")
-                || "<init>".equals(name)
-                || "<clinit>".equals(name)) {
+        if (name.startsWith("$$crochet") || "<clinit>".equals(name)) {
             return base;
         }
-        return new WrapStoresMV(api, base, locals);
+        boolean isCtor = "<init>".equals(name);
+        return new WrapStoresMV(api, base, locals, className, superName, isCtor);
     }
 
-    private static final class WrapStoresMV extends MethodVisitor {
+    private static final class WrapStoresMV extends CtorAwareMv {
         private final SharedLocalsProvider locals;
 
-        WrapStoresMV(int api, MethodVisitor delegate, SharedLocalsProvider locals) {
-            super(api, delegate);
+        WrapStoresMV(int api, MethodVisitor delegate, SharedLocalsProvider locals,
+                     String owner, String superName, boolean isCtor) {
+            super(api, delegate, owner, superName, isCtor);
             this.locals = locals;
         }
 
         @Override
-        public void visitInsn(int opcode) {
+        protected void visitInsnPostSuper(int opcode) {
             Type vt = valueTypeFor(opcode);
             if (vt == null) {
-                super.visitInsn(opcode);
+                super.visitInsnPostSuper(opcode);
                 return;
             }
             int slot = locals.sharedScratch(vt);
@@ -69,18 +84,18 @@ public final class ArrayAccessWrapper extends ClassVisitor {
             // stack: [..., arr, idx, val]    (val is 1 or 2 slots)
             locals.emitVarInsn(storeOp, slot);
             // stack: [..., arr, idx]
-            super.visitInsn(Opcodes.SWAP);
+            mv.visitInsn(Opcodes.SWAP);
             // stack: [..., idx, arr]
-            super.visitInsn(Opcodes.DUP);
+            mv.visitInsn(Opcodes.DUP);
             // stack: [..., idx, arr, arr]
-            super.visitMethodInsn(Opcodes.INVOKESTATIC, REGISTRY_INTERNAL,
+            mv.visitMethodInsn(Opcodes.INVOKESTATIC, REGISTRY_INTERNAL,
                     "beforeStore", BEFORE_STORE_DESC, false);
             // stack: [..., idx, arr]
-            super.visitInsn(Opcodes.SWAP);
+            mv.visitInsn(Opcodes.SWAP);
             // stack: [..., arr, idx]
             locals.emitVarInsn(loadOp, slot);
             // stack: [..., arr, idx, val]
-            super.visitInsn(opcode);
+            mv.visitInsn(opcode);
         }
 
         private static Type valueTypeFor(int opcode) {

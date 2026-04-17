@@ -9,10 +9,27 @@ package net.jonbell.crochet.runtime;
  * overhead on concurrent DaCapo workloads (tomcat, h2, lusearch, kafka).
  *
  * <p>This coordinator replaces the per-class lock with a bank of stripe locks
- * keyed by {@link System#identityHashCode(Object)}. With 256 stripes, threads
+ * keyed by {@link System#identityHashCode(Object)}. The count scales to the
+ * host machine (see {@link #STRIPE_COUNT}); with 64-4096 stripes, threads
  * working on distinct objects of the same user class almost never collide,
  * dropping contention from O(threads) to O(threads / stripes) on typical
  * workloads.
+ *
+ * <p><b>Padding</b>: each stripe is a {@link Stripe} instance whose class
+ * carries {@link jdk.internal.vm.annotation.Contended @Contended}, which HotSpot
+ * honors by inserting 128 bytes of padding before and after instance fields,
+ * pushing each stripe onto its own cache line (two lines, actually — HotSpot
+ * uses double-wide padding for the prefetcher). This is the standard recipe
+ * Doug Lea uses in {@code Striped64} and {@code ForkJoinPool} to keep
+ * neighboring stripes from false-sharing the monitor-inflation bits. The
+ * runtime is packed into {@code java.base} so the annotation resolves
+ * without {@code -XX:-RestrictContended}.
+ *
+ * <p><b>Dynamic count</b>: stripes sized to {@code 2^ceil(log2(4 * availableProcessors()))}
+ * with clamps at 64 (min) and 4096 (max). The 4x multiplier covers bursty
+ * arrival patterns where a single checkpoint triggers a burst of fastAccess
+ * calls from many objects landing on the same stripe. On a 16-CPU host this
+ * evaluates to 128 stripes; on a 96-CPU host it evaluates to 512.
  *
  * <p><b>Correctness relative to the paper's invariants</b>:
  * <ul>
@@ -43,24 +60,59 @@ package net.jonbell.crochet.runtime;
  * {@code synchronized(x)} on the same object, and we don't want to contend
  * with that. The stripe is derived from {@code System.identityHashCode(obj)}
  * so it's stable and doesn't require the object's intrinsic monitor.
+ *
+ * <p><b>Hash mixing</b>: {@code System.identityHashCode} on some JVM builds
+ * (notably legacy G1 with biased locking) shows biased low bits — the first
+ * few objects allocated on a young-gen TLAB can share a hash prefix. We xor
+ * in the top 16 bits ({@code h ^= h >>> 16}) before masking, which is the
+ * same mixer {@link java.util.concurrent.ConcurrentHashMap#spread} uses to
+ * defuse biased keys.
  */
 final class FastAccessCoordinator {
 
     private FastAccessCoordinator() {}
 
     /**
-     * Power of two stripe count. 256 gives enough parallelism for DaCapo-scale
-     * workloads (dozens of threads, thousands of in-flight objects) with
-     * negligible memory overhead (~2 KiB of monitor headers).
+     * Power-of-two stripe count. Scaled to {@code 2^ceil(log2(4 * availableProcessors()))}
+     * with clamps at 64 (min) and 4096 (max). Sized once at class-init time;
+     * re-sizing under load would require a CHM-style migration, which is not
+     * worth the complexity for a bank of monitor objects.
      */
-    private static final int STRIPE_COUNT = 256;
-    private static final int STRIPE_MASK = STRIPE_COUNT - 1;
-    private static final Object[] STRIPES = new Object[STRIPE_COUNT];
+    private static final int STRIPE_COUNT;
+    private static final int STRIPE_MASK;
+    private static final Stripe[] STRIPES;
 
     static {
-        for (int i = 0; i < STRIPE_COUNT; i++) {
-            STRIPES[i] = new Object();
+        int cpus = Runtime.getRuntime().availableProcessors();
+        int target = 4 * Math.max(1, cpus);
+        int pow2 = 1;
+        while (pow2 < target) {
+            pow2 <<= 1;
         }
+        if (pow2 < 64) {
+            pow2 = 64;
+        } else if (pow2 > 4096) {
+            pow2 = 4096;
+        }
+        STRIPE_COUNT = pow2;
+        STRIPE_MASK = STRIPE_COUNT - 1;
+        STRIPES = new Stripe[STRIPE_COUNT];
+        for (int i = 0; i < STRIPE_COUNT; i++) {
+            STRIPES[i] = new Stripe();
+        }
+    }
+
+    /**
+     * Padded stripe wrapper. The monitor is on {@code this}; the class body
+     * carries no fields — padding comes from {@link jdk.internal.vm.annotation.Contended}
+     * which HotSpot interprets even on a field-less class by inserting
+     * pre/post padding regions in the object layout. Runtime is packed into
+     * {@code java.base} so access to the {@code jdk.internal.vm.annotation}
+     * package is granted without {@code -XX:-RestrictContended}.
+     */
+    @jdk.internal.vm.annotation.Contended
+    private static final class Stripe {
+        Stripe() {}
     }
 
     /**
@@ -70,9 +122,16 @@ final class FastAccessCoordinator {
      */
     static Object lockFor(Object obj) {
         // identityHashCode may allocate a hash on first call, but the result
-        // is stable for the object's lifetime per JLS §15.8.2. HotSpot's
-        // identityHashCode is already well-distributed in the low bits for
-        // fresh objects, so a plain mask suffices for our 256-stripe bank.
-        return STRIPES[System.identityHashCode(obj) & STRIPE_MASK];
+        // is stable for the object's lifetime per JLS §15.8.2. Some JVMs show
+        // biased low bits for fresh objects in the same TLAB (especially on
+        // large-eden tunings), so we mix the top 16 bits down before masking.
+        int h = System.identityHashCode(obj);
+        h ^= (h >>> 16);
+        return STRIPES[h & STRIPE_MASK];
+    }
+
+    /** Visible for tests and diagnostics. */
+    static int stripeCount() {
+        return STRIPE_COUNT;
     }
 }
