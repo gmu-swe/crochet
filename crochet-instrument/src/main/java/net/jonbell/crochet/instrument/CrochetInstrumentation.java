@@ -43,7 +43,18 @@ public class CrochetInstrumentation implements Instrumentation {
 
     @Override
     public byte[] apply(byte[] classFileBuffer) {
-        return transformer.transform(classFileBuffer, false);
+        try {
+            return transformer.transform(classFileBuffer, false);
+        } catch (Throwable t) {
+            // Transform failure at build time (jlink). Most commonly this is
+            // ASM's COMPUTE_FRAMES reflecting on a superclass that is not on
+            // the jlink classpath, or a class file too large to emit after
+            // adding the crochet surface. Returning null preserves the
+            // original bytes so the image still builds; the class just won't
+            // gain the crochet surface.
+            System.err.println("[crochet] transform failed; keeping original bytes: " + t);
+            return null;
+        }
     }
 
     @Override
@@ -59,8 +70,21 @@ public class CrochetInstrumentation implements Instrumentation {
 
     @Override
     public boolean shouldPack(String resourceName) {
+        // Pack only the classes that instrumented user/JCL code actually
+        // references at runtime: the runtime support (CheckpointRollbackAgent,
+        // CRIJInstrumented, ClassMeta, ...), the transform support the runtime
+        // calls back into (ProxyTemplate, Specializer), the @CrochetInstrumented
+        // marker, the patch helpers, and the agent's shaded ASM package
+        // (which Specializer / ProxyTemplate reach into to emit hidden proxy
+        // bytes). Agent entry points (CrochetAgent, TransformerWrapper)
+        // implement java.lang.instrument.ClassFileTransformer and must stay
+        // out of java.base — java.base does not read java.instrument. The
+        // agent jar is attached via -javaagent from outside java.base.
         return resourceName.startsWith(CrochetTransformer.RUNTIME_PACKAGE_PREFIX)
-                || resourceName.startsWith(CrochetTransformer.TRANSFORM_PACKAGE_PREFIX);
+                || resourceName.startsWith(CrochetTransformer.TRANSFORM_PACKAGE_PREFIX)
+                || resourceName.startsWith("net/jonbell/crochet/annotation/")
+                || resourceName.startsWith("net/jonbell/crochet/patch/")
+                || resourceName.startsWith("net/jonbell/crochet/agent/shaded/");
     }
 
     @Override

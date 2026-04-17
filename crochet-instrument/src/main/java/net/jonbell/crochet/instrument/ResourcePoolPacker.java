@@ -64,6 +64,11 @@ public class ResourcePoolPacker extends Packer {
             }
             // Add packages
             classNode.module.packages.addAll(packages);
+            // Note: java.base's requires list MUST be empty (JVMS rule); we
+            // cannot inject "requires jdk.unsupported" here. The packed runtime
+            // depends on sun.misc.Unsafe, so callers must launch the
+            // instrumented JDK with --add-reads java.base=jdk.unsupported (the
+            // demo/run-all.sh instrumented-mode path does this).
             ClassWriter cw = new ClassWriter(0);
             classNode.accept(cw);
             return cw.toByteArray();

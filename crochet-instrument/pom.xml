@@ -16,10 +16,10 @@
     <description>Produces a Crochet-instrumented JDK. jlink plugins for Java 9+, bulk rewriter for Java 8.</description>
 
     <properties>
-        <!-- This module references jdk.tools.jlink.plugin (JDK-internal); javac rejects
-             add-exports to system modules in release mode, so we fall back to source/target
-             to let the add-exports compiler arg below take effect. -->
-
+        <!-- javac rejects add-exports from a system module in release mode
+             ("exporting a package from system module jdk.jlink is not allowed
+             with release"). Fall back to source/target 17 so the add-exports
+             compiler arg below takes effect. -->
         <maven.compiler.release></maven.compiler.release>
         <maven.compiler.source>17</maven.compiler.source>
         <maven.compiler.target>17</maven.compiler.target>
@@ -59,11 +59,11 @@
             <plugin>
                 <artifactId>maven-compiler-plugin</artifactId>
                 <configuration>
+                    <!-- jdk.jlink exports jdk.tools.jlink.plugin only to its own
+                         modules; name our module explicitly so javac can see it. -->
                     <compilerArgs>
-                        <arg>--add-modules</arg>
-                        <arg>jdk.jlink</arg>
                         <arg>--add-exports</arg>
-                        <arg>jdk.jlink/jdk.tools.jlink.plugin=ALL-UNNAMED</arg>
+                        <arg>jdk.jlink/jdk.tools.jlink.plugin=net.jonbell.crochet.instrument</arg>
                     </compilerArgs>
                 </configuration>
             </plugin>
@@ -77,6 +77,93 @@
                         </manifestEntries>
                     </archive>
                 </configuration>
+            </plugin>
+            <plugin>
+                <artifactId>maven-shade-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>shade</goal>
+                        </goals>
+                        <configuration>
+                            <createDependencyReducedPom>false</createDependencyReducedPom>
+                            <relocations>
+                                <relocation>
+                                    <pattern>org.jacoco.core</pattern>
+                                    <shadedPattern>
+                                        net.jonbell.crochet.instrument.shaded.jacoco
+                                    </shadedPattern>
+                                </relocation>
+                                <relocation>
+                                    <pattern>org.objectweb.asm</pattern>
+                                    <shadedPattern>
+                                        net.jonbell.crochet.instrument.shaded.asm
+                                    </shadedPattern>
+                                </relocation>
+                            </relocations>
+                            <artifactSet>
+                                <includes>
+                                    <!-- Bundle the agent (transformer + runtime) so the
+                                         instrument jar is self-contained. -->
+                                    <include>net.jonbell.crochet:*</include>
+                                    <include>org.jacoco:*</include>
+                                    <include>org.ow2.asm:*</include>
+                                </includes>
+                            </artifactSet>
+                            <filters>
+                                <filter>
+                                    <artifact>org.ow2.asm:*</artifact>
+                                    <excludes>
+                                        <exclude>module-info.class</exclude>
+                                        <exclude>META-INF/MANIFEST.MF</exclude>
+                                        <exclude>META-INF/*.SF</exclude>
+                                        <exclude>META-INF/*.DSA</exclude>
+                                        <exclude>META-INF/*.RSA</exclude>
+                                    </excludes>
+                                </filter>
+                                <filter>
+                                    <artifact>org.jacoco:*</artifact>
+                                    <excludes>
+                                        <exclude>module-info.class</exclude>
+                                        <exclude>META-INF/MANIFEST.MF</exclude>
+                                        <exclude>META-INF/*.SF</exclude>
+                                        <exclude>META-INF/*.DSA</exclude>
+                                        <exclude>META-INF/*.RSA</exclude>
+                                    </excludes>
+                                </filter>
+                                <filter>
+                                    <artifact>net.jonbell.crochet:crochet-agent</artifact>
+                                    <excludes>
+                                        <exclude>module-info.class</exclude>
+                                        <exclude>META-INF/MANIFEST.MF</exclude>
+                                    </excludes>
+                                </filter>
+                            </filters>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <groupId>org.moditect</groupId>
+                <artifactId>moditect-maven-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>add-module-info</id>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>add-module-info</goal>
+                        </goals>
+                        <configuration>
+                            <overwriteExistingFiles>true</overwriteExistingFiles>
+                            <module>
+                                <moduleInfoFile>
+                                    ${project.build.sourceDirectory}/module-info.java
+                                </moduleInfoFile>
+                            </module>
+                        </configuration>
+                    </execution>
+                </executions>
             </plugin>
         </plugins>
     </build>

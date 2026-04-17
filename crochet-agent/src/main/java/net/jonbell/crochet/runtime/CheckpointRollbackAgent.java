@@ -18,12 +18,19 @@ import sun.misc.Unsafe;
  * Runtime support invoked from instrumented user classes and the user-facing
  * checkpoint/rollback API.
  *
- * <p>V1: klass-swap + lazy snapshot. {@link #checkpoint(Object)} / {@link #rollback(Object, int)}
- * swap the object to a per-user-class hidden Fast proxy. The proxy's
- * {@code $$crochetAccess} override delegates to {@link #fastAccess(CRIJInstrumented)},
- * which takes the snapshot (on checkpoint) or restores from it (on rollback)
- * on the FIRST field access and then swaps the klass back to the user class,
- * so the object is "normal" for all subsequent accesses.
+ * <p>Gap 6 / V2: klass-swap + lazy snapshot with race-winner concurrency.
+ * {@link #checkpoint(Object)} / {@link #rollback(Object, int)} swap the object
+ * to a per-user-class hidden Fast proxy. The proxy's {@code $$crochetAccess}
+ * override delegates to {@link #fastAccess(CRIJInstrumented)}, which uses a
+ * CAS on the klass header to ensure exactly one thread does the
+ * snapshot/restore work while peers return cheaply.
+ *
+ * <p>Gap 8 (exception safety): the winner's snapshot/restore runs inside a
+ * try/catch that zeroes the version + nulls the snap on throw and raises a
+ * {@link RollbackException} with {@link RollbackException#POISON_VERSION}.
+ * Because the winner swapped klass <em>at the top</em>, no finally clause is
+ * needed — a thrown path leaves the object in the user-class state with a
+ * consistent (zeroed) view, preserving the paper's I3 continuity invariant.
  */
 public final class CheckpointRollbackAgent {
 
@@ -44,10 +51,6 @@ public final class CheckpointRollbackAgent {
     /** Byte offset of the (compressed) klass pointer in a HotSpot object header. */
     public static final long KLASS_OFFSET = 8L;
 
-    /**
-     * Template bytes for the Fast-state proxy. Emitted once and rewritten per
-     * user class by {@link Specializer}.
-     */
     private static volatile byte[] FAST_TEMPLATE;
 
     private static byte[] fastTemplate() {
@@ -65,7 +68,8 @@ public final class CheckpointRollbackAgent {
     }
 
     // Paper §3.4: "uses atomic compare-and-swap operations". The counter is
-    // lock-free under contention via a CAS retry loop.
+    // lock-free under contention via a CAS retry loop. I1 (unique) and I2
+    // (monotone) follow from CAS-on-successor-value.
     private static final AtomicInteger VERSION_COUNTER = new AtomicInteger(0);
 
     public static int nextCheckpointVersion() {
@@ -99,123 +103,173 @@ public final class CheckpointRollbackAgent {
 
     /** User-facing: checkpoint {@code target}. Returns the version id. */
     public static int checkpoint(Object target) {
+        Class<?> userClass = realUserClassOf(target);
         int v = nextCheckpointVersion();
         ((CRIJInstrumented) target).$$crochetCheckpoint(v);
+        ArrayRegistry.propagateCheckpoint(target, v);
+        checkpointClassAtVersion(userClass, v);
         return v;
     }
 
     /** User-facing: roll {@code target} back to the state captured at version {@code v}. */
     public static void rollback(Object target, int v) {
+        Class<?> userClass = realUserClassOf(target);
         int rv = nextRollbackVersion();
         ((CRIJInstrumented) target).$$crochetRollback(rv);
+        ArrayRegistry.propagateRollback(target, v);
+        rollbackClassAtVersion(userClass, rv);
+    }
+
+    private static Class<?> realUserClassOf(Object target) {
+        Class<?> c = target.getClass();
+        if (CRIJFast.class.isAssignableFrom(c)) {
+            return c.getSuperclass();
+        }
+        return c;
     }
 
     /* ---------- called from instrumented code ---------- */
 
     /**
-     * Bound into every user class's {@code $$crochetCheckpoint} body by
-     * {@link net.jonbell.crochet.transform.FieldAdder}. Lazily generates the
-     * Fast proxy for {@code userClass}, then klass-swaps {@code target}.
-     */
-    /**
      * Called from the emitted {@code $$crochetCheckpoint} / {@code $$crochetRollback}
-     * bodies AFTER the version field has been bumped. If proxy generation or
-     * klass swap fails, the caller's bump must be undone — we do that here.
-     *
-     * @param priorVersion the value of {@code $$crochetVersion} BEFORE the caller
-     *                     bumped it; restored on failure.
+     * bodies once the caller has installed the sentinel version {@code -v}. Looks
+     * up (and generates if needed) the fast proxy, then CASes the klass from
+     * user to proxy. A failed CAS is benign — a peer may have already swapped;
+     * the sentinel version is what drives fastAccess regardless.
+     */
+    public static void swapToFastProxy(Object target, Class<?> userClass) {
+        Class<?> fastProxy = fastProxyFor(userClass);
+        changeClass(target, userClass, fastProxy);
+    }
+
+    /**
+     * Backwards-compat shim used by bytecode emitted by an earlier FieldAdder
+     * that passed a {@code priorVersion} argument. The new sentinel-aware
+     * emit does not call this form; kept non-deprecated so older cached
+     * instrumentation still links.
      */
     public static void swapToFastProxy(Object target, Class<?> userClass, int priorVersion) {
-        Class<?> fastProxy;
         try {
-            fastProxy = fastProxyFor(userClass);
+            Class<?> fastProxy = fastProxyFor(userClass);
+            changeClass(target, userClass, fastProxy);
         } catch (RuntimeException | Error e) {
             ((CRIJInstrumented) target).$$crochetSetVersion(priorVersion);
             throw new RollbackException(RollbackException.POISON_VERSION, e);
         }
-        // CAS failure is benign: if another thread already swapped us, we're
-        // already in (or past) the target state. The version we just wrote
-        // will be observed by the next fastAccess either way.
-        changeClass(target, userClass, fastProxy);
-    }
-
-    /** Backward-compat shim for any bytecode emitted before the 3-arg form. */
-    @Deprecated
-    public static void swapToFastProxy(Object target, Class<?> userClass) {
-        swapToFastProxy(target, userClass, 0);
     }
 
     /**
-     * Invoked by the Fast proxy's overridden {@code $$crochetAccess} (via the
-     * template in {@link ProxyTemplate}). Decides checkpoint vs rollback based
-     * on the version parity of {@code obj} and performs the snapshot or restore
-     * work, then swaps the klass back to the user class so subsequent accesses
-     * run without hook overhead.
+     * Invoked by the Fast proxy's overridden {@code $$crochetAccess}. Gap 6
+     * race-winner pattern: we CAS the klass from fast-proxy back to user at the
+     * <em>top</em> of the method, so exactly one thread enters the
+     * snapshot/restore body. Peers whose CAS fails return immediately.
+     *
+     * <p>The winner's work is wrapped in try/catch for gap 8: an exception
+     * mid-snapshot leaves the klass at user (already swapped), and we zero
+     * version+snap so the object is in a consistent "no active checkpoint"
+     * state before raising {@link RollbackException}.
      */
     public static void fastAccess(CRIJInstrumented obj) {
-        Class<?> proxyClass = obj.getClass();
-        Class<?> userClass = proxyClass.getSuperclass();
+        Class<?> observedClass = obj.getClass();
+        // Quick exit: klass may have already been CAS'd back to the user class
+        // by a peer that completed the work. If so, we can proceed to the
+        // caller's field access without any hook overhead.
+        if (!CRIJFast.class.isAssignableFrom(observedClass)) {
+            return;
+        }
+        Class<?> userClass = observedClass.getSuperclass();
         if (userClass == null) {
             throw new RollbackException(RollbackException.POISON_VERSION,
                     new IllegalStateException("fastAccess: proxy has no superclass"));
         }
+
         int v = obj.$$crochetGetVersion();
-        if (v == 0) {
-            changeClass(obj, proxyClass, userClass);
-            return;
+        // Sentinel decode (paper Listing 3): mid-update callers may observe -v
+        // between sentinel install and finalize; treat realV = |v|.
+        int realV = (v < 0) ? -v : v;
+
+        // Gap 6/8 resolution: we serialize ALL fastAccess entrants for this
+        // object via a lock derived from the object's user class, so there is
+        // no "winner publishes user-class but work still in flight" window.
+        // Work runs to completion while klass is still proxy; klass CAS happens
+        // at the END of the critical section. Non-winners that wait on the
+        // same lock observe klass == user on re-check and return cheaply.
+        //
+        // We intentionally do NOT synchronize on {@code obj} itself to avoid
+        // contending with user code that might lock on the object. Instead we
+        // use the object's $$crochetSnap slot when present (rollback path) or
+        // the user-class {@link Class} object as a class-wide lock (checkpoint
+        // path when no snap exists yet).
+        Object lock = obj.$$crochetGetSnap();
+        if (lock == null) {
+            // Checkpoint-before-first-access: no snap exists yet, sync on class.
+            lock = userClass;
         }
-        Throwable thrown = null;
-        boolean rollbackBranch = (v & 1) == 0;
-        try {
-            if (!rollbackBranch) {
-                // Checkpoint state. Shadow allocated first; only published
-                // via setSnap on success. Throws leave snap at its prior
-                // value and obj untouched.
-                Object shadow = allocateShadow(userClass);
-                obj.$$crochetCopyFieldsTo(shadow);
-                obj.$$crochetSetSnap(shadow);
-                obj.$$crochetPropagateCheckpoint(v);
-            } else {
-                // Rollback state. Snap cleared only AFTER successful
-                // copyFieldsFrom — a mid-copy throw preserves the snap so
-                // the caller could retry (if they know the state is recoverable).
-                Object snap = obj.$$crochetGetSnap();
-                if (snap != null) {
-                    obj.$$crochetCopyFieldsFrom(snap);
-                    obj.$$crochetSetSnap(null);
+        synchronized (lock) {
+            // Re-check under the lock: a peer that we were blocked behind may
+            // already have finished the work and CAS'd klass to user.
+            if (!CRIJFast.class.isAssignableFrom(obj.getClass())) {
+                return;
+            }
+            // Re-read the version in case a peer completed while we blocked.
+            v = obj.$$crochetGetVersion();
+            realV = (v < 0) ? -v : v;
+            if (realV == 0) {
+                swapKlassProxyToUser(obj, userClass);
+                return;
+            }
+            boolean rollbackBranch = (realV & 1) == 0;
+            try {
+                if (!rollbackBranch) {
+                    // Checkpoint: paper §3.1 flat-nested semantics — the latest
+                    // checkpoint overwrites any previous snap. A racing entrant
+                    // that sees the same version and was blocked behind us will
+                    // re-check klass under the lock and find klass=user; it
+                    // returns cheaply so it doesn't double-install.
+                    Object shadow = allocateShadow(userClass);
+                    obj.$$crochetCopyFieldsTo(shadow);
+                    obj.$$crochetSetSnap(shadow);
+                    obj.$$crochetPropagateCheckpoint(realV);
+                } else {
+                    Object snap = obj.$$crochetGetSnap();
+                    if (snap != null) {
+                        obj.$$crochetCopyFieldsFrom(snap);
+                        obj.$$crochetSetSnap(null);
+                    }
+                    obj.$$crochetPropagateRollback(realV);
                 }
-                obj.$$crochetPropagateRollback(v);
+            } catch (Throwable t) {
+                // Gap 8: zero the version and snap to leave a consistent
+                // no-active-checkpoint state before rethrowing as poison.
+                try {
+                    obj.$$crochetSetVersion(0);
+                    obj.$$crochetSetSnap(null);
+                } catch (Throwable ignore) {
+                }
+                swapKlassProxyToUser(obj, userClass);
+                if (t instanceof RollbackException re) {
+                    throw re;
+                }
+                throw new RollbackException(RollbackException.POISON_VERSION, t);
             }
-        } catch (Throwable t) {
-            thrown = t;
-        } finally {
-            // Always swap klass back to the user class. CAS-race-loss is benign.
-            changeClass(obj, proxyClass, userClass);
+            // Work is done; swap klass from proxy to user. Any peer that
+            // blocked on our lock will re-check CRIJFast and return cheaply.
+            swapKlassProxyToUser(obj, userClass);
         }
-        if (thrown != null) {
-            if (thrown instanceof RollbackException re) {
-                throw re;
-            }
-            throw new RollbackException(RollbackException.POISON_VERSION, thrown);
-        }
+    }
+
+    private static void swapKlassProxyToUser(CRIJInstrumented obj, Class<?> userClass) {
+        ClassMeta meta = ClassMeta.of(userClass);
+        int userK  = meta.userBinding().klass;
+        int proxyK = meta.fastBinding().klass;
+        U.compareAndSwapInt(obj, KLASS_OFFSET, proxyK, userK);
     }
 
     /* ---------- Gap 3: reflective static-field checkpoint ---------- */
 
-    /**
-     * Per-class snapshot of non-final, non-synthetic static fields, keyed on
-     * {@link Class}. V1: eager reflective snapshot; {@link #checkpointStatics}
-     * reads every static into the cache, {@link #rollbackStatics} writes them
-     * back. No bytecode rewriting — mutations to the statics happen on the
-     * real field slots, no redirection.
-     */
     private static final Map<Class<?>, Map<String, Object>> STATIC_SNAPS =
             Collections.synchronizedMap(new IdentityHashMap<>());
 
-    /**
-     * Captures a snapshot of all non-final static fields of {@code c} (and
-     * nothing inherited). Returns a checkpoint version id.
-     */
     public static int checkpointStatics(Class<?> c) {
         int v = nextCheckpointVersion();
         Map<String, Object> snap = new LinkedHashMap<>();
@@ -237,7 +291,6 @@ public final class CheckpointRollbackAgent {
         return v;
     }
 
-    /** Restores the statics captured by the matching {@link #checkpointStatics}. */
     public static void rollbackStatics(Class<?> c, int v) {
         nextRollbackVersion();
         Map<String, Object> snap = STATIC_SNAPS.remove(c);
@@ -257,16 +310,6 @@ public final class CheckpointRollbackAgent {
 
     /* ---------- Gap 4: reflective array checkpoint ---------- */
 
-    /**
-     * Per-array snapshot keyed by identity. {@code checkpointArray} records a
-     * deep copy; {@code rollbackArray} writes it back into the same array
-     * instance so all references remain valid.
-     *
-     * <p>V1 is single-level only — nested arrays or CRIJInstrumented element
-     * propagation is driven explicitly by the caller. Moving to a version
-     * that propagates through element refs is straightforward once we have
-     * the array-visitor pass working.
-     */
     private static final Map<Object, Object> ARRAY_SNAPS =
             Collections.synchronizedMap(new IdentityHashMap<>());
 
@@ -304,51 +347,46 @@ public final class CheckpointRollbackAgent {
 
     /* ---------- klass-swap machinery ---------- */
 
-    /**
-     * Atomically flip the (compressed) klass pointer of {@code target} from the
-     * klass of {@code from} to the klass of {@code to}.
-     *
-     * <p>Returns {@code true} if the CAS succeeded, {@code false} if another
-     * thread got there first. Callers that require the swap must check; callers
-     * that just want the target state (e.g. fastAccess's swap-back) can ignore.
-     */
-    @SuppressWarnings("deprecation")
     public static boolean changeClass(Object target, Class<?> from, Class<?> to) {
         int fromKlass = klassOf(from);
         int toKlass = klassOf(to);
         return U.compareAndSwapInt(target, KLASS_OFFSET, fromKlass, toKlass);
     }
 
-    /** Returns the compressed klass-pointer int for {@code c}, caching it in {@link ClassMeta}. */
     public static int klassOf(Class<?> c) {
-        ClassMeta meta = ClassMeta.of(c);
-        Object prealloc = meta.preallocInst;
-        if (prealloc == null) {
-            synchronized (meta) {
-                prealloc = meta.preallocInst;
-                if (prealloc == null) {
-                    prealloc = allocateShadow(c);
-                    meta.preallocInst = prealloc;
-                    meta.userKlass = U.getInt(prealloc, KLASS_OFFSET);
-                }
-            }
-        }
-        return meta.userKlass;
+        return ClassMeta.of(c).userBinding().klass;
+    }
+
+    /* ---------- Gap 6: version field-offset helpers for emitted bytecode ---------- */
+
+    /** Volatile read of $$crochetVersion on target. */
+    public static int versionVolatileGet(Object target, Class<?> userClass) {
+        long off = ClassMeta.of(userClass).fieldOffsets().versionOffset;
+        return U.getIntVolatile(target, off);
+    }
+
+    /** CAS on $$crochetVersion; returns true iff expect matched. */
+    public static boolean versionCas(Object target, Class<?> userClass, int expect, int update) {
+        long off = ClassMeta.of(userClass).fieldOffsets().versionOffset;
+        return U.compareAndSwapInt(target, off, expect, update);
+    }
+
+    public static void versionStore(Object target, Class<?> userClass, int value) {
+        long off = ClassMeta.of(userClass).fieldOffsets().versionOffset;
+        U.putIntVolatile(target, off, value);
     }
 
     /* ---------- lazy Fast-proxy generation ---------- */
 
     public static Class<?> fastProxyFor(Class<?> userClass) {
+        return ClassMeta.of(userClass).fastBinding().clazz;
+    }
+
+    public static Class<?> fastProxyForInternal(Class<?> userClass) {
         ClassMeta meta = ClassMeta.of(userClass);
         Class<?> proxy = meta.fastProxyClass;
         if (proxy == null) {
-            synchronized (meta) {
-                proxy = meta.fastProxyClass;
-                if (proxy == null) {
-                    proxy = generateFastProxy(userClass);
-                    meta.fastProxyClass = proxy;
-                }
-            }
+            proxy = generateFastProxy(userClass);
         }
         return proxy;
     }
@@ -360,5 +398,85 @@ public final class CheckpointRollbackAgent {
         } catch (Throwable t) {
             throw new IllegalStateException("Failed to generate Fast proxy for " + userClass, t);
         }
+    }
+
+    /* ---------- Gap 3 (bytecode): static-field helper lookup ---------- */
+
+    public static CRIJInstrumented sfHelperFor(Class<?> userClass) {
+        ClassMeta meta = ClassMeta.of(userClass);
+        CRIJInstrumented h = meta.sfHelper;
+        if (h != null) {
+            return h;
+        }
+        synchronized (meta) {
+            h = meta.sfHelper;
+            if (h != null) {
+                return h;
+            }
+            h = generateSFHelper(userClass, meta);
+            meta.sfHelper = h;
+            return h;
+        }
+    }
+
+    private static CRIJInstrumented generateSFHelper(Class<?> userClass, ClassMeta meta) {
+        try {
+            String userInternal = userClass.getName().replace('.', '/');
+            String helperInternal = userInternal + "$$crochetSFHelper";
+            java.util.List<net.jonbell.crochet.transform.StaticFieldHelperTemplate.FieldRecord> statics =
+                    staticFieldsOf(userClass);
+            byte[] bytes = net.jonbell.crochet.transform.StaticFieldHelperTemplate.emit(
+                    userInternal, helperInternal, statics);
+            MethodHandles.Lookup lookup = meta.resolveLookup();
+            Class<?> helperClass = lookup.defineHiddenClass(bytes, true,
+                            java.lang.invoke.MethodHandles.Lookup.ClassOption.NESTMATE,
+                            java.lang.invoke.MethodHandles.Lookup.ClassOption.STRONG)
+                    .lookupClass();
+            meta.sfHelperClass = helperClass;
+            Object instance = allocateShadow(helperClass);
+            return (CRIJInstrumented) instance;
+        } catch (Throwable t) {
+            throw new IllegalStateException("Failed to generate SF helper for " + userClass, t);
+        }
+    }
+
+    private static java.util.List<net.jonbell.crochet.transform.StaticFieldHelperTemplate.FieldRecord>
+    staticFieldsOf(Class<?> c) {
+        java.util.List<net.jonbell.crochet.transform.StaticFieldHelperTemplate.FieldRecord> out = new java.util.ArrayList<>();
+        for (Field f : c.getDeclaredFields()) {
+            if (!java.lang.reflect.Modifier.isStatic(f.getModifiers())) continue;
+            if (java.lang.reflect.Modifier.isFinal(f.getModifiers())) continue;
+            if (f.isSynthetic()) continue;
+            if (f.getName().startsWith("$$crochet")) continue;
+            String desc = org.objectweb.asm.Type.getDescriptor(f.getType());
+            out.add(new net.jonbell.crochet.transform.StaticFieldHelperTemplate.FieldRecord(
+                    f.getName(), desc));
+        }
+        return out;
+    }
+
+    public static int checkpointClass(Class<?> c) {
+        int v = nextCheckpointVersion();
+        checkpointClassAtVersion(c, v);
+        return v;
+    }
+
+    public static void checkpointClassAtVersion(Class<?> c, int v) {
+        CRIJInstrumented h = sfHelperFor(c);
+        h.$$crochetCheckpoint(v);
+    }
+
+    public static void rollbackClass(Class<?> c, int v) {
+        int rv = nextRollbackVersion();
+        rollbackClassAtVersion(c, rv);
+    }
+
+    public static void rollbackClassAtVersion(Class<?> c, int rv) {
+        ClassMeta meta = ClassMeta.of(c);
+        CRIJInstrumented h = meta.sfHelper;
+        if (h == null) {
+            return;
+        }
+        h.$$crochetRollback(rv);
     }
 }

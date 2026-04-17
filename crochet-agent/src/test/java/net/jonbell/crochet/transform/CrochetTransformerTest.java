@@ -58,23 +58,26 @@ class CrochetTransformerTest {
         byte[] original = readClassBytes(Sample.class.getName());
         CrochetTransformer t = new CrochetTransformer();
         byte[] first = t.transform(original, false);
+        // Gap 7 added an @CrochetInstrumented marker + pre-scan that returns
+        // null (JVMTI convention for "no change") when the class already
+        // carries the marker. So a second pass on an already-transformed class
+        // returns null — and crucially still does not double-inject.
         byte[] second = t.transform(first, false);
-        assertNotNull(second);
+        assertNull(second, "second pass should no-op via annotation pre-scan");
 
         MethodCount count = new MethodCount(LookupInjector.LOOKUP_METHOD_NAME);
-        new ClassReader(second).accept(count, 0);
-        assertEquals(1, count.count, "second pass must not duplicate the injected method");
+        new ClassReader(first).accept(count, 0);
+        assertEquals(1, count.count, "first pass injects exactly one lookup method");
     }
 
     @Test
     void skipsInterfaces() throws Exception {
         byte[] original = readClassBytes(SampleInterface.class.getName());
+        // Gap 7 moved interface-skip into transform() itself: interfaces cannot
+        // take the injected instance fields/methods, so the transformer returns
+        // null rather than emitting a no-op class.
         byte[] instrumented = new CrochetTransformer().transform(original, false);
-        assertNotNull(instrumented);
-
-        MethodCount count = new MethodCount(LookupInjector.LOOKUP_METHOD_NAME);
-        new ClassReader(instrumented).accept(count, 0);
-        assertEquals(0, count.count, "interfaces should not receive a static lookup method");
+        assertNull(instrumented, "transformer should skip interfaces outright");
     }
 
     private static byte[] readClassBytes(String fullyQualifiedName) throws IOException {

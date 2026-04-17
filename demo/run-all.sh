@@ -1,5 +1,10 @@
 #!/bin/bash
 # Compile and run every scenario under demo/scenarios/*, report pass/fail.
+#
+# Modes:
+#   ./run-all.sh                  -- baseline JDK (default)
+#   ./run-all.sh --instrumented   -- use /tmp/jdk-inst if present
+#   INST_JDK=/path ./run-all.sh --instrumented  -- use specified instrumented JDK
 set -u
 cd "$(dirname "$0")"
 
@@ -9,6 +14,35 @@ if [ ! -f "$AGENT_JAR" ]; then
     (cd .. && PATH=~/.local/bin:$PATH mvn -q -pl :crochet-agent package -DskipTests) || {
         echo "FAIL: build"; exit 1; }
 fi
+
+USE_INSTRUMENTED=0
+for arg in "$@"; do
+    case "$arg" in
+        --instrumented) USE_INSTRUMENTED=1 ;;
+    esac
+done
+
+JAVA_CMD="java"
+EXTRA_ARGS=""
+MODE="baseline"
+if [ "$USE_INSTRUMENTED" = "1" ]; then
+    INST_JDK="${INST_JDK:-/tmp/jdk-inst}"
+    if [ ! -x "$INST_JDK/bin/java" ]; then
+        echo "Instrumented JDK not found at $INST_JDK/bin/java."
+        echo "Build one with:"
+        echo "  java -jar ../crochet-instrument/target/crochet-instrument-*.jar \$JAVA_HOME $INST_JDK"
+        exit 1
+    fi
+    JAVA_CMD="$INST_JDK/bin/java"
+    # The packed CheckpointRollbackAgent still references sun.misc.Unsafe
+    # (jdk.unsupported); java.base cannot declare `requires jdk.unsupported`
+    # so the runtime reads must be granted externally.
+    EXTRA_ARGS="--add-reads java.base=jdk.unsupported"
+    MODE="instrumented ($INST_JDK)"
+fi
+
+echo "# mode: $MODE"
+echo
 
 PASS=0
 FAIL=0
@@ -27,7 +61,7 @@ for dir in scenarios/*/; do
         continue
     fi
 
-    out=$(cd "$dir" && java -cp ".:$AGENT_JAR" -javaagent:"$AGENT_JAR" Main 2>&1)
+    out=$(cd "$dir" && $JAVA_CMD $EXTRA_ARGS -cp ".:$AGENT_JAR" -javaagent:"$AGENT_JAR" Main 2>&1)
     ec=$?
     if [ $ec -eq 0 ] && echo "$out" | grep -q "SCENARIO OK"; then
         echo "PASS"
