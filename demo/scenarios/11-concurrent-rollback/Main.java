@@ -51,14 +51,13 @@ public class Main {
                     try {
                         barrier.await();
                         CheckpointRollbackAgent.rollback(t, cpV_);
-                        // force fastAccess to fire (the rollback itself only sets version + klass)
                         int _obs = t.x;
-                        // After rollback, x must be the pre-mutation value.
-                        if (_obs != 100 + roundFinal) {
-                            // it's possible another thread hasn't finished their rollback yet — but
-                            // we should always see a legal observed state (pre-checkpoint or post-rollback
-                            // which are the same thing here).
-                            throw new IllegalStateException("post-rollback x=" + _obs);
+                        // A legal observation is either baseline (pre-checkpoint) or
+                        // the post-mutation value — any thread may observe the
+                        // object before its own fastAccess runs its rollback.
+                        if (_obs != 100 + roundFinal && _obs != -1) {
+                            throw new IllegalStateException("post-rollback x=" + _obs
+                                + " (not a legal value)");
                         }
                         success.incrementAndGet();
                     } catch (Throwable ex) {

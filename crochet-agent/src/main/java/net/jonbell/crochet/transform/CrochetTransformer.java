@@ -67,6 +67,7 @@ public class CrochetTransformer {
         chain = new LookupInjector(Opcodes.ASM9, chain);
         if (!isJdkClass) {
             chain = new FieldAccessWrapper(Opcodes.ASM9, chain);
+            chain = new ArrayCopyInterceptor(Opcodes.ASM9, chain);
             chain = maybeWrap(chain, "net.jonbell.crochet.transform.StaticFieldRewriter");
             chain = maybeWrap(chain, "net.jonbell.crochet.transform.ArrayAccessWrapper");
         }

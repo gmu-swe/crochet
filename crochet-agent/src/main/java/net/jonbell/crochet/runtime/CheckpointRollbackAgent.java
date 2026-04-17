@@ -184,6 +184,25 @@ public final class CheckpointRollbackAgent {
     }
 
     /**
+     * Replacement for {@code System.arraycopy} emitted by
+     * {@link net.jonbell.crochet.transform.ArrayCopyInterceptor}. Ensures the
+     * destination array's snapshot is captured before the native bulk copy
+     * overwrites its contents. This closes the "System.arraycopy bypass"
+     * gap where a registered array could be modified in bulk without
+     * triggering the per-slot xASTORE pre-hook.
+     *
+     * <p>Reads of {@code src} don't need a hook — we only care about writes
+     * to a possibly-registered destination.
+     */
+    public static void interceptedArraycopy(Object src, int srcPos,
+                                            Object dst, int dstPos, int length) {
+        if (dst != null) {
+            ArrayRegistry.beforeStore(dst);
+        }
+        System.arraycopy(src, srcPos, dst, dstPos, length);
+    }
+
+    /**
      * Invoked by the Fast proxy's overridden {@code $$crochetAccess}. Gap 6
      * race-winner pattern: we CAS the klass from fast-proxy back to user at the
      * <em>top</em> of the method, so exactly one thread enters the
@@ -208,7 +227,11 @@ public final class CheckpointRollbackAgent {
                     new IllegalStateException("fastAccess: proxy has no superclass"));
         }
 
-        int v = obj.$$crochetGetVersion();
+        // Read version with volatile semantics so we observe the latest
+        // sentinel or finalized value published by $$crochetCheckpoint /
+        // $$crochetRollback's CAS.
+        long versionOff = ClassMeta.of(userClass).fieldOffsets().versionOffset;
+        int v = U.getIntVolatile(obj, versionOff);
         // Sentinel decode (paper Listing 3): mid-update callers may observe -v
         // between sentinel install and finalize; treat realV = |v|.
         int realV = (v < 0) ? -v : v;
@@ -238,8 +261,9 @@ public final class CheckpointRollbackAgent {
             if (!CRIJFast.class.isAssignableFrom(obj.getClass())) {
                 return;
             }
-            // Re-read the version in case a peer completed while we blocked.
-            v = obj.$$crochetGetVersion();
+            // Re-read the version with volatile semantics in case a peer
+            // completed (and CAS'd a new finalized value) while we blocked.
+            v = U.getIntVolatile(obj, versionOff);
             realV = (v < 0) ? -v : v;
             if (realV == 0) {
                 swapKlassProxyToUser(obj, userClass);
