@@ -29,7 +29,10 @@ public class CrochetTransformer {
         chain = new LookupInjector(Opcodes.ASM9, chain);
         chain = new FieldAccessWrapper(Opcodes.ASM9, chain);
         chain = new FieldAdder(Opcodes.ASM9, chain);
-        reader.accept(chain, 0);
+        // EXPAND_FRAMES: required by LocalVariablesSorter, used by
+        // FieldAccessWrapper to spill 2-slot field values when instrumenting
+        // PUTFIELD of long/double.
+        reader.accept(chain, ClassReader.EXPAND_FRAMES);
         return writer.toByteArray();
     }
 
