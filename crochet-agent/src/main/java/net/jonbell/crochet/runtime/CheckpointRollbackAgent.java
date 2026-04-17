@@ -2,6 +2,7 @@ package net.jonbell.crochet.runtime;
 
 import java.lang.invoke.MethodHandles;
 import java.lang.reflect.Field;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import net.jonbell.crochet.transform.ProxyTemplate;
 import net.jonbell.crochet.transform.Specializer;
@@ -58,22 +59,37 @@ public final class CheckpointRollbackAgent {
         return t;
     }
 
-    private static int VERSION_COUNTER;
+    // Paper §3.4: "uses atomic compare-and-swap operations". The counter is
+    // lock-free under contention via a CAS retry loop.
+    private static final AtomicInteger VERSION_COUNTER = new AtomicInteger(0);
 
-    public static synchronized int nextCheckpointVersion() {
-        VERSION_COUNTER++;
-        if (VERSION_COUNTER % 2 == 0) {
-            VERSION_COUNTER++;
+    public static int nextCheckpointVersion() {
+        while (true) {
+            int cur = VERSION_COUNTER.get();
+            int next = cur + 1;
+            if ((next & 1) == 0) {
+                next++; // force odd (checkpoint)
+            }
+            if (VERSION_COUNTER.compareAndSet(cur, next)) {
+                return next;
+            }
         }
-        return VERSION_COUNTER;
     }
 
-    public static synchronized int nextRollbackVersion() {
-        VERSION_COUNTER++;
-        if (VERSION_COUNTER % 2 != 0) {
-            VERSION_COUNTER++;
+    public static int nextRollbackVersion() {
+        while (true) {
+            int cur = VERSION_COUNTER.get();
+            int next = cur + 1;
+            if ((next & 1) != 0) {
+                next++; // force even (rollback)
+            }
+            if (next == 0) {
+                next = 2; // preserve 0 as "no checkpoint" sentinel
+            }
+            if (VERSION_COUNTER.compareAndSet(cur, next)) {
+                return next;
+            }
         }
-        return VERSION_COUNTER;
     }
 
     /** User-facing: checkpoint {@code target}. Returns the version id. */
