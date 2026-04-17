@@ -207,7 +207,15 @@ public final class FieldAdder extends ClassVisitor {
         } else {
             alreadyInstrumented = true;
         }
-        super.visit(version, access, name, signature, superName, newIfaces);
+        // Bump class-file version to V1_7 (major=51) minimum so our emitted
+        // methods carry StackMapTable attributes that the modern verifier
+        // expects. Pre-V1_6 class files (major<50) use inference-based
+        // verification that doesn't compose with our COMPUTE_FRAMES output;
+        // commons-logging ships at V1_1 (major=45) and trips "Illegal type
+        // in constant pool" VerifyError without this bump.
+        int majorBump = Math.max(version & 0xFFFF, Opcodes.V1_7);
+        int versionBumped = (version & 0xFFFF0000) | majorBump;
+        super.visit(versionBumped, access, name, signature, superName, newIfaces);
     }
 
     @Override

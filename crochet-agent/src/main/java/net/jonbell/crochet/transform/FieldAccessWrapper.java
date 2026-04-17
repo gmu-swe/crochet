@@ -97,24 +97,25 @@ public final class FieldAccessWrapper extends ClassVisitor {
                     return;
                 }
 
-                // --- 2-slot PUTFIELD (new) ---
-                // stack: [..., objref, value_hi, value_lo]    (J or D)
-                Type t = Type.getType(descriptor);
-                int slot = lvs.newLocal(t);
-                int storeOp = t.getOpcode(Opcodes.ISTORE); // LSTORE or DSTORE
-                int loadOp  = t.getOpcode(Opcodes.ILOAD);  // LLOAD or DLOAD
-
-                // Stash the 2-slot value into our temp local. After this the
-                // two value-slots are gone and objref is on top.
-                super.visitVarInsn(storeOp, slot);
-                // stack: [..., objref]
-                super.visitInsn(Opcodes.DUP);
-                // stack: [..., objref, objref]
+                // --- 2-slot PUTFIELD via pure stack gymnastics ---
+                // Using LocalVariablesSorter.newLocal here appeared clean but
+                // interacts poorly with ClassWriter.COMPUTE_FRAMES on large
+                // methods (h2's Parser.parseCreate, fop's FObj): the frame
+                // computation reports local slots as "top" at downstream
+                // joins, producing VerifyError "Bad local variable type".
+                // Stack-only rearrangement avoids the scratch-local problem
+                // entirely.
+                //
+                // stack: [..., objref, v_hi, v_lo]    (v is 2-slot; objref is 1-slot)
+                super.visitInsn(Opcodes.DUP2_X1);
+                // stack: [..., v_hi, v_lo, objref, v_hi, v_lo]
+                super.visitInsn(Opcodes.POP2);
+                // stack: [..., v_hi, v_lo, objref]
+                super.visitInsn(Opcodes.DUP_X2);
+                // stack: [..., objref, v_hi, v_lo, objref]
                 super.visitMethodInsn(Opcodes.INVOKEVIRTUAL, owner,
                         "$$crochetAccess", "()V", false);
-                // stack: [..., objref]
-                super.visitVarInsn(loadOp, slot);
-                // stack: [..., objref, value_hi, value_lo]
+                // stack: [..., objref, v_hi, v_lo]
                 super.visitFieldInsn(opcode, owner, name, descriptor);
                 return;
             }

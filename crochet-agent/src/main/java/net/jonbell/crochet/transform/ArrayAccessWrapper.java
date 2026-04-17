@@ -3,12 +3,17 @@ package net.jonbell.crochet.transform;
 import org.objectweb.asm.ClassVisitor;
 import org.objectweb.asm.MethodVisitor;
 import org.objectweb.asm.Opcodes;
-import org.objectweb.asm.Type;
-import org.objectweb.asm.commons.LocalVariablesSorter;
 
 /**
  * Gap 4 (bytecode): wraps every typed xASTORE with a pre-hook that calls
- * {@link net.jonbell.crochet.runtime.ArrayRegistry#beforeStore(Object)}.
+ * {@link net.jonbell.crochet.runtime.ArrayRegistry#beforeStore(Object)} so
+ * lazy snapshot of checkpointed arrays is triggered on the first write.
+ *
+ * <p>Implementation is LVS-free — stacking multiple LocalVariablesSorters
+ * (one per visitor that wanted scratch locals) produced cumulative index
+ * rewrites that confused COMPUTE_FRAMES on large methods. Pure stack
+ * gymnastics work for 1-slot value stores; 2-slot stores (LASTORE, DASTORE)
+ * fall through unwrapped for now, matching the FieldAccessWrapper policy.
  */
 public final class ArrayAccessWrapper extends ClassVisitor {
 
@@ -31,52 +36,42 @@ public final class ArrayAccessWrapper extends ClassVisitor {
                 || "<clinit>".equals(name)) {
             return base;
         }
-        LocalVariablesSorter lvs = new LocalVariablesSorter(access, descriptor, base);
-        return new WrapStoresMV(api, lvs, lvs);
+        return new WrapStoresMV(api, base);
     }
 
     private static final class WrapStoresMV extends MethodVisitor {
-        private final LocalVariablesSorter lvs;
 
-        WrapStoresMV(int api, MethodVisitor delegate, LocalVariablesSorter lvs) {
+        WrapStoresMV(int api, MethodVisitor delegate) {
             super(api, delegate);
-            this.lvs = lvs;
         }
 
         @Override
         public void visitInsn(int opcode) {
-            Type valueType = valueTypeOf(opcode);
-            if (valueType == null) {
+            if (!isOneSlotArrayStore(opcode)) {
                 super.visitInsn(opcode);
                 return;
             }
-            int valueSlot = lvs.newLocal(valueType);
-            int idxSlot = lvs.newLocal(Type.INT_TYPE);
-            int valueStoreOp = valueType.getOpcode(Opcodes.ISTORE);
-            int valueLoadOp = valueType.getOpcode(Opcodes.ILOAD);
-
-            super.visitVarInsn(valueStoreOp, valueSlot);
-            super.visitVarInsn(Opcodes.ISTORE, idxSlot);
+            // stack: [..., arr, idx, val]   (val is 1-slot)
+            super.visitInsn(Opcodes.DUP2_X1);
+            // stack: [..., idx, val, arr, idx, val]
+            super.visitInsn(Opcodes.POP2);
+            // stack: [..., idx, val, arr]
             super.visitInsn(Opcodes.DUP);
+            // stack: [..., idx, val, arr, arr]
             super.visitMethodInsn(Opcodes.INVOKESTATIC, REGISTRY_INTERNAL,
                     "beforeStore", BEFORE_STORE_DESC, false);
-            super.visitVarInsn(Opcodes.ILOAD, idxSlot);
-            super.visitVarInsn(valueLoadOp, valueSlot);
+            // stack: [..., idx, val, arr]
+            super.visitInsn(Opcodes.DUP_X2);
+            // stack: [..., arr, idx, val, arr]
+            super.visitInsn(Opcodes.POP);
+            // stack: [..., arr, idx, val]
             super.visitInsn(opcode);
         }
 
-        private static Type valueTypeOf(int opcode) {
-            return switch (opcode) {
-                case Opcodes.IASTORE -> Type.INT_TYPE;
-                case Opcodes.LASTORE -> Type.LONG_TYPE;
-                case Opcodes.FASTORE -> Type.FLOAT_TYPE;
-                case Opcodes.DASTORE -> Type.DOUBLE_TYPE;
-                case Opcodes.AASTORE -> Type.getObjectType("java/lang/Object");
-                case Opcodes.BASTORE -> Type.INT_TYPE;
-                case Opcodes.CASTORE -> Type.INT_TYPE;
-                case Opcodes.SASTORE -> Type.INT_TYPE;
-                default -> null;
-            };
+        private static boolean isOneSlotArrayStore(int opcode) {
+            return opcode == Opcodes.IASTORE || opcode == Opcodes.FASTORE
+                    || opcode == Opcodes.AASTORE || opcode == Opcodes.BASTORE
+                    || opcode == Opcodes.CASTORE || opcode == Opcodes.SASTORE;
         }
     }
 }

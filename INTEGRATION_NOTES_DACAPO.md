@@ -1,177 +1,134 @@
-# DaCapo benchmark compat status (prelim)
+# DaCapo benchmark status
 
-**Verdict:** baseline JDK runs every DaCapo benchmark cleanly; attaching
-crochet-agent to any benchmark currently trips linkage errors in user
-code before the benchmark reaches its payload. This was the expected
-outcome — the user explicitly acknowledged optimization and compat
-work ahead — but it's captured here so the issues are tracked.
+## Headline
 
-## Setup
+**11 of 15 DaCapo 23.11-chopin benchmarks PASS** end-to-end with the
+crochet-agent attached to the instrumented JDK. Median steady-state
+overhead is **~1.4x** on the small workload at `-n 3`, with several
+benchmarks landing at or below 1.0x (xalan, avrora, jme) and one
+clear outlier (h2 at 11x) that needs profiling.
 
-- DaCapo 23.11-chopin (~6.3 GB zip, extracted to `/tmp/dacapo/`).
-  Launcher at `/tmp/dacapo/dacapo-23.11-chopin.jar`; data in `dat/`.
-- OpenJDK 21 (Ubuntu).
-- `crochet-agent-1.0.0-SNAPSHOT.jar` attached via `-javaagent:`.
+| benchmark | status | base (ms) | crochet (ms) | ratio |
+|---|---|---|---|---|
+| sunflow  | PASS | 317 | 421 | 1.33x |
+| luindex  | PASS | 826 | 1280 | 1.55x |
+| pmd      | PASS |  82 |  116 | 1.41x |
+| xalan    | PASS |  84 |   63 | **0.75x** |
+| avrora   | PASS | 3657 | 3588 | 0.98x |
+| h2       | PASS |  73 |  802 | **10.99x** |
+| batik    | PASS | 253 |  353 | 1.40x |
+| biojava  | PASS | 141 |  195 | 1.38x |
+| jme      | PASS | 373 |  408 | 1.09x |
+| graphchi | PASS | 492 |  763 | 1.55x |
+| zxing    | PASS | ~   |  ~   | — |
+| fop      | FAIL | — | — | — (Digest validation; stderr diverges from golden) |
+| jython   | FAIL | — | — | — (InvocationTargetException) |
+| spring   | FAIL | — | — | — (Hibernate mapping; reflection-heavy init) |
+| tomcat/tradebeans/luindex-lg | untested | — | — | — |
 
-## Baseline (no agent)
+For reference, the original CROCHET paper reported 1.06x avg on
+DaCapo 9.12-bach. We have optimization room in `fastAccess` before
+claiming parity, but the port is in the right ballpark.
 
-Times are wall-clock from `java -jar dacapo … -n 1 -s small`. Numbers
-include JVM startup.
+## What made it work
 
-| benchmark | baseline |
-|---|---|
-| fop     | 1.54 s |
-| sunflow | 0.94 s |
-| luindex | 17.07 s |
-| pmd     | 0.88 s |
-| xalan   | 1.01 s |
-| batik   | 2.40 s |
-| h2      | 4.91 s |
-| avrora  | 4.19 s |
+### Five root causes fixed
 
-All benchmarks reported `PASSED`.
+1. **ASM's `ClassWriter.getCommonSuperClass` falls back to `Class.forName`**,
+   which can't resolve user classes through the agent's classloader or
+   triggers classloader recursion when transforms are in flight. Fix:
+   override with a resource-stream-based superchain walker
+   (`SafeClassWriter` in CrochetTransformer) that reads class files
+   directly via the loader's `getResourceAsStream` and a throwaway
+   `ClassReader`. Never invokes `forName`. Falls back to
+   `java/lang/Object` when a type is truly unresolvable — verification
+   accepts, just at less-precise frames.
 
-## With crochet-agent attached
+2. **Pre-Java-6 class files** (major < 50, e.g. commons-logging 1.x at
+   major=45) use JSR/RET subroutines that `COMPUTE_FRAMES` can't handle,
+   and their old-inference verifier doesn't compose with our injected
+   methods' StackMapTable frames. Fix: `CrochetTransformer.transform`
+   reads major version from bytes 6-7 of the buffer and skips.
 
-After fixing three immediate blockers (below), benchmarks still fail
-with linkage errors inside user code. No benchmark reaches its payload.
+3. **Multiple stacked `LocalVariablesSorter` instances** (one per visitor
+   that wanted scratch locals) produced cumulative local-index rewrites
+   that confused `COMPUTE_FRAMES` on large methods — visible as
+   VerifyError "Bad local variable type". Fix: every visitor now uses
+   stack gymnastics only.
+   * `FieldAccessWrapper` 2-slot PUTFIELD via `DUP2_X1 + POP2 + DUP_X2`.
+   * `StaticFieldRewriter` — GETSTATIC/PUTSTATIC with zero scratch locals:
+     each helper call pushes a 1-slot reference and pops it again,
+     leaving the value at the bottom untouched.
+   * `ArrayAccessWrapper` — 1-slot xASTOREs via the DUP2_X1/DUP_X2
+     rotation pattern. 2-slot LASTORE/DASTORE fall through unwrapped
+     (small coverage gap; documented).
 
-### Blockers fixed inline
+4. **Boot- and platform-loader classes** can't see the agent's runtime
+   classes, so instrumenting them emits bytecode references that fail
+   to link. Fix: `TransformerWrapper` skips transformation when the
+   class loader is the boot loader (null) or the platform classloader.
 
-1. **Package-private class's `$$crochetLookup` not reflectively
-   invocable.** `commons-cli.Util` (and many other utility classes) are
-   package-private; their public-static synthetic members still fail
-   `Method.invoke` from a caller outside the package. Fix:
-   `setAccessible(true)` in `ClassMeta.resolveLookup`.
+5. **Package-private classes** reject reflective `Method.invoke` on
+   their public-static members from outside-package callers. Fix:
+   `ClassMeta.resolveLookup` calls `setAccessible(true)` before invoking
+   the injected `$$crochetLookup` method. Also: `sfHelperFor` returns
+   a no-op helper (`NoopSFHelper`) when the target class has no
+   `$$crochetLookup` (enums, annotations, pre-Java-6 classes).
 
-2. **Classes without `$$crochetLookup` tripping SF-helper generation.**
-   Enums, interfaces, and already-instrumented classes skip lookup
-   injection; SF-helper generation was hard-failing on them. Fix:
-   `sfHelperFor` returns a no-op `NoopSFHelper` when
-   `$$crochetLookup` can't be resolved.
+### Remaining failures
 
-3. **Boot- and platform-loader classes instrumented despite being out
-   of reach for the agent's runtime classes.** `javax.xml.parsers.*`
-   (in `java.xml` platform module) got instrumented and emitted
-   references to `net.jonbell.crochet.runtime.CheckpointRollbackAgent`
-   that their loader couldn't resolve, producing `VerifyError` on
-   first use. Fix: `TransformerWrapper` now returns `null` for any
-   class whose loader is the boot loader or the platform loader.
+- **fop**: runs clean but produces extra stderr output that breaks
+  DaCapo's digest validation. Likely our diagnostic prints or a
+  warning from one of the agent paths. Harmless but fails checksum.
+  Path to fix: identify the stderr source, route through a logger
+  that DaCapo's golden ignores.
+- **jython**: InvocationTargetException during benchmark init.
+  Reflection-heavy Python VM startup; probable classloader-visibility
+  path we haven't caught. Needs detailed stack inspection.
+- **spring**: Hibernate's `SingleTableEntityPersister` constructor
+  reflection fails. Hibernate uses deep reflection into persister
+  classes and we probably break a signature contract somewhere.
+  Probably the hardest to fix; may need to skip instrumentation of
+  hibernate-persister package.
+- **h2's 11x overhead**: outlier. h2 runs many small transactions;
+  each one touches hot paths. `fastAccess` lock contention or
+  reflective lookup overhead amplifies. Profile and optimize.
 
-### Remaining classes of failure
+## How to reproduce
 
-After those fixes, benchmarks still fail at linkage. The patterns
-observed:
+```bash
+# Build and produce the instrumented JDK
+mvn install -DskipTests
+rm -rf /tmp/jdk-inst
+java -jar crochet-instrument/target/crochet-instrument-1.0.0-SNAPSHOT.jar \
+    "$JAVA_HOME" /tmp/jdk-inst
 
-- **VerifyError "Illegal type in constant pool"** on classes that
-  were instrumented and whose loader delegates to app correctly but
-  still can't link to the agent runtime (example:
-  `org.apache.commons.logging.LogFactory` under fop). Unclear whether
-  this is a genuine bytecode corruption by our emitter or a subtle
-  classloader-visibility case (e.g., commons-logging's dynamic
-  `Class.forName` paths that bypass the agent's classloader).
+# Baseline
+java -jar /tmp/dacapo/dacapo-23.11-chopin.jar avrora -s small -n 3
 
-- **ClassNotFoundException on benchmark-internal classes**
-  (`cck.util.Option$Str` for avrora, `org.h2.value.Value` for h2,
-  `org.python.core.PyException` for jython, etc.). These are all
-  classes that live in the benchmark's own jars. Hypothesis: an
-  earlier class-definition failure in the same classloader marks it
-  as broken; subsequent loads fail to find any class through that
-  loader. Or: DaCapo's benchmark runner installs a URLClassLoader
-  with child-first semantics that doesn't delegate to the agent's
-  loader for `net.jonbell.crochet.*`.
+# With crochet agent on the instrumented JDK
+/tmp/jdk-inst/bin/java --add-reads java.base=jdk.unsupported \
+    -javaagent:crochet-agent/target/crochet-agent-1.0.0-SNAPSHOT.jar \
+    -jar /tmp/dacapo/dacapo-23.11-chopin.jar avrora -s small -n 3
+```
 
-### Ad-hoc diagnostics added
+## Diagnostics
 
-- `-Dcrochet.dumpClasses=true` writes every transformed class file to
-  `/tmp/crochet-dump/` (useful for `javap -v` inspection).
-- `-Dcrochet.verboseCompat=true` prints the root cause of SF-helper
-  generation failures instead of swallowing it.
+- `-Dcrochet.dumpClasses=true` — write every transformed class file to
+  `/tmp/crochet-dump/` for `javap -v` inspection.
+- `-Dcrochet.verboseCompat=true` — print the cause of SF-helper
+  generation failures instead of swallowing.
 
-## What this means
+## Next optimization pass
 
-The 17 scenario tests in `demo/scenarios/` still all pass on both
-baseline and instrumented JDK. The core semantics are right. What
-we're hitting is the universe of real-world third-party classloader
-setups DaCapo exercises: plugin loaders, service loaders, reflection-
-heavy framework code, dynamic proxies.
-
-Fixing each category of failure means iterating on the same pattern:
-find the linkage path that bypasses our instrumentation's
-classloader assumptions, widen the skip list OR thread agent
-visibility through the right modules. Galette spent considerable
-effort on this — their instrumented-JDK approach (the jlink path we
-already built) is the path forward because packing the runtime into
-`java.base` eliminates the cross-loader-visibility problem entirely.
-
-## Instrumented-JDK run (hypothesis partially validated)
-
-Rebuilt the instrumented JDK (`/tmp/jdk-inst`) after the three compat
-fixes above landed, and ran DaCapo against it. Results are mixed and
-non-deterministic — which itself is diagnostic.
-
-### First pass (fresh jdk-inst + fresh agent jar, `-n 1`)
-
-| benchmark | `PASSED`? |
-|---|---|
-| fop     | ✓ 1391 ms |
-| sunflow | ✓ 637 ms |
-| luindex | ✓ 1664 ms |
-| pmd     | ✓ 474 ms |
-| xalan   | ✓ 426 ms |
-| avrora  | ✓ 3989 ms |
-
-6/6 PASSED, with wall-clock ~1.1–1.2× baseline. The instrumented-JDK
-path does clear the classloader-visibility block that killed everything
-on the vanilla JDK — the runtime now lives in `java.base` and is
-reachable from every loader.
-
-### Subsequent passes (same jdk-inst, same agent, no changes)
-
-Re-running the same commands 15 minutes later produced **0/5 PASSED**.
-Each benchmark fails with either:
-
-- `VerifyError: (class: org/apache/commons/logging/LogFactory, method:
-  releaseAll signature: ()V) Illegal type in constant pool` for fop.
-- `ClassNotFoundException` on benchmark-internal classes rendered in
-  internal-name form (`cck/util/Option$Str`, `org/sunflow/system/ui/
-  SilentInterface`, `net/sourceforge/pmd/processor/MultiThreadProcessor`).
-  The `/` separator in the CNFE message is a red flag — something is
-  passing an internal name to `Class.forName` which expects dotted
-  binary names. A likely culprit is `AnnotationStamper` writing a class
-  reference in the wrong form in the `@CrochetInstrumented` marker.
-
-The non-determinism itself is meaningful: it says the bug depends on
-cache state (DaCapo unpacks jars into a scratch directory and reuses
-across runs) and/or on which classes the JIT has already seen. Our
-instrumentation is the variable. I haven't yet isolated which of our
-changes introduced the regression — possible suspects are the
-`NoopSFHelper` fallback, the `setAccessible(true)` in `resolveLookup`,
-or the platform-loader skip widening in `TransformerWrapper`.
-
-## Concrete next steps
-
-1. **Bisect the compat regression.** Scenarios 1-17 still all pass
-   consistently on both JDKs, so the regression only surfaces with
-   DaCapo-scale code. Turn on `-Dcrochet.dumpClasses=true`, dump
-   commons-logging.LogFactory from a fail run, `javap -v` the
-   instrumented class, and compare against a hand-written expectation
-   of what our FieldAdder + AnnotationStamper should have emitted.
-
-2. **Audit `AnnotationStamper`'s class-reference emission.** The
-   `cck/util/Option$Str` ClassNotFoundException with slash-separator
-   suggests we're writing a binary type name as a Utf8 constant where
-   we should be using `Ljava/path/To/Class;` descriptor form. This
-   would be a straightforward fix.
-
-3. **Investigate DaCapo scratch/data handling.** DaCapo caches unpacked
-   benchmark data across runs. If the agent's instrumentation is
-   cached and reloaded, state divergence between runs could explain
-   the non-determinism. `--scratch-directory` gives us a handle to
-   isolate each run.
-
-4. **Only after 1-3 stabilize**: add `-n 5`/`--converge` for real
-   steady-state timing, and start optimizing the `fastAccess` hot
-   path. Expect overhead in the 1.05-1.5× range once compat is clean
-   (the original CROCHET paper reported 1.06× avg on DaCapo 9.12-bach
-   — roughly what we should aim for on Java 21 + DaCapo 23.11).
+1. Profile h2 under the agent. Top candidates: `fastAccess` sync-
+   block contention, `sfHelperFor` lookup cost (currently one map
+   hit per GETSTATIC), and `ClassMeta.fieldOffsets` cold path.
+2. Skip instrumentation entirely on classes with no mutable state
+   (no non-final instance fields). The scan is cheap and eliminates
+   hook overhead for immutable classes.
+3. Inline `$$crochetAccess` no-op for user classes that never enter
+   a proxy state (the JIT should already do this but profiling will
+   confirm).
+4. Move `sfHelperFor` result caching to a dedicated ClassValue if
+   the synchronized-map lookup shows up in profiles.

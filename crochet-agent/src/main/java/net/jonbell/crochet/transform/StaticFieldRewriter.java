@@ -32,18 +32,21 @@ public final class StaticFieldRewriter extends ClassVisitor {
                 || "<clinit>".equals(name)) {
             return base;
         }
-        LocalVariablesSorter lvs = new LocalVariablesSorter(access, descriptor, base);
-        return new WrapStaticsMV(api, lvs, lvs);
+        return new WrapStaticsMV(api, base);
     }
 
     private static final class WrapStaticsMV extends MethodVisitor {
-        private final LocalVariablesSorter lvs;
 
-        WrapStaticsMV(int api, MethodVisitor delegate, LocalVariablesSorter lvs) {
+        WrapStaticsMV(int api, MethodVisitor delegate) {
             super(api, delegate);
-            this.lvs = lvs;
         }
 
+        /**
+         * GETSTATIC/PUTSTATIC both handled without any scratch local —
+         * invokestatic pushes a 1-slot helper reference, invokevirtual
+         * consumes it. The original stack shape underneath is preserved,
+         * so any existing 2-slot value for PUTSTATIC stays intact.
+         */
         @Override
         public void visitFieldInsn(int opcode, String owner, String name, String descriptor) {
             if (!shouldWrap(opcode, owner, name)) {
@@ -51,18 +54,18 @@ public final class StaticFieldRewriter extends ClassVisitor {
                 return;
             }
             if (opcode == Opcodes.GETSTATIC) {
+                // stack: [...]
                 emitPreHook(owner);
+                // stack: [...]
                 super.visitFieldInsn(opcode, owner, name, descriptor);
                 return;
             }
             if (opcode == Opcodes.PUTSTATIC) {
-                Type t = Type.getType(descriptor);
-                int slot = lvs.newLocal(t);
-                int storeOp = t.getOpcode(Opcodes.ISTORE);
-                int loadOp = t.getOpcode(Opcodes.ILOAD);
-                super.visitVarInsn(storeOp, slot);
+                // stack: [..., value]  (value is 1 or 2 slots, doesn't matter)
+                // Each emitted call pushes then pops exactly one slot, so
+                // value is untouched at the bottom when we hit PUTSTATIC.
                 emitPreHook(owner);
-                super.visitVarInsn(loadOp, slot);
+                // stack: [..., value]
                 super.visitFieldInsn(opcode, owner, name, descriptor);
                 return;
             }

@@ -52,7 +52,7 @@ final class TransformerWrapper implements ClassFileTransformer {
             return null;
         }
         try {
-            byte[] out = delegate.transform(classfileBuffer, false);
+            byte[] out = delegate.transform(classfileBuffer, false, loader);
             if (out != null && Boolean.getBoolean("crochet.dumpClasses")) {
                 dumpClass(className, out);
             }
