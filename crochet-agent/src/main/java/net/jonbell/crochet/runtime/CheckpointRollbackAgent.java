@@ -464,10 +464,52 @@ public final class CheckpointRollbackAgent {
             if (h != null) {
                 return h;
             }
+            // Classes our transformer skips (enums, annotations, already-
+            // instrumented classes from another tool, JDK classes the agent
+            // runtime-skips) won't have $$crochetLookup. In that case, return
+            // a no-op helper so the user's GETSTATIC/PUTSTATIC continues to
+            // hit the real static field. Checkpoint/rollback silently skip
+            // these statics — matches the final-class proxy policy.
+            if (!hasLookup(userClass)) {
+                h = NoopSFHelper.INSTANCE;
+                meta.sfHelper = h;
+                return h;
+            }
             h = generateSFHelper(userClass, meta);
             meta.sfHelper = h;
             return h;
         }
+    }
+
+    private static boolean hasLookup(Class<?> userClass) {
+        try {
+            userClass.getDeclaredMethod("$$crochetLookup");
+            return true;
+        } catch (Throwable t) {
+            // NoClassDefFoundError can fire here if the class was instrumented
+            // but its classloader can't resolve CRIJInstrumented (happens in
+            // plugin-style classloader hierarchies DaCapo uses). Treat any
+            // failure as "not instrumented" so we fall back to the no-op
+            // SF helper rather than breaking the user's program.
+            return false;
+        }
+    }
+
+    /** Placeholder helper for classes the agent chose not to instrument. */
+    private static final class NoopSFHelper implements CRIJInstrumented {
+        static final NoopSFHelper INSTANCE = new NoopSFHelper();
+        @Override public void $$crochetCopyFieldsTo(Object to) {}
+        @Override public void $$crochetCopyFieldsFrom(Object old) {}
+        @Override public void $$crochetCheckpoint(int version) {}
+        @Override public void $$crochetRollback(int version) {}
+        @Override public void $$crochetPropagateCheckpoint(int version) {}
+        @Override public void $$crochetPropagateRollback(int version) {}
+        @Override public int $$crochetGetVersion() { return 0; }
+        @Override public void $$crochetSetVersion(int version) {}
+        @Override public Object $$crochetGetSnap() { return null; }
+        @Override public void $$crochetSetSnap(Object snap) {}
+        @Override public void $$crochetAccess() {}
+        @Override public boolean $$crochetIsRollbackState() { return false; }
     }
 
     private static CRIJInstrumented generateSFHelper(Class<?> userClass, ClassMeta meta) {
@@ -487,6 +529,11 @@ public final class CheckpointRollbackAgent {
             Object instance = allocateShadow(helperClass);
             return (CRIJInstrumented) instance;
         } catch (Throwable t) {
+            if (Boolean.getBoolean("crochet.verboseCompat")) {
+                System.err.println("Crochet SF helper gen FAILED for " + userClass.getName()
+                        + ": " + t.getClass().getSimpleName() + ": " + t.getMessage());
+                t.printStackTrace(System.err);
+            }
             throw new IllegalStateException("Failed to generate SF helper for " + userClass, t);
         }
     }

@@ -43,7 +43,12 @@ final class TransformerWrapper implements ClassFileTransformer {
         // baked classes carry @CrochetInstrumented so the transformer's
         // annotation pre-scan would return null anyway — this filter is
         // then redundant but cheap.
-        if (!JDK_INSTRUMENTED && isVanillaJdkClass(className)) {
+        // Boot-loaded classes can't resolve CRIJInstrumented from the agent
+        // classloader, so instrumenting them produces NoClassDefFoundError on
+        // first access. javax.xml.bind, org.w3c.dom, etc. live here via
+        // platform modules.
+        if (!JDK_INSTRUMENTED && (loader == null || isVanillaJdkClass(className)
+                || isPlatformLoader(loader))) {
             return null;
         }
         try {
@@ -56,6 +61,27 @@ final class TransformerWrapper implements ClassFileTransformer {
             t.printStackTrace();
             return null;
         }
+    }
+
+    /**
+     * Platform loader owns JDK modules that aren't in the base image — e.g.
+     * {@code java.xml} (which holds javax.xml.parsers.DocumentBuilderFactory)
+     * and {@code jdk.crypto.ec}. These classes are subject to the same agent-
+     * classloader isolation as boot-loaded classes, so instrumenting them
+     * emits bytecode references to {@code net.jonbell.crochet.runtime.*} that
+     * their loader can't resolve at link time.
+     */
+    private static boolean isPlatformLoader(ClassLoader loader) {
+        ClassLoader platform = ClassLoader.getPlatformClassLoader();
+        for (ClassLoader l = loader; l != null; l = l.getParent()) {
+            if (l == platform) {
+                // Only treat as platform-owned if loader itself IS the platform
+                // loader or one of its parents — app classloader has platform
+                // as parent but owns user code that can link to the agent.
+                return loader == platform;
+            }
+        }
+        return false;
     }
 
     private static boolean isVanillaJdkClass(String internalName) {

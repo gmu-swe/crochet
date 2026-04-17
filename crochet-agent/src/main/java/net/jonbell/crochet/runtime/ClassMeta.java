@@ -103,6 +103,12 @@ public final class ClassMeta {
         }
         try {
             Method m = userClass.getDeclaredMethod("$$crochetLookup");
+            // Package-private classes (e.g. org.apache.commons.cli.Util) still
+            // reject reflective invocation of their public members from outside
+            // the package without setAccessible. The injected $$crochetLookup is
+            // ACC_PUBLIC ACC_STATIC but the enclosing class access controls
+            // whether callers can actually reach it.
+            m.setAccessible(true);
             Object result = m.invoke(null);
             l = (MethodHandles.Lookup) result;
             lookup = l;
