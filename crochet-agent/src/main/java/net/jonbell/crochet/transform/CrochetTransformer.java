@@ -24,9 +24,10 @@ public class CrochetTransformer {
         if (shouldSkip(name)) {
             return null;
         }
-        ClassWriter writer = new ClassWriter(reader, ClassWriter.COMPUTE_MAXS);
+        ClassWriter writer = new ClassWriter(reader, ClassWriter.COMPUTE_MAXS | ClassWriter.COMPUTE_FRAMES);
         ClassVisitor chain = writer;
         chain = new LookupInjector(Opcodes.ASM9, chain);
+        chain = new FieldAdder(Opcodes.ASM9, chain);
         reader.accept(chain, 0);
         return writer.toByteArray();
     }
@@ -38,13 +39,22 @@ public class CrochetTransformer {
         if (internalName.equals("module-info") || internalName.endsWith("/module-info")) {
             return true;
         }
-        if (internalName.equals("java/lang/Object")) {
+        // JDK classes: don't instrument until the jlink pipeline (Phase 1.2)
+        // wires our runtime into java.base. V0 demo targets user classes only.
+        if (internalName.startsWith("java/")
+                || internalName.startsWith("jdk/")
+                || internalName.startsWith("sun/")
+                || internalName.startsWith("com/sun/")) {
             return true;
         }
         if (internalName.startsWith(RUNTIME_PACKAGE_PREFIX)
                 || internalName.startsWith(TRANSFORM_PACKAGE_PREFIX)
                 || internalName.startsWith(AGENT_PACKAGE_PREFIX)
                 || internalName.startsWith(PATCH_PACKAGE_PREFIX)) {
+            return true;
+        }
+        // Galette's relocated ASM sits under our shaded package
+        if (internalName.startsWith("net/jonbell/crochet/agent/shaded/")) {
             return true;
         }
         return false;
