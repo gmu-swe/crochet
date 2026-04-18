@@ -38,9 +38,20 @@ public final class StaticFieldRewriter extends ClassVisitor {
 
     private String className;
     private String superName;
+    private final ClassLoader loader;
 
     public StaticFieldRewriter(int api, ClassVisitor delegate) {
+        this(api, delegate, null);
+    }
+
+    /**
+     * @param loader the caller's class loader, used by
+     *        {@link StaticFieldAnalysis} to probe owner classes for
+     *        mutable static fields. May be {@code null} (boot loader).
+     */
+    public StaticFieldRewriter(int api, ClassVisitor delegate, ClassLoader loader) {
         super(api, delegate);
+        this.loader = loader;
     }
 
     @Override
@@ -62,13 +73,16 @@ public final class StaticFieldRewriter extends ClassVisitor {
             return base;
         }
         boolean isCtor = "<init>".equals(name);
-        return new WrapStaticsMV(api, base, className, superName, isCtor);
+        return new WrapStaticsMV(api, base, className, superName, isCtor, loader);
     }
 
     private static final class WrapStaticsMV extends CtorAwareMv {
+        private final ClassLoader loader;
 
-        WrapStaticsMV(int api, MethodVisitor delegate, String owner, String superName, boolean isCtor) {
+        WrapStaticsMV(int api, MethodVisitor delegate, String owner, String superName,
+                      boolean isCtor, ClassLoader loader) {
             super(api, delegate, owner, superName, isCtor);
+            this.loader = loader;
         }
 
         /**
@@ -79,7 +93,7 @@ public final class StaticFieldRewriter extends ClassVisitor {
          */
         @Override
         protected void visitFieldInsnPostSuper(int opcode, String owner, String name, String descriptor) {
-            if (!shouldWrap(opcode, owner, name)) {
+            if (!shouldWrap(opcode, owner, name, loader)) {
                 super.visitFieldInsnPostSuper(opcode, owner, name, descriptor);
                 return;
             }
@@ -108,7 +122,7 @@ public final class StaticFieldRewriter extends ClassVisitor {
                     "noteStaticAccess", NOTE_STATIC_ACCESS_DESC, false);
         }
 
-        private static boolean shouldWrap(int opcode, String owner, String name) {
+        private static boolean shouldWrap(int opcode, String owner, String name, ClassLoader loader) {
             if (opcode != Opcodes.GETSTATIC && opcode != Opcodes.PUTSTATIC) {
                 return false;
             }
@@ -123,6 +137,19 @@ public final class StaticFieldRewriter extends ClassVisitor {
                 return false;
             }
             if (name.startsWith("$$crochet")) {
+                return false;
+            }
+            // Transform-time elision: if the owner class declares no non-final,
+            // non-synthetic, non-$$crochet static fields, the pre-hook has
+            // nothing to track — checkpointStatics already skips final/synthetic
+            // fields during its reflective scan, so the hook's materialisation
+            // would be a no-op at runtime. Skip the whole wrap emit.
+            //
+            // The probe is a cached resource-stream read of the owner's class
+            // file (StaticFieldAnalysis). Misses are a one-time cost; hits are
+            // lock-free. A probe that cannot resolve the class returns "mutable"
+            // conservatively, so unresolved classes still get the wrap.
+            if (!StaticFieldAnalysis.ownerMayHaveMutableStatics(owner, loader)) {
                 return false;
             }
             return true;

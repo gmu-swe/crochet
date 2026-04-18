@@ -112,7 +112,7 @@ public class CrochetTransformer {
             SharedLocalsProvider locals = new SharedLocalsProvider(Opcodes.ASM9, chain);
             chain = locals;
             chain = new ArrayAccessWrapper(Opcodes.ASM9, chain, locals);
-            chain = new StaticFieldRewriter(Opcodes.ASM9, chain);
+            chain = new StaticFieldRewriter(Opcodes.ASM9, chain, loader);
             chain = new ArrayCopyInterceptor(Opcodes.ASM9, chain);
             chain = new FieldAccessWrapper(Opcodes.ASM9, chain, locals);
             // ReflectionRewriter sits at the top of the user-class chain.
