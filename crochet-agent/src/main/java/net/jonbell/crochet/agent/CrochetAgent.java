@@ -2,6 +2,7 @@ package net.jonbell.crochet.agent;
 
 import java.lang.instrument.Instrumentation;
 
+import net.jonbell.crochet.runtime.ArrayRegistry;
 import net.jonbell.crochet.runtime.CheckpointRollbackAgent;
 import net.jonbell.crochet.runtime.RuntimeReady;
 
@@ -31,6 +32,22 @@ public final class CrochetAgent {
             // the -javaagent path still falls back to TOUCHED_CLASSES +
             // INITIALIZED_CLASSES as root sources.
         }
+        // Preload the lazy-reached runtime classes that the gated pre-hook
+        // paths in {@link RuntimeReady} (noteStaticAccess / beforeStore /
+        // fieldAccess / interceptedArraycopy) would otherwise load on the
+        // first {@code VERSION_GATE != 0} call — which, if triggered from
+        // inside an active {@link TransformerWrapper#transform} frame,
+        // recursively re-enters the transformer for the runtime class
+        // itself and fires {@link ClassCircularityError}. Loading them here
+        // (while we're still inside premain on a well-controlled stack)
+        // is always safe: {@code READY} is still false and
+        // {@code VERSION_GATE} is still 0, so any instrumented code their
+        // class initializers indirectly invoke early-exits in RuntimeReady.
+        try {
+            ArrayRegistry.warmup();
+        } catch (Throwable ignored) {
+        }
+
         inst.addTransformer(new TransformerWrapper(), true);
         // Gap 7 closure: flip the RuntimeReady flag now that the agent
         // runtime's dependency closure is installed and reachable. Before

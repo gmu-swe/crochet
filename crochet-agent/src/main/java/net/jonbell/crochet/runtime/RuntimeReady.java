@@ -51,7 +51,7 @@ public final class RuntimeReady {
 
     /**
      * Pre-checkpoint gate. Non-zero iff at least one checkpoint or
-     * rollback has fired (written opaquely by
+     * rollback has fired (written from
      * {@link VersionCounter#nextCheckpointVersion} and
      * {@link VersionCounter#nextRollbackVersion}). Before any checkpoint
      * there is nothing to track — the pre-hooks can early-return from
@@ -76,8 +76,20 @@ public final class RuntimeReady {
      * which the JVM rejects with {@link ClassCircularityError}. Keeping
      * the gate purely local to {@link RuntimeReady} means the
      * fast-path branch reaches no other package-local class.
+     *
+     * <p><b>Int, not long</b>: the gate is used only as a boolean-ish
+     * "is any checkpoint ever active" signal — the actual value doesn't
+     * matter to consumers, only {@code !=0}. Making it int lets us emit
+     * the site-level gate as {@code GETSTATIC + IFEQ} (6 bytes) rather
+     * than {@code GETSTATIC + LCONST_0 + LCMP + IFEQ} (8 bytes), and
+     * avoids the {@code LCMP} instruction entirely on the hot path.
+     * Theoretical wraparound after {@code Integer.MAX_VALUE}
+     * checkpoints would momentarily flip the gate back to 0 between
+     * counter wrap and the next bump, opening a one-bump window where
+     * a pre-hook could miss its snap. That is not reachable in any
+     * realistic workload (2^31 checkpoints in a single JVM lifetime).
      */
-    public static volatile long VERSION_GATE;
+    public static volatile int VERSION_GATE;
 
     /**
      * Called once from {@link net.jonbell.crochet.agent.CrochetAgent}
@@ -97,9 +109,57 @@ public final class RuntimeReady {
      * once the runtime is ready and at least one checkpoint has fired.
      */
     public static void noteStaticAccess(Class<?> userClass) {
-        if (!READY) return;
-        if (VERSION_GATE == 0L) return;
+        // {@code VERSION_GATE} subsumes the former {@code READY} check.
+        // {@code VERSION_GATE} can only become non-zero when a checkpoint
+        // fires, which can only happen after user code runs, which only
+        // runs after premain (where {@code READY} is set). So
+        // {@code VERSION_GATE != 0L} implies {@code READY == true} by
+        // causal order. One fewer volatile load per pre-hook call.
+        if (VERSION_GATE == 0) return;
         CheckpointRollbackAgent.noteStaticAccess(userClass);
+    }
+
+    /**
+     * Pre-hook emitted by
+     * {@link net.jonbell.crochet.transform.FieldAccessWrapper} before
+     * every GETFIELD/PUTFIELD of an instrumented owner's field. Routes
+     * through here so the {@code VERSION_GATE == 0} fast-path can
+     * eliminate the pre-hook entirely for the "agent attached, no
+     * checkpoint ever fired" case that dominates DaCapo and other
+     * production steady-state workloads.
+     *
+     * <p>Under the prior emit shape (direct {@code INVOKEVIRTUAL
+     * owner.$$crochetAccess()}), every GETFIELD/PUTFIELD in
+     * {@code java.base} paid a vtable dispatch to a single-RETURN NOOP
+     * body on user-class instances and (post-JIT) inlined to zero — but
+     * the interpreter + C1 phase before full JIT'ing, plus the bytecode
+     * inflation on methods not hot enough to reach C2, accumulated into
+     * a substantial overhead once Gap 7's field-wrap expansion brought
+     * ~10k new sites into scope. Measured: biojava 1.32x → 5.60x,
+     * tradebeans 1.34x → 3.23x, tradesoap 0.67x → 2.24x between
+     * pre-Gap-7 and post-correctness baselines.
+     *
+     * <p>Routing through this helper collapses the steady-state site to
+     * a single volatile-long read + branch, which the JIT inlines into
+     * the caller. When {@code VERSION_GATE == 0}, the call becomes a
+     * dead branch and C2 eliminates it entirely. When a checkpoint is
+     * active, we fall through to {@code $$crochetAccess} on the
+     * instance — {@link CRIJInstrumented} INVOKEINTERFACE here is
+     * megamorphic (many owner types call through the same helper), but
+     * is only reached once a checkpoint has fired, which is rare.
+     *
+     * <p>The prior rejected variant
+     * ({@code CheckpointRollbackAgent.fastAccessIfProxy(Object)} with
+     * {@code if (obj instanceof CRIJFast) fastAccess(...)}) was measured
+     * 20-40% slower than unguarded {@code INVOKEVIRTUAL} on h2, because
+     * it paid a secondary-super-cache check for the interface
+     * {@code instanceof} on every call. This variant avoids that: the
+     * {@code VERSION_GATE} check is a plain volatile-long compare, not
+     * a type-system query, so steady-state cost is lower than both.
+     */
+    public static void fieldAccess(Object target) {
+        if (VERSION_GATE == 0) return;
+        ((CRIJInstrumented) target).$$crochetAccess();
     }
 
     /**
@@ -110,8 +170,8 @@ public final class RuntimeReady {
      * checkpoint has fired.
      */
     public static void beforeStore(Object array) {
-        if (!READY) return;
-        if (VERSION_GATE == 0L) return;
+        // {@code READY} check dropped; see {@link #noteStaticAccess}.
+        if (VERSION_GATE == 0) return;
         ArrayRegistry.beforeStore(array);
     }
 
@@ -123,7 +183,23 @@ public final class RuntimeReady {
      * just skip the registry tracking.
      */
     public static void interceptedArraycopy(Object src, int sPos, Object dst, int dPos, int len) {
-        if (!READY) {
+        // Fast path: when no checkpoint has ever fired (the dominant case
+        // for DaCapo and other agent-attached-but-unused workloads), skip
+        // the ArrayRegistry lookup and fall through to the native bulk-copy.
+        // Saves a CHM identity-lookup per intercepted arraycopy.
+        //
+        // {@link ArrayRegistry} must be force-loaded from
+        // {@link net.jonbell.crochet.agent.CrochetAgent#install} for this
+        // gate to be safe — the original (pre-gate) code path here always
+        // called {@code CheckpointRollbackAgent.interceptedArraycopy},
+        // which eagerly loaded {@code ArrayRegistry} via its body's
+        // {@code ArrayRegistry.beforeStore} reference during JVM bootstrap.
+        // With the gate, that eager load no longer happens; the first
+        // non-gate-zero call would otherwise land in the middle of
+        // {@code CrochetTransformer.transform} (ASM parsing), and the
+        // recursive transform for {@code ArrayRegistry} itself fires
+        // {@link ClassCircularityError}.
+        if (VERSION_GATE == 0) {
             System.arraycopy(src, sPos, dst, dPos, len);
             return;
         }

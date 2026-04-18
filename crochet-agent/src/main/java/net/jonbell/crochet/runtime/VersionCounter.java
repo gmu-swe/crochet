@@ -73,7 +73,7 @@ final class VersionCounter {
                 // inside RuntimeReady without touching any other runtime
                 // class. See {@code RuntimeReady#VERSION_GATE} for why
                 // this gate is load-bearing during JVM bootstrap.
-                RuntimeReady.VERSION_GATE = next;
+                RuntimeReady.VERSION_GATE = (int) next;
                 // Gap 7 closure: a successful first checkpoint implies the
                 // agent runtime is fully loaded. Flip the RuntimeReady gate
                 // so instrumented JDK bytecode's pre-hooks start tracking
@@ -104,7 +104,7 @@ final class VersionCounter {
                 // inside RuntimeReady without touching any other runtime
                 // class. See {@code RuntimeReady#VERSION_GATE} for why
                 // this gate is load-bearing during JVM bootstrap.
-                RuntimeReady.VERSION_GATE = next;
+                RuntimeReady.VERSION_GATE = (int) next;
                 RuntimeReady.markReady();
                 return (int) next;
             }

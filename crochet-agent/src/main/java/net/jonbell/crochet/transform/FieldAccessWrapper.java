@@ -1,6 +1,7 @@
 package net.jonbell.crochet.transform;
 
 import org.objectweb.asm.ClassVisitor;
+import org.objectweb.asm.Label;
 import org.objectweb.asm.MethodVisitor;
 import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.Type;
@@ -76,39 +77,29 @@ public final class FieldAccessWrapper extends ClassVisitor {
          * Emit the pre-hook for a GETFIELD/PUTFIELD receiver currently on
          * top of stack: {@code INVOKEVIRTUAL owner.$$crochetAccess()V}.
          *
-         * <p><b>Alternative evaluated and reverted:</b> a klass-guarded
-         * static call of shape {@code INVOKESTATIC
-         * CheckpointRollbackAgent.fastAccessIfProxy(Object)V}, whose body
-         * would be {@code if (obj instanceof CRIJFast) fastAccess((CRIJInstrumented) obj);}.
-         * The intent was to avoid vtable dispatch for the common case
-         * where the receiver's klass has not been swapped to a Fast proxy.
-         *
-         * <p>Direct measurement (graphchi/lusearch/h2 @ -s small -n 3, 5-10
-         * runs each) showed the static-call variant was, on this hardware,
-         * either slightly faster (graphchi, lusearch, within ~5% noise
-         * band) or a net regression (h2, ~20-40% slower across multiple
-         * 5-run and 10-run trials). The INVOKEVIRTUAL path benefits from
-         * the JIT's profile-guided devirtualization of
-         * {@code $$crochetAccess} on monomorphic-to-user-class sites — the
-         * user class's {@code $$crochetAccess} body is a single RETURN, so
-         * after the JIT inlines it the site costs ~0 cycles. An INSTANCEOF
-         * {@code CRIJFast} check inside a static callee always pays a
-         * secondary-super-cache check, which in h2's many-class workload
-         * is measurably more expensive than the inlined no-op. The
-         * static-call variant also did not measurably help graphchi once
-         * run-to-run variance was controlled for (10-iteration medians on
-         * both approaches land within 1σ of each other).
-         *
-         * <p>The alternative "inline class-check" emit
-         * ({@code DUP / INVOKEVIRTUAL Object.getClass() / INVOKESTATIC
-         * CRIJFast.isProxy / IFEQ / ...}) was evaluated conceptually but
-         * inflates per-site bytecode by ~6 instructions + a stackmap
-         * frame — expensive for tradebeans-class-heavy workloads with
-         * &gt;10k emit sites. Not implemented.
+         * <p>The caller is responsible for emitting the site-level gate
+         * check around this call (see {@code emitGateThen*} below).
+         * This keeps the INVOKEVIRTUAL dispatch which JIT profile-guided
+         * devirtualization collapses to a single-RETURN NOOP on all
+         * not-yet-checkpointed instances (the dominant case), while the
+         * outer {@code GETSTATIC VERSION_GATE + IFEQ} gate skips the
+         * dispatch entirely in interpreter + C1 tiers.
          */
         private static void emitPreHook(MethodVisitor mv, String fOwner) {
             mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, fOwner,
                     "$$crochetAccess", "()V", false);
+        }
+
+        /**
+         * Emit the {@code GETSTATIC VERSION_GATE; IFEQ skip} prefix. Caller
+         * supplies the {@code skip} label and emits the pre-hook body between
+         * it and the label.
+         */
+        private static void emitGatePrefix(MethodVisitor mv, Label skip) {
+            mv.visitFieldInsn(Opcodes.GETSTATIC,
+                    "net/jonbell/crochet/runtime/RuntimeReady",
+                    "VERSION_GATE", "I");
+            mv.visitJumpInsn(Opcodes.IFEQ, skip);
         }
 
         @Override
@@ -119,16 +110,24 @@ public final class FieldAccessWrapper extends ClassVisitor {
             }
             if (opcode == Opcodes.GETFIELD) {
                 // stack: [..., objref]
+                Label skip = new Label();
+                emitGatePrefix(mv, skip);
+                // stack: [..., objref]   (gate was popped by IFEQ)
                 mv.visitInsn(Opcodes.DUP);
                 // stack: [..., objref, objref]
                 emitPreHook(mv, fOwner);
                 // stack: [..., objref]
+                mv.visitLabel(skip);
+                // stack: [..., objref] on both paths — fall through to GETFIELD
                 mv.visitFieldInsn(opcode, fOwner, name, descriptor);
                 return;
             }
             if (opcode == Opcodes.PUTFIELD) {
                 boolean twoSlot = "J".equals(descriptor) || "D".equals(descriptor);
+                Label skip = new Label();
                 if (!twoSlot) {
+                    // stack: [..., objref, value]
+                    emitGatePrefix(mv, skip);
                     // stack: [..., objref, value]
                     mv.visitInsn(Opcodes.SWAP);
                     // stack: [..., value, objref]
@@ -138,20 +137,19 @@ public final class FieldAccessWrapper extends ClassVisitor {
                     // stack: [..., value, objref]
                     mv.visitInsn(Opcodes.SWAP);
                     // stack: [..., objref, value]
+                    mv.visitLabel(skip);
+                    // Both paths converge with stack [..., objref, value].
                     mv.visitFieldInsn(opcode, fOwner, name, descriptor);
                     return;
                 }
                 // 2-slot PUTFIELD: stash the wide value in a scratch local
-                // pulled from the chain-wide LVS, leaving objref on top so we
-                // can duplicate it for the hook. Scratch store/load are
-                // emitted via locals.emitVarInsn so they bypass the LVS's
-                // remap table — that table keys on (var, size) not type, and
-                // would otherwise alias our scratch with an original slot
-                // that happens to share the numeric index.
+                // pulled from the chain-wide LVS on the hook path.
                 Type vt = "J".equals(descriptor) ? Type.LONG_TYPE : Type.DOUBLE_TYPE;
                 int slot = locals.sharedScratch(vt);
                 int storeOp = vt.getOpcode(Opcodes.ISTORE);
                 int loadOp = vt.getOpcode(Opcodes.ILOAD);
+                // stack: [..., objref, v_hi, v_lo]
+                emitGatePrefix(mv, skip);
                 // stack: [..., objref, v_hi, v_lo]
                 locals.emitVarInsn(storeOp, slot);
                 // stack: [..., objref]
@@ -161,6 +159,8 @@ public final class FieldAccessWrapper extends ClassVisitor {
                 // stack: [..., objref]
                 locals.emitVarInsn(loadOp, slot);
                 // stack: [..., objref, v_hi, v_lo]
+                mv.visitLabel(skip);
+                // Both paths converge with stack [..., objref, v_hi, v_lo].
                 mv.visitFieldInsn(opcode, fOwner, name, descriptor);
                 return;
             }

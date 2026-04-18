@@ -1,6 +1,7 @@
 package net.jonbell.crochet.transform;
 
 import org.objectweb.asm.ClassVisitor;
+import org.objectweb.asm.Label;
 import org.objectweb.asm.MethodVisitor;
 import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.Type;
@@ -109,19 +110,23 @@ public final class StaticFieldRewriter extends ClassVisitor {
                 super.visitFieldInsnPostSuper(opcode, owner, name, descriptor);
                 return;
             }
-            if (opcode == Opcodes.GETSTATIC) {
-                // stack: [...]
+            if (opcode == Opcodes.GETSTATIC || opcode == Opcodes.PUTSTATIC) {
+                // Site-level VERSION_GATE check — the helper {@link
+                // RuntimeReady#noteStaticAccess} already short-circuits on
+                // {@code VERSION_GATE == 0}, but inlining the check at every
+                // emit site lets the interpreter / C1 tier skip the
+                // {@code LDC + INVOKESTATIC} dispatch entirely. C2 sees the
+                // branch as constant-zero in profile and eliminates it.
+                Label skip = new Label();
+                mv.visitFieldInsn(Opcodes.GETSTATIC, RUNTIME_READY_INTERNAL,
+                        "VERSION_GATE", "I");
+                mv.visitJumpInsn(Opcodes.IFEQ, skip);
                 emitPreHook(owner);
-                // stack: [...]
-                mv.visitFieldInsn(opcode, owner, name, descriptor);
-                return;
-            }
-            if (opcode == Opcodes.PUTSTATIC) {
-                // stack: [..., value]  (value is 1 or 2 slots, doesn't matter)
-                // Each emitted call pushes then pops exactly one slot, so
-                // value is untouched at the bottom when we hit PUTSTATIC.
-                emitPreHook(owner);
-                // stack: [..., value]
+                mv.visitLabel(skip);
+                // PUTSTATIC's existing 1- or 2-slot value sits below where
+                // the (now-elided) helper call's transient stack lived;
+                // both paths reach the field instruction with identical
+                // stack shape.
                 mv.visitFieldInsn(opcode, owner, name, descriptor);
                 return;
             }

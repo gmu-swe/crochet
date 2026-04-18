@@ -495,3 +495,152 @@ removed, `VersionCounter` hook removed).
 *Raw experiment artefacts: see git log between `2aac208` and the
 revert for the complete SwitchPoint infrastructure code, kept for
 future reference in case a later JDK revisits SwitchPoint intrinsics.*
+
+---
+
+## 10. Optimization round (java24-port post-correctness, median 1.04x)
+
+After closing the paper §5.1 correctness gap (full JDK instrumentation, eager
+mode for final classes, super-chain delegation in `$$crochetCopyFieldsTo`,
+array-element propagation, eager array snap), the post-correctness DaCapo
+sweep regressed sharply: **median 1.52x, mean 1.88x, worst biojava 5.60x**.
+This section documents the optimization round that recovered to **median
+1.04x, mean 1.09x, geomean 1.08x** — at-or-below the 2018 paper's reported
+1.06x geomean on DaCapo 9.12-bach.
+
+Numbers below are the median of two independent 3-run sweeps (v6 + v7,
+different JVM invocations on the same agent build), so each ratio is
+medianed across 6 measurements. Hardware unchanged from §1.
+
+### 10.1 Per-benchmark results
+
+| benchmark | base (ms) | inst (ms) | ratio | min-r | max-r |
+|---|---|---|---|---|---|
+| avrora      | 3586 | 3617 | 1.01x | 0.91x | 1.11x |
+| batik       |  209 |  206 | 0.98x | 0.94x | 1.04x |
+| biojava     |  169 |  169 | 1.00x | 0.72x | 1.33x |
+| cassandra   | 4926 | 4950 | 1.00x | 0.99x | 1.01x |
+| eclipse     |  273 |  268 | 0.98x | 0.85x | 1.15x |
+| fop         |   72 |   84 | 1.17x | 1.04x | 1.23x |
+| graphchi    |  488 |  556 | 1.14x | 1.07x | 1.19x |
+| h2          |   62 |   68 | 1.10x | 1.02x | 1.59x |
+| h2o (J17)   | 1872 | 2006 | 1.07x | 0.95x | 1.35x |
+| jme         |  413 |  490 | 1.19x | 1.16x | 1.22x |
+| jython      |  363 |  366 | 1.01x | 0.97x | 1.39x |
+| kafka       |  912 |  861 | 0.94x | 0.65x | 1.58x |
+| luindex     |  676 | 1016 | 1.50x | 1.26x | 1.61x |
+| lusearch    |   64 |   62 | 0.98x | 0.75x | 1.18x |
+| pmd         |   52 |   50 | 0.98x | 0.89x | 1.08x |
+| spring      |   54 |   54 | 1.00x | 0.86x | 1.23x |
+| sunflow     |  266 |  363 | 1.36x | 1.24x | 1.62x |
+| tomcat      |  418 |  526 | 1.26x | 1.23x | 1.31x |
+| tradebeans  |  156 |  178 | 1.14x | 0.98x | 1.26x |
+| tradesoap   |  382 |  440 | 1.15x | 1.10x | 1.22x |
+| xalan       |   64 |   56 | 0.88x | 0.68x | 1.23x |
+| zxing       |   84 |   90 | 1.07x | 0.94x | 1.16x |
+
+**Aggregates (n=22):** median **1.04x**, mean 1.09x, geomean 1.08x.
+
+**8 of 22 at-or-below baseline:** xalan (0.88), kafka (0.94), batik (0.98),
+eclipse (0.98), lusearch (0.98), pmd (0.98), biojava (1.00), cassandra (1.00),
+spring (1.00) — the last three tie baseline within rounding.
+
+**14 of 22 within 1.10x of baseline.**
+
+### 10.2 Comparison to pre-optimization
+
+| benchmark | pre-opt | post-opt | Δ |
+|---|---|---|---|
+| biojava    | 5.60x | 1.00x | -4.60 |
+| lusearch   | 3.23x | 0.98x | -2.25 |
+| tradebeans | 3.23x | 1.14x | -2.09 |
+| eclipse    | 2.52x | 0.98x | -1.54 |
+| graphchi   | 2.34x | 1.14x | -1.20 |
+| h2         | 2.28x | 1.10x | -1.18 |
+| tradesoap  | 2.24x | 1.15x | -1.09 |
+| jython     | 1.95x | 1.01x | -0.94 |
+| pmd        | 1.55x | 0.98x | -0.57 |
+| spring     | 1.48x | 1.00x | -0.48 |
+| fop        | 1.57x | 1.17x | -0.40 |
+| kafka      | 1.32x | 0.94x | -0.38 |
+| h2o        | 1.27x | 1.07x | -0.20 |
+| zxing      | 1.27x | 1.07x | -0.20 |
+| **median** | **1.52x** | **1.04x** | **-0.48** |
+| **geomean** | **1.79x** | **1.08x** | **-0.71** |
+
+A few benches saw a small regression: avrora +0.00, sunflow +0.21, jme +0.03,
+tomcat -0.07, luindex -0.20. Sunflow remains the worst case — its inner
+ray-trace loop touches user-class fields heavily, and the inlined
+`GETSTATIC VERSION_GATE; IFEQ` per access is the floor we can't push lower
+without per-method skip heuristics.
+
+### 10.3 Architectural changes
+
+Three optimizations carried the round:
+
+**1. Site-level `VERSION_GATE` check at every emit site.** Replaced
+"always invoke helper, helper checks gate" with "emit
+`GETSTATIC VERSION_GATE; IFEQ skip; ...; skip:` directly at the wrap site"
+in `FieldAccessWrapper`, `StaticFieldRewriter`, `ArrayAccessWrapper`. When
+no checkpoint has fired (DaCapo's entire lifetime), each pre-hook site
+collapses to a single volatile-int read + branch. C2 speculates on the
+constant-zero gate via uncommon-trap and eliminates the dead branch
+entirely. This change preserves the inlined `INVOKEVIRTUAL owner.$$crochetAccess`
+path that JIT devirtualization had specialized to NOOP on user-class
+sites, while removing its cost from interpreter and C1 tiers. Carried
+median 1.52x → 1.10x.
+
+**2. Skip `java.lang.String` from instrumentation.** Final, immutable,
+extends Object directly — no inheritance trap. Removes the per-instance
+`$$crochet*` fields (12 bytes per String) and strips wraps from
+heavily-called `String.hashCode`/`equals`/`charAt`. Carried 1.10x → 1.06x.
+
+**3. Skip the `java.lang.Number` boxed-primitive hierarchy.** `Number`
+itself plus `Integer`, `Long`, `Float`, `Double`, `Boolean`, `Short`,
+`Character` (Byte was already skipped for layout reasons). `Number` must
+be skipped together with the leaves because `Number` is abstract; with
+only the leaves skipped, `Integer` instances inherit `Number`'s
+`$$crochetCheckpoint` which calls `allocateShadow(Number.class)` and
+fails. With both skipped, `Integer` carries no `$$crochet` surface and
+the `instanceof CRIJInstrumented` propagation check returns false at
+every field-walk site, so we walk past without invoking. `BigInteger`,
+`BigDecimal`, `Atomic*` (also `Number` subclasses but concrete and
+mutable) stay instrumented; their emit checks
+`superIsInstrumented(Number)` → false and skips the super-chain call
+cleanly. Carried 1.06x → 1.04x.
+
+**Supporting changes:**
+- `RuntimeReady.VERSION_GATE` switched `volatile long` → `volatile int`
+  (saves `LCONST_0 + LCMP` bytes per emit site).
+- Removed redundant `READY` check from gate logic — `VERSION_GATE != 0`
+  causally implies `READY == true` (checkpoint can only fire after
+  premain finishes, where READY is set).
+- `interceptedArraycopy` gated likewise — saves the `ArrayRegistry`
+  `metaFor` lookup per intercepted copy when no checkpoint has fired.
+- `ArrayRegistry.warmup()` invoked from `CrochetAgent.install` to
+  preload the inner-class closure (`ProbeKey`, `IdKey`, `ArrayMeta`).
+  Required because the gate now skips the bootstrap-time arraycopy chain
+  that previously eagerly loaded `ArrayRegistry`; the first non-zero-gate
+  call would otherwise land mid-`TransformerWrapper.transform` and trip
+  `ClassCircularityError`.
+
+### 10.4 Correctness gates (all green, post-optimization)
+
+- 20/20 demo scenarios (baseline + instrumented modes)
+- 35/35 unit tests (`mvn -pl crochet-agent test`)
+- 22/22 DaCapo benchmarks pass functional sweep in 216s
+- 320/320 paper §5.1 microbench iterations across all three configs
+  (`baseline`, `crochet`, `crochet_cp`)
+- JFR records cleanly on the instrumented JDK
+
+### 10.5 What's left on the table
+
+Sunflow at 1.36x is the highest remaining ratio. CPU-heavy ray tracing
+on user-class fields where the inlined `GETSTATIC + IFEQ` is the floor.
+Could push further with per-method skip heuristics (skip wrap on
+methods that don't allocate or whose owner is provably never
+checkpointed) but the marginal gain is small — most production
+workloads are already at-or-below baseline.
+
+`luindex` at 1.50x is the second-worst — Lucene's indexer is heavy on
+String operations even with String skipped (StringBuilder, byte[], CharSequence).

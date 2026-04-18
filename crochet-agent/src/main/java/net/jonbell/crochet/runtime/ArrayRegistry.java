@@ -126,6 +126,27 @@ public final class ArrayRegistry {
         return prior != null ? prior : candidate;
     }
 
+    /**
+     * Force-load the inner-class dependency closure of ArrayRegistry
+     * ({@code ProbeKey}, {@code IdKey}, {@code ArrayMeta}) by exercising
+     * {@link #metaFor} once. Called from
+     * {@link net.jonbell.crochet.agent.CrochetAgent#install} so the first
+     * post-checkpoint {@code beforeStore} call never triggers a lazy
+     * inner-class load while the caller is already inside
+     * {@link net.jonbell.crochet.agent.TransformerWrapper#transform} —
+     * which recursively re-enters the transformer and fires
+     * {@link ClassCircularityError}.
+     *
+     * <p>The {@code new Object[0]} probe flows through the full path:
+     * {@code metaFor} → {@code new ProbeKey}, {@code META.get}, and
+     * (on miss) {@code new IdKey} / {@code new ArrayMeta}. After return
+     * the probe and its meta are eligible for GC (META's keys are
+     * {@link WeakReference}s), so this leaves no runtime state behind.
+     */
+    public static void warmup() {
+        metaFor(new Object[0]);
+    }
+
     public static void registerForCheckpoint(Object array, int v) {
         if (array == null) {
             return;

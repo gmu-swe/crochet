@@ -315,6 +315,53 @@ public class CrochetTransformer {
         if (internalName.equals("java/lang/Byte")) {
             return true;
         }
+        // Immutable JDK leaves: state invariant after construction, so
+        // checkpoint / rollback on them is a no-op. Skipping removes
+        // the per-instance {@code $$crochet*} fields (12 bytes each —
+        // very visible on hot allocation sites for boxed primitives and
+        // String concat), strips wraps from heavily-called methods like
+        // {@code String.hashCode}, {@code Integer.intValue}, and frees
+        // C2 inline budget on every method that touches them.
+        //
+        // <p>Other instrumented classes that hold references to these
+        // immutables still snap the REFERENCE in their own
+        // {@code $$crochetCopyFieldsTo}; on rollback the reference is
+        // restored — and since the immutable instance's state never
+        // changed, the restored reference is observationally identical
+        // to a deep restore.
+        //
+        // <p>{@code Number} (abstract) must be in this set too: with
+        // {@code Number} instrumented but {@code Integer} skipped, an
+        // {@code Integer} instance inherits {@code Number}'s
+        // {@code $$crochetCheckpoint} which calls
+        // {@code allocateShadow(Number.class)} — fails because
+        // {@code Number} is abstract. With {@code Number} also skipped,
+        // {@code Integer} carries no {@code $$crochet} surface; the
+        // {@code instanceof CRIJInstrumented} check at every reference-
+        // field propagation site returns false for {@code Integer}, so
+        // we walk past without invoking anything.
+        //
+        // <p>{@code BigInteger} / {@code BigDecimal} / {@code Atomic*}
+        // (also Number subclasses) stay instrumented — they're concrete
+        // and DO carry mutable state worth tracking. Their emitted
+        // surface checks {@code superIsInstrumented(Number)} → false
+        // and skips the super-call chain to Number cleanly.
+        //
+        // <p>{@code String}'s lazy {@code hash} cache is the one
+        // post-{@code <init>} write — caches a deterministic function
+        // of the immutable {@code value} array, so missing its rollback
+        // means the next {@code hashCode()} recomputes the same value.
+        if (internalName.equals("java/lang/String")
+                || internalName.equals("java/lang/Number")
+                || internalName.equals("java/lang/Integer")
+                || internalName.equals("java/lang/Long")
+                || internalName.equals("java/lang/Float")
+                || internalName.equals("java/lang/Double")
+                || internalName.equals("java/lang/Boolean")
+                || internalName.equals("java/lang/Short")
+                || internalName.equals("java/lang/Character")) {
+            return true;
+        }
         // Our own runtime/transform/agent/patch/annotation code must never
         // recurse — the instrumentation chain uses these classes directly.
         if (internalName.startsWith(RUNTIME_PACKAGE_PREFIX)

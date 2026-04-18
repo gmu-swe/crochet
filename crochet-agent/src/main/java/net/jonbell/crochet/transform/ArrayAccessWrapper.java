@@ -1,6 +1,7 @@
 package net.jonbell.crochet.transform;
 
 import org.objectweb.asm.ClassVisitor;
+import org.objectweb.asm.Label;
 import org.objectweb.asm.MethodVisitor;
 import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.Type;
@@ -85,6 +86,17 @@ public final class ArrayAccessWrapper extends ClassVisitor {
             int slot = locals.sharedScratch(vt);
             int storeOp = vt.getOpcode(Opcodes.ISTORE);
             int loadOp = vt.getOpcode(Opcodes.ILOAD);
+            // Site-level VERSION_GATE check: skip the entire stash + dup +
+            // hook + restore dance when no checkpoint has fired. The hook
+            // shape would still produce a no-op via {@link RuntimeReady#beforeStore}
+            // but inlining the gate at every xASTORE site lets the
+            // interpreter / C1 tier avoid the dispatch entirely.
+            // stack: [..., arr, idx, val]
+            Label skip = new Label();
+            mv.visitFieldInsn(Opcodes.GETSTATIC,
+                    "net/jonbell/crochet/runtime/RuntimeReady",
+                    "VERSION_GATE", "I");
+            mv.visitJumpInsn(Opcodes.IFEQ, skip);
             // Scratch store/load emitted via locals.emitVarInsn — bypasses
             // the LVS remap table so the slot lands at its allocated index
             // rather than being aliased with an original local of the same
@@ -103,6 +115,10 @@ public final class ArrayAccessWrapper extends ClassVisitor {
             // stack: [..., arr, idx]
             locals.emitVarInsn(loadOp, slot);
             // stack: [..., arr, idx, val]
+            mv.visitLabel(skip);
+            // Both paths converge with stack [..., arr, idx, val] — the hook
+            // path roundtripped val through the scratch local; the skip path
+            // never disturbed it.
             mv.visitInsn(opcode);
         }
 
