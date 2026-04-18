@@ -8,11 +8,16 @@
 set -u
 cd "$(dirname "$0")"
 
-AGENT_JAR="$(cd .. && pwd)/crochet-agent/target/crochet-agent-1.0.0-SNAPSHOT.jar"
-if [ ! -f "$AGENT_JAR" ]; then
+# Resolve the agent jar by glob so we don't have to hard-code the snapshot
+# version (the Maven coords on the java24-port branch carry a tapestry-* tag
+# which changes per integration round).
+AGENT_GLOB="$(cd .. && pwd)/crochet-agent/target/crochet-agent-*.jar"
+AGENT_JAR=$(ls -t $AGENT_GLOB 2>/dev/null | head -1 || true)
+if [ -z "${AGENT_JAR:-}" ] || [ ! -f "$AGENT_JAR" ]; then
     echo "Building crochet-agent..."
     (cd .. && PATH=~/.local/bin:$PATH mvn -q -pl :crochet-agent package -DskipTests) || {
         echo "FAIL: build"; exit 1; }
+    AGENT_JAR=$(ls -t $AGENT_GLOB 2>/dev/null | head -1)
 fi
 
 USE_INSTRUMENTED=0
