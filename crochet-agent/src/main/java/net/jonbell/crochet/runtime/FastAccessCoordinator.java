@@ -73,29 +73,6 @@ final class FastAccessCoordinator {
     private FastAccessCoordinator() {}
 
     /**
-     * Lock-policy selector (paper §3.4). Two implementations ship:
-     * <ul>
-     *   <li>{@code STRIPE} (default): monitor bank, coarse-grained across
-     *       distinct objects that hash to the same stripe; reentrant via
-     *       HotSpot's monitor inflation.
-     *   <li>{@code VERSION_CAS}: the winner CASes {@code $$crochetVersion →
-     *       0} on the object itself to claim the snap work. Losers spin on
-     *       the klass header until the winner publishes klass=user. No
-     *       monitor, no stripe allocation; per-object (no false sharing
-     *       across objects that would collide under stripe).
-     * </ul>
-     * Selected once at class-init time via {@code -Dcrochet.lockPolicy};
-     * defaults to {@code stripe}. Change via
-     * {@code -Dcrochet.lockPolicy=versionCAS} at JVM startup.
-     */
-    enum Policy { STRIPE, VERSION_CAS }
-
-    static final Policy POLICY =
-            "versionCAS".equalsIgnoreCase(System.getProperty("crochet.lockPolicy", ""))
-                    ? Policy.VERSION_CAS
-                    : Policy.STRIPE;
-
-    /**
      * Power-of-two stripe count. Scaled to {@code 2^ceil(log2(4 * availableProcessors()))}
      * with clamps at 64 (min) and 4096 (max). Sized once at class-init time;
      * re-sizing under load would require a CHM-style migration, which is not
