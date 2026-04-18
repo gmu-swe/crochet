@@ -29,3 +29,4 @@ scratch/
 # JVM crash artifacts
 hs_err_pid*.log
 core.*
+crochet-agent/src/main/native/libcrochet-jvmti.so

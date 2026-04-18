@@ -297,6 +297,18 @@ public final class CheckpointRollbackAgent {
                 }
             }
         }
+        // Stack-frame roots: no-op when the optional native JVMTI agent
+        // (libcrochet-jvmti) isn't loaded. Closes the parity gap with
+        // legacy Tagger.checkpointStackRoots — without this, references
+        // held only by an active stack frame's locals would be silently
+        // dropped from the snapshot graph.
+        try {
+            StackRoots.checkpointStackRoots(v, true);
+        } catch (Throwable t) {
+            if (Boolean.getBoolean("crochet.verboseCompat")) {
+                System.err.println("checkpointAll: stack roots skipped: " + t);
+            }
+        }
         return v;
     }
 
@@ -342,6 +354,16 @@ public final class CheckpointRollbackAgent {
                         System.err.println("rollbackAll: system CL skipped: " + x);
                     }
                 }
+            }
+        }
+        // Symmetric stack-frame rollback. {@code rv} (the rollback version)
+        // is what the per-element {@code $$crochetRollback} expects so its
+        // version-guard admits the call.
+        try {
+            StackRoots.rollbackStackRoots(rv, true);
+        } catch (Throwable t) {
+            if (Boolean.getBoolean("crochet.verboseCompat")) {
+                System.err.println("rollbackAll: stack roots skipped: " + t);
             }
         }
     }

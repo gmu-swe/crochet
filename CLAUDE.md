@@ -37,9 +37,19 @@ INST_JDK=/path/to/other-jdk bash run-all.sh --instrumented
 /tmp/jdk-inst/bin/java --add-reads java.base=jdk.unsupported \
     -javaagent:crochet-agent/target/crochet-agent-1.0.0-SNAPSHOT.jar \
     -jar whatever.jar
+
+# Optional: build the JVMTI native agent for stack-frame root collection
+(cd crochet-agent/src/main/native && make)
+# Then attach via -agentpath alongside -javaagent:
+/tmp/jdk-inst/bin/java --add-reads java.base=jdk.unsupported \
+    -agentpath:crochet-agent/src/main/native/libcrochet-jvmti.so \
+    -javaagent:crochet-agent/target/crochet-agent-1.0.0-SNAPSHOT.jar \
+    -jar whatever.jar
 ```
 
 `--add-reads java.base=jdk.unsupported` is required on the instrumented JDK because our packed runtime references `sun.misc.Unsafe` and `java.base` cannot declare `requires jdk.unsupported` itself.
+
+**Optional JVMTI native agent (`libcrochet-jvmti.so`)**: closes the legacy parity gap on stack-frame root collection. When attached, `checkpointAll` / `rollbackAll` walk every active stack frame's local references and propagate to `CRIJInstrumented` ones — this is what lets `checkpointAll` capture an object held only by a method local. Without the native agent, `StackRoots.engaged` stays `false` and the stack walk is a no-op (heap-rooted checkpointing works exactly as before). Demo scenario 21-stack-roots tests both modes and degrades gracefully when the native isn't loaded.
 
 ## Runtime diagnostics (system properties)
 
