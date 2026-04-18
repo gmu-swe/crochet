@@ -1,7 +1,12 @@
 package net.jonbell.crochet.runtime;
 
+import java.lang.instrument.Instrumentation;
+import java.util.Collections;
+import java.util.HashSet;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+
+import net.jonbell.crochet.annotation.CrochetEager;
 
 import sun.misc.Unsafe;
 
@@ -112,6 +117,86 @@ public final class CheckpointRollbackAgent {
     static final Set<Class<?>> TOUCHED_CLASSES = ConcurrentHashMap.newKeySet();
 
     /**
+     * Set of user classes whose {@code <clinit>} has fired on the instrumented
+     * JDK. Populated from a registration call emitted by
+     * {@link net.jonbell.crochet.transform.FieldAdder} into the top of every
+     * user class's class initializer. Unlike {@link #TOUCHED_CLASSES} (which
+     * only captures classes the runtime has noticed via {@code ClassMeta.of}
+     * — typically on first GETSTATIC/PUTSTATIC or first object allocation),
+     * this set captures classes whose static state was initialized by any
+     * code path including those that bypassed our bytecode hooks: native
+     * init, reflection, framework hidden-class defines, etc.
+     *
+     * <p>This closes the legacy CROCHET {@code ClassCoverageProbe} /
+     * {@code RootCollector} gap, where classes initialized via non-hooked
+     * paths would never make it into the {@code checkpointAll} root set.
+     *
+     * <p>The registration call is guarded on the agent-side by a try/catch
+     * in {@link #registerInitializedClass} so VERY early
+     * {@code java.base} class initialization (which can fire before this
+     * class itself is fully initialized) tolerates a missing helper state.
+     */
+    static final Set<Class<?>> INITIALIZED_CLASSES = ConcurrentHashMap.newKeySet();
+
+    /**
+     * Handle to the {@link Instrumentation} instance captured by
+     * {@link net.jonbell.crochet.agent.CrochetAgent#premain}. Only populated
+     * when the runtime is loaded via the {@code -javaagent} path; remains
+     * {@code null} when the runtime is packed into {@code java.base} without
+     * an external agent attached.
+     *
+     * <p>Used by {@link #checkpointAll()} as a fallback discovery mechanism:
+     * when present, we iterate {@link Instrumentation#getAllLoadedClasses()}
+     * and include any class that implements {@link CRIJInstrumented} but
+     * has not yet been registered by {@code <clinit>} emission or
+     * {@link ClassMeta#of}. This catches classes whose {@code <clinit>} fired
+     * before our registration helper emit was in place (e.g. if the agent
+     * attaches after some user classes have already been loaded).
+     */
+    private static volatile Instrumentation INSTRUMENTATION_HANDLE;
+
+    /**
+     * Called once from {@link net.jonbell.crochet.agent.CrochetAgent#premain}
+     * (and {@code agentmain}) to publish the {@link Instrumentation} handle
+     * so {@link #checkpointAll()} can discover classes loaded before our
+     * transformer was installed. Calling this a second time is benign — the
+     * handle is idempotent — but is an orderly no-op since the JVM provides
+     * the same handle to each {@code premain}/{@code agentmain} invocation.
+     */
+    public static void setInstrumentation(Instrumentation inst) {
+        INSTRUMENTATION_HANDLE = inst;
+    }
+
+    /**
+     * Registration call emitted by {@link net.jonbell.crochet.transform.FieldAdder}
+     * at the top of every user class's {@code <clinit>} (synthesised if
+     * absent). Captures every class whose {@code <clinit>} runs on the
+     * instrumented JDK, regardless of whether our runtime has seen it via
+     * {@code ClassMeta.of}.
+     *
+     * <p>The {@code <clinit>} of some {@code java.base} classes fires VERY
+     * early during JVM bootstrap, before this class itself is fully
+     * initialized on the {@code -javaagent} path. To tolerate that, the
+     * emitted bytecode wraps the {@code INVOKESTATIC} in its own try/catch
+     * that silently swallows any {@link Throwable} — and this helper runs a
+     * second try/catch of its own so that even if the static initialization
+     * of {@link #INITIALIZED_CLASSES} hasn't yet run, the caller doesn't
+     * see a {@link NoClassDefFoundError} or {@link ExceptionInInitializerError}.
+     */
+    public static void registerInitializedClass(Class<?> c) {
+        if (c == null) {
+            return;
+        }
+        try {
+            INITIALIZED_CLASSES.add(c);
+        } catch (Throwable ignored) {
+            // Very-early boot: INITIALIZED_CLASSES may not yet be initialized
+            // (the containing CheckpointRollbackAgent class initializer could
+            // still be running). Silently skip — next call will succeed.
+        }
+    }
+
+    /**
      * Opt-out for users whose test frameworks or hosting containers assume
      * the system classloader / thread list are stable. When {@code true},
      * {@link #checkpointAll} / {@link #rollbackAll} skip those two roots and
@@ -124,8 +209,19 @@ public final class CheckpointRollbackAgent {
      * Paper §3 "checkpoint the live world". Bumps the version counter once,
      * then walks:
      * <ul>
-     *   <li>Every user class materialised via {@link ClassMeta#of} (their
-     *       reflective statics via {@link #checkpointClassAtVersion}).
+     *   <li>Every user class in the union of:
+     *     <ul>
+     *       <li>{@link #TOUCHED_CLASSES} — classes the runtime has materialised
+     *           via {@link ClassMeta#of} (typically on first GETSTATIC/PUTSTATIC);
+     *       <li>{@link #INITIALIZED_CLASSES} — classes whose {@code <clinit>}
+     *           fired and invoked {@link #registerInitializedClass} (closes
+     *           the legacy {@code ClassCoverageProbe} / {@code RootCollector}
+     *           gap: captures classes initialised via native init, reflective
+     *           force-init, or framework hidden-class defines);
+     *       <li>{@link java.lang.instrument.Instrumentation#getAllLoadedClasses()} —
+     *           available only on the {@code -javaagent} path, covers classes
+     *           whose {@code <clinit>} fired before our transformer attached.
+     *     </ul>
      *   <li>Every live {@link Thread} from
      *       {@link Thread#getAllStackTraces} — threads are instrumented
      *       objects, so each gets {@link #checkpoint(Object)}.
@@ -146,10 +242,11 @@ public final class CheckpointRollbackAgent {
      */
     public static int checkpointAll() {
         int v = nextCheckpointVersion();
-        // Snapshot TOUCHED_CLASSES before iterating — a new $$crochetAccess
-        // from a peer thread can populate the set mid-iteration otherwise and
-        // we'd capture a class at the wrong version.
-        Class<?>[] classes = TOUCHED_CLASSES.toArray(new Class<?>[0]);
+        // Snapshot all root sets before iterating — a new $$crochetAccess
+        // from a peer thread can populate TOUCHED_CLASSES mid-iteration
+        // otherwise and we'd capture a class at the wrong version. The
+        // union de-dupes classes present in more than one set via HashSet.
+        Set<Class<?>> classes = collectRootClasses();
         for (Class<?> c : classes) {
             try {
                 checkpointClassAtVersion(c, v);
@@ -199,7 +296,7 @@ public final class CheckpointRollbackAgent {
      */
     public static void rollbackAll(int v) {
         int rv = nextRollbackVersion();
-        Class<?>[] classes = TOUCHED_CLASSES.toArray(new Class<?>[0]);
+        Set<Class<?>> classes = collectRootClasses();
         for (Class<?> c : classes) {
             try {
                 rollbackClassAtVersion(c, rv);
@@ -234,6 +331,61 @@ public final class CheckpointRollbackAgent {
                 }
             }
         }
+    }
+
+    /**
+     * Unions {@link #TOUCHED_CLASSES}, {@link #INITIALIZED_CLASSES}, and (when
+     * available) the instrumented subset of
+     * {@link Instrumentation#getAllLoadedClasses()} into a single HashSet for
+     * stable iteration. Called at the top of {@link #checkpointAll()} and
+     * {@link #rollbackAll(int)} to ensure both APIs see identical roots.
+     *
+     * <p>The {@link Instrumentation} fallback catches classes whose
+     * {@code <clinit>} fired before the agent's transformer was installed
+     * and thus never got the {@link #registerInitializedClass} emit. These
+     * classes are discoverable only after the fact via
+     * {@code getAllLoadedClasses}; we filter on
+     * {@code CRIJInstrumented.class.isAssignableFrom(c)} to get exactly the
+     * classes the transformer did eventually process.
+     *
+     * <p>The fallback gate is the {@link #INSTRUMENTATION_HANDLE} — null on
+     * the jlink/packed-runtime path (no external agent), so the fallback is
+     * a no-op there. On the jlink path the JDK is pre-instrumented and every
+     * class's {@code <clinit>} carries the registration call, so the primary
+     * path ({@link #INITIALIZED_CLASSES}) already covers the root set.
+     */
+    private static Set<Class<?>> collectRootClasses() {
+        Set<Class<?>> roots = new HashSet<>();
+        roots.addAll(TOUCHED_CLASSES);
+        roots.addAll(INITIALIZED_CLASSES);
+        Instrumentation inst = INSTRUMENTATION_HANDLE;
+        if (inst != null) {
+            try {
+                Class<?>[] loaded = inst.getAllLoadedClasses();
+                for (Class<?> c : loaded) {
+                    if (c == null) {
+                        continue;
+                    }
+                    if (c.isArray() || c.isInterface() || c.isAnnotation()) {
+                        continue;
+                    }
+                    if (!CRIJInstrumented.class.isAssignableFrom(c)) {
+                        continue;
+                    }
+                    // Fast-proxy subclasses inherit CRIJInstrumented; the
+                    // real user class (first non-CRIJFast type) is the
+                    // root we care about.
+                    if (CRIJFast.class.isAssignableFrom(c)) {
+                        continue;
+                    }
+                    roots.add(c);
+                }
+            } catch (Throwable ignored) {
+                // Instrumentation API is optional; never let a scan failure
+                // abort checkpointAll.
+            }
+        }
+        return roots;
     }
 
     /**
@@ -332,6 +484,96 @@ public final class CheckpointRollbackAgent {
     /** See {@link FastProxySupport#allocateShadow(Class)}. */
     public static Object allocateShadow(Class<?> c) {
         return FastProxySupport.allocateShadow(c);
+    }
+
+    /* ---------- Eager checkpoint opt-in ---------- */
+
+    /**
+     * Cached parse of {@code -Dcrochet.eagerClasses}. Re-parsed lazily when
+     * the property string changes (typically never — set once at JVM startup
+     * — but the tests vary it per scenario and the transformer-side
+     * {@code FieldAdder} also re-resolves). The fully-qualified string form
+     * (dots) is preserved here; the bytecode-transform path uses slashes.
+     */
+    private static volatile String eagerPropCached;
+    private static volatile Set<String> eagerClassNamesCached = Collections.emptySet();
+
+    private static Set<String> eagerClassNames() {
+        String prop = System.getProperty("crochet.eagerClasses");
+        if (prop == null) {
+            if (eagerPropCached != null) {
+                eagerPropCached = null;
+                eagerClassNamesCached = Collections.emptySet();
+            }
+            return Collections.emptySet();
+        }
+        String cached = eagerPropCached;
+        if (prop.equals(cached)) {
+            return eagerClassNamesCached;
+        }
+        Set<String> parsed = parseEagerClassNames(prop);
+        eagerClassNamesCached = parsed;
+        eagerPropCached = prop;
+        return parsed;
+    }
+
+    private static Set<String> parseEagerClassNames(String prop) {
+        if (prop == null || prop.isBlank()) {
+            return Collections.emptySet();
+        }
+        Set<String> names = new HashSet<>();
+        for (String part : prop.split(",")) {
+            String trimmed = part.trim();
+            if (!trimmed.isEmpty()) {
+                names.add(trimmed);
+            }
+        }
+        return Collections.unmodifiableSet(names);
+    }
+
+    /**
+     * True iff instances of {@code c} should use the eager shallow-copy
+     * checkpoint strategy instead of the default Fast-proxy + lazy snapshot.
+     * Answers cache on {@link ClassMeta#eagerMode} so repeated queries are a
+     * single volatile read.
+     *
+     * <p>Two sources, either sufficient:
+     * <ul>
+     *   <li>{@link CrochetEager} present on the class declaration.
+     *   <li>Fully-qualified class name listed in
+     *       {@code -Dcrochet.eagerClasses}.
+     * </ul>
+     */
+    public static boolean isEagerClass(Class<?> c) {
+        if (c == null) {
+            return false;
+        }
+        // Consult the system property first with a live read — tests (and
+        // rare runtime reconfigurers) can flip eligibility without the
+        // cached ClassMeta.eagerMode going stale. Annotation membership
+        // never changes post-class-load, so that half is safe to cache.
+        Set<String> opted = eagerClassNames();
+        if (!opted.isEmpty() && opted.contains(c.getName())) {
+            return true;
+        }
+        ClassMeta meta = ClassMeta.of(c);
+        Boolean cached = meta.eagerMode;
+        if (cached != null) {
+            return cached;
+        }
+        boolean eager;
+        try {
+            eager = c.isAnnotationPresent(CrochetEager.class);
+        } catch (Throwable t) {
+            // Reflection on annotations can fail under broken classloaders
+            // (e.g. during early VM boot when annotation types haven't
+            // finished loading). Default to "not eager" and keep going —
+            // the worst outcome is Fast-proxy instead of eager, which is
+            // the existing behaviour anyway.
+            eager = false;
+        }
+        meta.eagerMode = eager;
+        return eager;
     }
 
     /* ---------- klass-swap machinery (facade) ---------- */

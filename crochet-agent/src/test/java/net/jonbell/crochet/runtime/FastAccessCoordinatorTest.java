@@ -32,6 +32,18 @@ class FastAccessCoordinatorTest {
     }
 
     @Test
+    void policyDefaultsToStripe() {
+        // Without -Dcrochet.lockPolicy set in the Surefire configuration, the
+        // selector should default to STRIPE. This test asserts the default
+        // hasn't drifted (and catches an accidental flip of the default).
+        //
+        // The FastAccessCoordinator class has already been initialised by the
+        // time the first test method runs, so we're reading the baked-in value.
+        assertEquals(FastAccessCoordinator.Policy.STRIPE, FastAccessCoordinator.POLICY,
+                "default lock policy must be STRIPE; override via -Dcrochet.lockPolicy=versionCAS");
+    }
+
+    @Test
     void lockForSpreadsAcrossStripes() {
         // 10k fresh objects should land on many distinct stripes. The mixer
         // is idempotent (deterministic); all that matters is distinct-hash

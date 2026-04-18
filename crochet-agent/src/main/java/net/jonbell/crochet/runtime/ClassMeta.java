@@ -110,6 +110,18 @@ public final class ClassMeta {
     /** Singleton helper instance used as snapshot storage. */
     public volatile CRIJInstrumented sfHelper;
 
+    /**
+     * Tri-state cache for {@code @CrochetEager} membership (annotation OR
+     * the {@code -Dcrochet.eagerClasses} opt-in list).
+     *
+     * <p>Computed once on first query per class. {@code null} means "not yet
+     * resolved", {@link Boolean#TRUE} / {@link Boolean#FALSE} are the cached
+     * answers. The boxed {@link Boolean} is used as a sentinel because the
+     * two materialised values are interned singletons — reads are a single
+     * volatile load.
+     */
+    volatile Boolean eagerMode;
+
     private ClassMeta(Class<?> userClass) {
         this.userClass = userClass;
     }

@@ -25,3 +25,7 @@ debug-verify
 DUMP_CLASS_FILES
 /.claude/
 scratch/
+
+# JVM crash artifacts
+hs_err_pid*.log
+core.*

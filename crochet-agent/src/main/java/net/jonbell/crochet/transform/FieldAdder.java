@@ -1,8 +1,12 @@
 package net.jonbell.crochet.transform;
 
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
+import org.objectweb.asm.AnnotationVisitor;
 import org.objectweb.asm.ClassVisitor;
 import org.objectweb.asm.FieldVisitor;
 import org.objectweb.asm.Label;
@@ -54,6 +58,56 @@ public final class FieldAdder extends ClassVisitor {
 
     private static final String INSTRUMENTED = "net/jonbell/crochet/runtime/CRIJInstrumented";
     private static final String AGENT = "net/jonbell/crochet/runtime/CheckpointRollbackAgent";
+
+    /** Descriptor of {@link net.jonbell.crochet.annotation.CrochetEager}. */
+    static final String CROCHET_EAGER_DESC =
+            "Lnet/jonbell/crochet/annotation/CrochetEager;";
+
+    /**
+     * Fully-qualified class names opted in to the eager strategy via
+     * {@code -Dcrochet.eagerClasses=Foo.Bar,Baz}. Internal/slash form. The
+     * transformer consults this plus the {@code @CrochetEager} annotation —
+     * either is sufficient.
+     *
+     * <p>Cached in a volatile field keyed by the string form of the property.
+     * Re-parses only when the underlying property changes, which in practice
+     * never happens outside tests (the system property is set at JVM start).
+     */
+    private static volatile String eagerPropCached;
+    private static volatile Set<String> eagerInternalNamesCached = Collections.emptySet();
+
+    private static Set<String> eagerClassInternalNames() {
+        String prop = System.getProperty("crochet.eagerClasses");
+        if (prop == null) {
+            if (eagerPropCached != null) {
+                eagerPropCached = null;
+                eagerInternalNamesCached = Collections.emptySet();
+            }
+            return Collections.emptySet();
+        }
+        String cached = eagerPropCached;
+        if (prop.equals(cached)) {
+            return eagerInternalNamesCached;
+        }
+        Set<String> parsed = parseEagerClassInternalNames(prop);
+        eagerInternalNamesCached = parsed;
+        eagerPropCached = prop;
+        return parsed;
+    }
+
+    private static Set<String> parseEagerClassInternalNames(String prop) {
+        if (prop == null || prop.isBlank()) {
+            return Collections.emptySet();
+        }
+        Set<String> names = new HashSet<>();
+        for (String part : prop.split(",")) {
+            String trimmed = part.trim();
+            if (!trimmed.isEmpty()) {
+                names.add(trimmed.replace('.', '/'));
+            }
+        }
+        return Collections.unmodifiableSet(names);
+    }
 
     /**
      * Emits a sentinel-aware body for {@code $$crochetCheckpoint} /
@@ -187,15 +241,44 @@ public final class FieldAdder extends ClassVisitor {
     private boolean alreadyInstrumented;
     private boolean hasVersionField;
     private boolean hasSnapField;
+    private boolean hasClinit;
+    private final boolean emitClinitRegistration;
+    private boolean eagerMode;
 
     public FieldAdder(int api, ClassVisitor delegate) {
+        this(api, delegate, true);
+    }
+
+    /**
+     * @param emitClinitRegistration when {@code true} (the default for user
+     *        classes) the visitor emits a
+     *        {@code CheckpointRollbackAgent.registerInitializedClass(ThisClass.class)}
+     *        call at the top of every class's {@code <clinit>} — synthesising
+     *        one if absent. Set to {@code false} for JDK classes on the
+     *        minimal pipeline: JDK {@code <clinit>} can fire during JVM
+     *        bootstrap before our agent runtime is initialised, and even our
+     *        try/catch-wrapped emit is more risk than benefit there. Classes
+     *        initialised via the JDK's own bootstrap are captured instead via
+     *        the {@link java.lang.instrument.Instrumentation#getAllLoadedClasses()}
+     *        fallback in {@code checkpointAll}.
+     */
+    public FieldAdder(int api, ClassVisitor delegate, boolean emitClinitRegistration) {
         super(api, delegate);
+        this.emitClinitRegistration = emitClinitRegistration;
     }
 
     @Override
     public void visit(int version, int access, String name, String signature,
                       String superName, String[] interfaces) {
         this.className = name;
+        // System-property opt-in (-Dcrochet.eagerClasses=...) is re-resolved
+        // per class (with a cached parse); the annotation check is deferred
+        // to visitAnnotation below. Both are "OR" — presence via either is
+        // sufficient.
+        Set<String> opted = eagerClassInternalNames();
+        if (!opted.isEmpty() && opted.contains(name)) {
+            this.eagerMode = true;
+        }
         String[] newIfaces = interfaces;
         boolean hasMarker = false;
         if (interfaces != null) {
@@ -228,6 +311,20 @@ public final class FieldAdder extends ClassVisitor {
     }
 
     @Override
+    public AnnotationVisitor visitAnnotation(String descriptor, boolean visible) {
+        // {@code @CrochetEager} is RUNTIME-retained, so reader sees it with
+        // visible=true. We flip a boolean; the delegate chain still emits the
+        // annotation onto the transformed class file so reflective queries
+        // post-transform ({@link
+        // net.jonbell.crochet.runtime.CheckpointRollbackAgent#isEagerClass})
+        // stay consistent.
+        if (CROCHET_EAGER_DESC.equals(descriptor)) {
+            this.eagerMode = true;
+        }
+        return super.visitAnnotation(descriptor, visible);
+    }
+
+    @Override
     public FieldVisitor visitField(int access, String name, String descriptor,
                                    String signature, Object value) {
         if (VERSION_FIELD.equals(name)) {
@@ -239,6 +336,81 @@ public final class FieldAdder extends ClassVisitor {
             instanceFields.add(new InstrumentedSurfaceEmitter.FieldRef(name, descriptor));
         }
         return super.visitField(access, name, descriptor, signature, value);
+    }
+
+    @Override
+    public MethodVisitor visitMethod(int access, String name, String descriptor,
+                                     String signature, String[] exceptions) {
+        MethodVisitor base = super.visitMethod(access, name, descriptor, signature, exceptions);
+        // Prepend the class-init registration call to an existing <clinit>.
+        // alreadyInstrumented classes skip the emit (a prior pass already
+        // handled it); emitClinitRegistration is false on JDK classes.
+        if ("<clinit>".equals(name) && emitClinitRegistration && !alreadyInstrumented) {
+            hasClinit = true;
+            if (base == null) {
+                return null;
+            }
+            return new ClinitRegistrar(api, base, className);
+        }
+        return base;
+    }
+
+    /**
+     * Wraps an existing user {@code <clinit>} to prepend a
+     * {@code CheckpointRollbackAgent.registerInitializedClass(ThisClass.class)}
+     * call, guarded by a try/catch block that swallows every {@link Throwable}.
+     *
+     * <p>The try/catch tolerates very-early initialisation paths (packed-
+     * runtime path, where CheckpointRollbackAgent's own {@code <clinit>} might
+     * still be running when a peer class's {@code <clinit>} fires) and any
+     * classloader-specific {@link NoClassDefFoundError} for the runtime
+     * facade on restricted loaders.
+     */
+    private static final class ClinitRegistrar extends MethodVisitor {
+        private final String ownerInternal;
+
+        ClinitRegistrar(int api, MethodVisitor mv, String ownerInternal) {
+            super(api, mv);
+            this.ownerInternal = ownerInternal;
+        }
+
+        @Override
+        public void visitCode() {
+            super.visitCode();
+            emitRegisterCall(mv, ownerInternal);
+        }
+    }
+
+    /**
+     * Emits the registration call plus a try/catch that swallows every
+     * {@link Throwable}. Body:
+     * <pre>
+     *   try {
+     *       CheckpointRollbackAgent.registerInitializedClass(ThisClass.class);
+     *   } catch (Throwable t) {
+     *       // swallow; runtime not yet ready
+     *   }
+     * </pre>
+     *
+     * <p>Uses {@code COMPUTE_FRAMES} (the class-level writer already requests
+     * it) to emit any required stack-map frames for the catch landing pad.
+     */
+    static void emitRegisterCall(MethodVisitor mv, String ownerInternal) {
+        Label tryStart = new Label();
+        Label tryEnd = new Label();
+        Label handler = new Label();
+        Label after = new Label();
+        mv.visitLabel(tryStart);
+        mv.visitLdcInsn(Type.getObjectType(ownerInternal));
+        mv.visitMethodInsn(Opcodes.INVOKESTATIC, AGENT, "registerInitializedClass",
+                "(Ljava/lang/Class;)V", false);
+        mv.visitLabel(tryEnd);
+        mv.visitJumpInsn(Opcodes.GOTO, after);
+        mv.visitLabel(handler);
+        // Caught Throwable is on stack; discard.
+        mv.visitInsn(Opcodes.POP);
+        mv.visitLabel(after);
+        mv.visitTryCatchBlock(tryStart, tryEnd, handler, "java/lang/Throwable");
     }
 
     @Override
@@ -291,8 +463,35 @@ public final class FieldAdder extends ClassVisitor {
                     "$$crochetPropagateRollback", "$$crochetRollback", instanceFields);
             InstrumentedSurfaceEmitter.emitAccessNoop(this);
             InstrumentedSurfaceEmitter.emitIsRollbackStateSentinel(this, className);
+            // If the user class has no <clinit> of its own, synthesise a
+            // minimal one whose only job is to call
+            // {@code CheckpointRollbackAgent.registerInitializedClass(ThisClass.class)}
+            // — wrapped in a Throwable catch-all so very-early-boot paths
+            // where the agent runtime isn't yet initialised don't crash the
+            // caller's <clinit>.
+            //
+            // Gate on emitClinitRegistration so JDK classes on the minimal
+            // pipeline (no user-class wrappers) don't grow a new <clinit> —
+            // those classes' {@code <clinit>} can fire during JVM bootstrap
+            // before CheckpointRollbackAgent's own class init has run, and
+            // rely on the Instrumentation#getAllLoadedClasses() fallback in
+            // checkpointAll for discovery instead.
+            if (emitClinitRegistration && !hasClinit) {
+                emitSynthesizedClinit();
+            }
         }
         super.visitEnd();
+    }
+
+    private void emitSynthesizedClinit() {
+        MethodVisitor mv = super.visitMethod(
+                Opcodes.ACC_STATIC | Opcodes.ACC_SYNTHETIC,
+                "<clinit>", "()V", null, null);
+        mv.visitCode();
+        emitRegisterCall(mv, className);
+        mv.visitInsn(Opcodes.RETURN);
+        mv.visitMaxs(0, 0);
+        mv.visitEnd();
     }
 
     private void emitCheckpoint() {
@@ -300,7 +499,11 @@ public final class FieldAdder extends ClassVisitor {
                 Opcodes.ACC_PUBLIC | Opcodes.ACC_SYNTHETIC,
                 "$$crochetCheckpoint", "(I)V", null, null);
         mv.visitCode();
-        emitVersionGuardedEntry(mv);
+        if (eagerMode) {
+            emitEagerVersionGuardedEntry(mv, /*checkpoint=*/true);
+        } else {
+            emitVersionGuardedEntry(mv);
+        }
         mv.visitMaxs(0, 0);
         mv.visitEnd();
     }
@@ -310,8 +513,177 @@ public final class FieldAdder extends ClassVisitor {
                 Opcodes.ACC_PUBLIC | Opcodes.ACC_SYNTHETIC,
                 "$$crochetRollback", "(I)V", null, null);
         mv.visitCode();
-        emitVersionGuardedEntry(mv);
+        if (eagerMode) {
+            emitEagerVersionGuardedEntry(mv, /*checkpoint=*/false);
+        } else {
+            emitVersionGuardedEntry(mv);
+        }
         mv.visitMaxs(0, 0);
         mv.visitEnd();
+    }
+
+    /**
+     * Eager counterpart to {@link #emitVersionGuardedEntry}. The sentinel-CAS
+     * framing is identical (so paper invariants I1, I2, and sentinel-decode
+     * semantics continue to hold), but the body does a shallow copy on this
+     * instance instead of swapping to a Fast proxy:
+     *
+     * <pre>
+     *   int cur   = Agent.versionVolatileGet(this, ThisClass.class);
+     *   int realV = Math.abs(cur);
+     *   if (realV &gt;= v) return;                                        // I2 guard
+     *   if (!Agent.versionCas(this, ThisClass.class, cur, -v)) return;   // peer won
+     *   try {
+     *       if (checkpoint) {
+     *           Object shadow = Agent.allocateShadow(ThisClass.class);
+     *           this.$$crochetCopyFieldsTo(shadow);
+     *           this.$$crochetSnap = shadow;
+     *       } else {
+     *           Object snap = this.$$crochetSnap;
+     *           if (snap != null) {
+     *               this.$$crochetCopyFieldsFrom(snap);
+     *               this.$$crochetSnap = null;
+     *           }
+     *       }
+     *   } catch (Throwable t) {
+     *       Agent.versionCas(this, ThisClass.class, -v, 0);              // zero version
+     *       throw new RollbackException(POISON_VERSION, t);
+     *   }
+     *   Agent.versionCas(this, ThisClass.class, -v, v);                  // finalize
+     * </pre>
+     *
+     * <p>No klass swap ever happens, so {@code obj.getClass()} remains the
+     * original user class — identity-sensitive third-party code sees a
+     * stable type. {@code $$crochetAccess} on the user class is the no-op
+     * body from {@link InstrumentedSurfaceEmitter#emitAccessNoop}; it never
+     * triggers {@link net.jonbell.crochet.runtime.CheckpointRollbackAgent#fastAccess}
+     * because the klass never transitions to the proxy.
+     *
+     * <p>Gap-8: the catch block zeroes the version (rather than restoring the
+     * prior value) because a thrown path means {@code this.$$crochetSnap} may
+     * be partially written; the consistent "no active checkpoint" state
+     * needs both the version and the snap to read as clear. The throw is a
+     * {@link net.jonbell.crochet.runtime.RollbackException#POISON_VERSION}
+     * per paper §3 exception safety.
+     *
+     * <p>Local layout: slot 0 is {@code this}, slot 1 is {@code v}, slot 2 is
+     * {@code cur}, slot 3 is {@code realV}, slot 4 is the caught throwable,
+     * slot 5 is the shadow / snap reference.
+     */
+    private void emitEagerVersionGuardedEntry(MethodVisitor mv, boolean checkpoint) {
+        Label proceed      = new Label();
+        Label gotSentinel  = new Label();
+        Label tryStart     = new Label();
+        Label tryEnd       = new Label();
+        Label handler      = new Label();
+        Label afterHandler = new Label();
+
+        // ---- cur = Agent.versionVolatileGet(this, ThisClass.class)
+        mv.visitVarInsn(Opcodes.ALOAD, 0);
+        mv.visitLdcInsn(Type.getObjectType(className));
+        mv.visitMethodInsn(Opcodes.INVOKESTATIC, AGENT, "versionVolatileGet",
+                "(Ljava/lang/Object;Ljava/lang/Class;)I", false);
+        mv.visitVarInsn(Opcodes.ISTORE, 2);
+
+        // ---- realV = Math.abs(cur)
+        mv.visitVarInsn(Opcodes.ILOAD, 2);
+        mv.visitMethodInsn(Opcodes.INVOKESTATIC, "java/lang/Math", "abs",
+                "(I)I", false);
+        mv.visitVarInsn(Opcodes.ISTORE, 3);
+
+        // ---- if (realV >= v) return;
+        mv.visitVarInsn(Opcodes.ILOAD, 3);
+        mv.visitVarInsn(Opcodes.ILOAD, 1);
+        mv.visitJumpInsn(Opcodes.IF_ICMPLT, proceed);
+        mv.visitInsn(Opcodes.RETURN);
+        mv.visitLabel(proceed);
+
+        // ---- if (!Agent.versionCas(this, ThisClass.class, cur, -v)) return;
+        mv.visitVarInsn(Opcodes.ALOAD, 0);
+        mv.visitLdcInsn(Type.getObjectType(className));
+        mv.visitVarInsn(Opcodes.ILOAD, 2);
+        mv.visitVarInsn(Opcodes.ILOAD, 1);
+        mv.visitInsn(Opcodes.INEG);
+        mv.visitMethodInsn(Opcodes.INVOKESTATIC, AGENT, "versionCas",
+                "(Ljava/lang/Object;Ljava/lang/Class;II)Z", false);
+        mv.visitJumpInsn(Opcodes.IFNE, gotSentinel);
+        mv.visitInsn(Opcodes.RETURN);
+        mv.visitLabel(gotSentinel);
+
+        // ---- try { ... eager body ... }
+        mv.visitLabel(tryStart);
+        if (checkpoint) {
+            // Object shadow = Agent.allocateShadow(ThisClass.class);
+            mv.visitLdcInsn(Type.getObjectType(className));
+            mv.visitMethodInsn(Opcodes.INVOKESTATIC, AGENT, "allocateShadow",
+                    "(Ljava/lang/Class;)Ljava/lang/Object;", false);
+            mv.visitVarInsn(Opcodes.ASTORE, 5);
+            // this.$$crochetCopyFieldsTo(shadow);
+            mv.visitVarInsn(Opcodes.ALOAD, 0);
+            mv.visitVarInsn(Opcodes.ALOAD, 5);
+            mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, className,
+                    "$$crochetCopyFieldsTo", "(Ljava/lang/Object;)V", false);
+            // this.$$crochetSnap = shadow;
+            mv.visitVarInsn(Opcodes.ALOAD, 0);
+            mv.visitVarInsn(Opcodes.ALOAD, 5);
+            mv.visitFieldInsn(Opcodes.PUTFIELD, className, SNAP_FIELD,
+                    "Ljava/lang/Object;");
+        } else {
+            // Object snap = this.$$crochetSnap;
+            mv.visitVarInsn(Opcodes.ALOAD, 0);
+            mv.visitFieldInsn(Opcodes.GETFIELD, className, SNAP_FIELD,
+                    "Ljava/lang/Object;");
+            mv.visitVarInsn(Opcodes.ASTORE, 5);
+            // if (snap != null) { this.$$crochetCopyFieldsFrom(snap); this.$$crochetSnap = null; }
+            Label snapNull = new Label();
+            mv.visitVarInsn(Opcodes.ALOAD, 5);
+            mv.visitJumpInsn(Opcodes.IFNULL, snapNull);
+            mv.visitVarInsn(Opcodes.ALOAD, 0);
+            mv.visitVarInsn(Opcodes.ALOAD, 5);
+            mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, className,
+                    "$$crochetCopyFieldsFrom", "(Ljava/lang/Object;)V", false);
+            mv.visitVarInsn(Opcodes.ALOAD, 0);
+            mv.visitInsn(Opcodes.ACONST_NULL);
+            mv.visitFieldInsn(Opcodes.PUTFIELD, className, SNAP_FIELD,
+                    "Ljava/lang/Object;");
+            mv.visitLabel(snapNull);
+        }
+        mv.visitLabel(tryEnd);
+        mv.visitJumpInsn(Opcodes.GOTO, afterHandler);
+
+        // ---- catch (Throwable t):
+        //      Agent.versionCas(this, ThisClass.class, -v, 0);  // clear version
+        //      throw new RollbackException(POISON_VERSION, t);
+        mv.visitLabel(handler);
+        mv.visitVarInsn(Opcodes.ASTORE, 4);
+        mv.visitVarInsn(Opcodes.ALOAD, 0);
+        mv.visitLdcInsn(Type.getObjectType(className));
+        mv.visitVarInsn(Opcodes.ILOAD, 1);
+        mv.visitInsn(Opcodes.INEG);                                  // expect = -v
+        mv.visitInsn(Opcodes.ICONST_0);                              // update = 0
+        mv.visitMethodInsn(Opcodes.INVOKESTATIC, AGENT, "versionCas",
+                "(Ljava/lang/Object;Ljava/lang/Class;II)Z", false);
+        mv.visitInsn(Opcodes.POP);
+        mv.visitTypeInsn(Opcodes.NEW, "net/jonbell/crochet/runtime/RollbackException");
+        mv.visitInsn(Opcodes.DUP);
+        mv.visitLdcInsn(-1);
+        mv.visitVarInsn(Opcodes.ALOAD, 4);
+        mv.visitMethodInsn(Opcodes.INVOKESPECIAL,
+                "net/jonbell/crochet/runtime/RollbackException",
+                "<init>", "(ILjava/lang/Throwable;)V", false);
+        mv.visitInsn(Opcodes.ATHROW);
+
+        // ---- finalize: Agent.versionCas(this, ThisClass.class, -v, v); return;
+        mv.visitLabel(afterHandler);
+        mv.visitVarInsn(Opcodes.ALOAD, 0);
+        mv.visitLdcInsn(Type.getObjectType(className));
+        mv.visitVarInsn(Opcodes.ILOAD, 1);
+        mv.visitInsn(Opcodes.INEG);
+        mv.visitVarInsn(Opcodes.ILOAD, 1);
+        mv.visitMethodInsn(Opcodes.INVOKESTATIC, AGENT, "versionCas",
+                "(Ljava/lang/Object;Ljava/lang/Class;II)Z", false);
+        mv.visitInsn(Opcodes.POP);
+        mv.visitInsn(Opcodes.RETURN);
+        mv.visitTryCatchBlock(tryStart, tryEnd, handler, "java/lang/Throwable");
     }
 }

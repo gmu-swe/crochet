@@ -102,7 +102,12 @@ public class CrochetTransformer {
         ClassVisitor chain = writer;
         chain = new AnnotationStamper(Opcodes.ASM9, chain);
         chain = new LookupInjector(Opcodes.ASM9, chain);
-        chain = new FieldAdder(Opcodes.ASM9, chain);
+        // Skip <clinit> registration emit for JDK classes: their static
+        // initialisers run during JVM bootstrap, before the CheckpointRollback
+        // Agent class itself is fully initialised on the packed-runtime path.
+        // getAllLoadedClasses() in checkpointAll covers JDK-loaded roots
+        // reactively once an agent is attached.
+        chain = new FieldAdder(Opcodes.ASM9, chain, /*emitClinitRegistration=*/ !isJdkClass);
         if (!isJdkClass) {
             SharedLocalsProvider locals = new SharedLocalsProvider(Opcodes.ASM9, chain);
             chain = locals;
