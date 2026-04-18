@@ -411,3 +411,87 @@ In rough priority order, where to invest next if reducing overhead matters:
 *Raw data: `/tmp/crochet-bench/results.csv` (133 rows = header + 22 benches × 2 modes × 3
 runs). Driver: `/tmp/crochet-bench/driver.sh`. Per-bench runner: `/tmp/crochet-bench/run_bench.sh`.
 Runtime traces: `/tmp/crochet-bench/trace-{h2,lusearch,tradebeans,graphchi,eclipse}.log`.*
+
+---
+
+## 9. SwitchPoint experiment (post-benchmark) — negative result
+
+Commit `2aac208` recommended a `MutableCallSite`/`SwitchPoint`-backed
+redirect of `noteStaticAccess` to let HotSpot deoptimise the pre-hook
+to a no-op pre-first-checkpoint. I implemented the experiment on
+`java24-port` at `2aac208` as a follow-up:
+
+- New `runtime/NoteStaticAccessSwitch.java` holding a single
+  `SwitchPoint`, a `NOOP` `MethodHandle` pointing at an explicit
+  empty static method, and a `REAL` handle pointing at
+  `SfHelperFactory.noteStaticAccess`. `bootstrap()` returned a
+  `ConstantCallSite` wrapping `SWITCH.guardWithTest(NOOP, REAL)`.
+- `StaticFieldRewriter` changed from `INVOKESTATIC` to
+  `INVOKEDYNAMIC` pointing at the bootstrap.
+- `VersionCounter.nextCheckpointVersion` / `nextRollbackVersion`
+  called `NoteStaticAccessSwitch.invalidate()` on the first CAS
+  transition from 0 (idempotent thereafter).
+
+**Result**: no measurable improvement on h2 under DaCapo. Three
+probes, `-n 10`, three runs each:
+
+| Configuration | Median (ms) | Runs |
+|---|---|---|
+| Pre-hook DISABLED entirely (diagnostic upper bound) | 245 | 222 / 245 / 397 |
+| INVOKESTATIC + `VERSION_COUNTER.getOpaque` gate (pre-experiment) | 651 | (BENCHMARK §2) |
+| INVOKEDYNAMIC + SwitchPoint + `MethodHandles.empty` NOOP | 835 | 828 / 835 / 916 |
+| INVOKEDYNAMIC + SwitchPoint + explicit-method NOOP | 646 | 537 / 646 / 822 |
+
+Key observations:
+
+- The diagnostic pre-hook-disabled run (245 ms) tells us h2's
+  instrumented cost is NOT all in `noteStaticAccess` — roughly half
+  (~200 ms) of h2's ~596 ms agent overhead is in the pre-hook path;
+  the other half is elsewhere (instance-field `$$crochetAccess`
+  dispatches, FieldAdder-emitted surface, etc.). The BENCHMARK
+  recommendation was based on the tracer's 89M static-access counts,
+  not a direct attribution.
+- `SwitchPoint.guardWithTest` is NOT folding to zero in this
+  HotSpot (21.0.10+7). The `MethodHandles.empty`-backed variant ran
+  *slower* than the old INVOKESTATIC path (835 > 651) — the indy
+  dispatch cost through the MethodHandle chain is higher than the
+  plain INVOKESTATIC cost the gate was already doing. Swapping to an
+  explicit static `noteStaticAccessNoop` method brought it back to
+  parity (646 ≈ 651) but not lower.
+- Each indy site creates its own `ConstantCallSite` + per-site
+  `guardWithTest` handle, so the JIT doesn't see a single cross-site
+  optimisation surface. HotSpot's SwitchPoint intrinsics may have
+  regressed since the JSR 292 era, or this specific usage pattern
+  doesn't trigger the fast path.
+
+**Decision**: reverted the whole experiment (`StaticFieldRewriter`
+back to `INVOKESTATIC noteStaticAccess`, `NoteStaticAccessSwitch.java`
+removed, `VersionCounter` hook removed).
+
+**Lessons captured**:
+
+1. The per-call-site cost of our pre-hook is about **4.5 ns** on
+   this hardware (400 ms / 89M calls), comparable to a simple
+   volatile-read + branch. The JIT is already doing well at inlining
+   `INVOKESTATIC noteStaticAccess` + the getOpaque gate.
+2. Future optimisation energy is better spent on **reducing the
+   number of pre-hook call sites emitted**, not on making each call
+   cheaper. Candidate approaches:
+   - Transform-time whole-class analysis: skip `StaticFieldRewriter`
+     wrap when the OWNER class's `<clinit>` + field declarations
+     prove the static is `final` (most `ValueNull`-style cases).
+     Requires owner-class introspection at caller transform time.
+   - Owner-side signalling: emit a class-level annotation / marker
+     during owner-class transform; caller-side checks the marker.
+     Requires owner-class to be transformed before callers of it.
+   - JIT-controlled deopt (`-XX:+UnlockDiagnosticVMOptions` +
+     `@IntrinsicCandidate`): out of scope; requires JDK changes.
+3. Microbenchmarking of MethodHandle intrinsics on HotSpot is
+   treacherous — the warm-up behaviour is highly version-dependent
+   and the assumed "free after inline" model doesn't always hold.
+
+---
+
+*Raw experiment artefacts: see git log between `2aac208` and the
+revert for the complete SwitchPoint infrastructure code, kept for
+future reference in case a later JDK revisits SwitchPoint intrinsics.*
