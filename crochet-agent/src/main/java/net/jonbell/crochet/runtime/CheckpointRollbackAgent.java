@@ -94,8 +94,21 @@ public final class CheckpointRollbackAgent {
     public static void rollback(Object target, int v) {
         Class<?> userClass = realUserClassOf(target);
         int rv = nextRollbackVersion();
-        ((CRIJInstrumented) target).$$crochetRollback(rv);
-        ArrayRegistry.propagateRollback(target, v);
+        CRIJInstrumented t = (CRIJInstrumented) target;
+        t.$$crochetRollback(rv);
+        // Force the lazy-mode fastAccess-driven field restore to complete
+        // BEFORE we walk {@code target}'s array-typed fields reflectively.
+        // Without this, {@link ArrayRegistry#propagateRollback} reads the
+        // post-workload (possibly resized) array reference rather than the
+        // one registered for snapshot — in the CHM resize case, the current
+        // {@code chm.table} points to {@code tab_v2}, which was never
+        // registered; {@code tab_v1} (the registered original) stays
+        // reachable only via {@code chm.$$crochetSnap} until fastAccess
+        // copies it back. For eager-mode classes (final user classes) this
+        // call is a no-op because their $$crochetRollback already finished
+        // the field restore inline.
+        t.$$crochetAccess();
+        ArrayRegistry.propagateRollback(target, v, rv);
         rollbackClassAtVersion(userClass, rv);
     }
 

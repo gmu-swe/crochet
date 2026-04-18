@@ -25,7 +25,13 @@ public final class ArrayCopyInterceptor extends ClassVisitor {
 
     private static final String SYSTEM_INTERNAL = "java/lang/System";
     private static final String ARRAYCOPY_DESC = "(Ljava/lang/Object;ILjava/lang/Object;II)V";
-    private static final String AGENT_INTERNAL = "net/jonbell/crochet/runtime/CheckpointRollbackAgent";
+    /**
+     * Bootstrap-safe forwarder. See {@code RuntimeReady} javadoc — the
+     * forwarder still performs the raw {@link System#arraycopy} before
+     * the runtime is ready (bulk-copy semantics must be preserved
+     * during JVM startup), it just skips the registry tracking.
+     */
+    private static final String AGENT_INTERNAL = "net/jonbell/crochet/runtime/RuntimeReady";
     private static final String INTERCEPT_NAME = "interceptedArraycopy";
 
     private String className;

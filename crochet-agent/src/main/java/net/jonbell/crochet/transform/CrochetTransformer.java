@@ -108,26 +108,33 @@ public class CrochetTransformer {
         // getAllLoadedClasses() in checkpointAll covers JDK-loaded roots
         // reactively once an agent is attached.
         chain = new FieldAdder(Opcodes.ASM9, chain, /*emitClinitRegistration=*/ !isJdkClass);
-        if (!isJdkClass) {
-            SharedLocalsProvider locals = new SharedLocalsProvider(Opcodes.ASM9, chain);
-            chain = locals;
-            chain = new ArrayAccessWrapper(Opcodes.ASM9, chain, locals);
-            chain = new StaticFieldRewriter(Opcodes.ASM9, chain, loader);
-            chain = new ArrayCopyInterceptor(Opcodes.ASM9, chain);
-            chain = new FieldAccessWrapper(Opcodes.ASM9, chain, locals);
-            // ReflectionRewriter sits at the top of the user-class chain.
-            // It only rewrites INVOKEVIRTUAL/INVOKESTATIC on specific
-            // reflection APIs into INVOKESTATIC helpers in ReflectionFilter,
-            // so it neither needs scratch locals nor interacts with frame
-            // computation. Placing it above the field/array wrappers is a
-            // style choice — any position works as long as it runs on the
-            // class's original call sites (i.e., not on the $$crochet* bodies
-            // those wrappers emit). Gated by REFLECTION_REWRITER_ENABLED
-            // (see the property javadoc above for the Weld regression that
-            // keeps the default off for now).
-            if (REFLECTION_REWRITER_ENABLED) {
-                chain = new ReflectionRewriter(Opcodes.ASM9, chain);
-            }
+        // Gap 7 closure: JDK classes now go through the full wrapper
+        // chain. Runtime entry points (noteStaticAccess, beforeStore,
+        // interceptedArraycopy) are routed through RuntimeReady, whose
+        // bootstrap gate returns early while the agent's dependency
+        // closure is still class-initializing. That makes the emitted
+        // INVOKESTATIC calls safe to run during JVM startup from
+        // instrumented HashMap/TreeMap/etc. The !isJdkClass gate here
+        // used to skip the wrappers entirely; it's dropped. isJdkClass
+        // is still used above to suppress the <clinit> registration
+        // emit, because that emit depends on CheckpointRollbackAgent
+        // being reachable at class-load time rather than at runtime.
+        SharedLocalsProvider locals = new SharedLocalsProvider(Opcodes.ASM9, chain);
+        chain = locals;
+        chain = new ArrayAccessWrapper(Opcodes.ASM9, chain, locals);
+        chain = new StaticFieldRewriter(Opcodes.ASM9, chain, loader);
+        chain = new ArrayCopyInterceptor(Opcodes.ASM9, chain);
+        chain = new FieldAccessWrapper(Opcodes.ASM9, chain, locals);
+        // ReflectionRewriter sits at the top of the user-class chain.
+        // It only rewrites INVOKEVIRTUAL/INVOKESTATIC on specific
+        // reflection APIs into INVOKESTATIC helpers in ReflectionFilter,
+        // so it neither needs scratch locals nor interacts with frame
+        // computation. Gated by REFLECTION_REWRITER_ENABLED (see the
+        // property javadoc above for the Weld regression that keeps
+        // the default off for now). Only rewritten for non-JDK classes
+        // because JDK reflection call sites are not our concern.
+        if (!isJdkClass && REFLECTION_REWRITER_ENABLED) {
+            chain = new ReflectionRewriter(Opcodes.ASM9, chain);
         }
         if (needsJsrInlining) {
             chain = new JsrInliner(Opcodes.ASM9, chain);

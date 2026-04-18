@@ -68,6 +68,20 @@ final class VersionCounter {
             }
             if (VERSION_COUNTER.compareAndSet(cur, next)) {
                 maybeWarnPerInstanceOverflow(next);
+                // Lift the RuntimeReady pre-checkpoint gate. Before this
+                // point, pre-hooks in instrumented JDK code early-return
+                // inside RuntimeReady without touching any other runtime
+                // class. See {@code RuntimeReady#VERSION_GATE} for why
+                // this gate is load-bearing during JVM bootstrap.
+                RuntimeReady.VERSION_GATE = next;
+                // Gap 7 closure: a successful first checkpoint implies the
+                // agent runtime is fully loaded. Flip the RuntimeReady gate
+                // so instrumented JDK bytecode's pre-hooks start tracking
+                // state. This handles the jlink-only mode where
+                // CrochetAgent.premain doesn't run (no -javaagent attached).
+                // Under the -javaagent path, premain already flipped it
+                // earlier; this call is a cheap re-write of the same value.
+                RuntimeReady.markReady();
                 return (int) next;
             }
         }
@@ -85,6 +99,13 @@ final class VersionCounter {
             }
             if (VERSION_COUNTER.compareAndSet(cur, next)) {
                 maybeWarnPerInstanceOverflow(next);
+                // Lift the RuntimeReady pre-checkpoint gate. Before this
+                // point, pre-hooks in instrumented JDK code early-return
+                // inside RuntimeReady without touching any other runtime
+                // class. See {@code RuntimeReady#VERSION_GATE} for why
+                // this gate is load-bearing during JVM bootstrap.
+                RuntimeReady.VERSION_GATE = next;
+                RuntimeReady.markReady();
                 return (int) next;
             }
         }

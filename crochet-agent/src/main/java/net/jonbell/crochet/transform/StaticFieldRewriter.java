@@ -23,7 +23,19 @@ import org.objectweb.asm.Type;
  */
 public final class StaticFieldRewriter extends ClassVisitor {
 
-    private static final String AGENT_INTERNAL = "net/jonbell/crochet/runtime/CheckpointRollbackAgent";
+    /**
+     * Internal name of the bootstrap-safe forwarder. Pre-hooks are
+     * emitted as {@code INVOKESTATIC RuntimeReady.noteStaticAccess(Class)V}
+     * rather than directly calling {@link CheckpointRollbackAgent} so
+     * that early-bootstrap invocations (from instrumented JDK classes
+     * like {@code HashMap} used inside the JVM startup sequence itself)
+     * see {@code RuntimeReady.READY == false} and return immediately,
+     * without triggering class-init of the full agent-runtime
+     * dependency closure. The forwarder is a single volatile-load +
+     * branch on the hot path; at steady state HotSpot predicts the
+     * taken branch and the gate is essentially free.
+     */
+    private static final String RUNTIME_READY_INTERNAL = "net/jonbell/crochet/runtime/RuntimeReady";
     /**
      * Descriptor of the fused pre-hook. The agent-side implementation does the
      * {@code sfHelperFor(C).$$crochetAccess()} job in a single static call so
@@ -118,7 +130,7 @@ public final class StaticFieldRewriter extends ClassVisitor {
 
         private void emitPreHook(String owner) {
             mv.visitLdcInsn(Type.getObjectType(owner));
-            mv.visitMethodInsn(Opcodes.INVOKESTATIC, AGENT_INTERNAL,
+            mv.visitMethodInsn(Opcodes.INVOKESTATIC, RUNTIME_READY_INTERNAL,
                     "noteStaticAccess", NOTE_STATIC_ACCESS_DESC, false);
         }
 
@@ -129,11 +141,24 @@ public final class StaticFieldRewriter extends ClassVisitor {
             if (owner == null || name == null) {
                 return false;
             }
+            // Gap 7 note: JDK classes participate in the FIELD and ARRAY
+            // wrapper chains (so user-object traversal into JDK-owned
+            // reference state is captured on snapshot). STATIC state on
+            // java/*, jdk/*, sun/*, com/sun/* owners is intentionally out
+            // of scope — it's mostly singletons / caches the paper never
+            // intends to snapshot, and the emitted pre-hook would
+            // recursively call back through instrumented JDK methods
+            // during bootstrap (see RuntimeReady's javadoc for the
+            // specific reentry: allowSecurityManager's GETSTATIC →
+            // noteStaticAccess → ClassMeta.of → ClassValue.get → first
+            // load of ClassValueMap → transformer → same owner).
             if (owner.startsWith("java/") || owner.startsWith("jdk/")
                     || owner.startsWith("sun/") || owner.startsWith("com/sun/")) {
                 return false;
             }
             if (owner.startsWith("net/jonbell/crochet/")) {
+                // Our own runtime must never recurse — the pre-hook body
+                // lives inside it.
                 return false;
             }
             if (name.startsWith("$$crochet")) {

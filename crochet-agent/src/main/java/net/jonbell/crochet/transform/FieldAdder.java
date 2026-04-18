@@ -237,6 +237,7 @@ public final class FieldAdder extends ClassVisitor {
     }
 
     private String className;
+    private String superName;
     private final List<InstrumentedSurfaceEmitter.FieldRef> instanceFields = new ArrayList<>();
     private boolean alreadyInstrumented;
     private boolean hasVersionField;
@@ -271,12 +272,26 @@ public final class FieldAdder extends ClassVisitor {
     public void visit(int version, int access, String name, String signature,
                       String superName, String[] interfaces) {
         this.className = name;
+        this.superName = superName;
         // System-property opt-in (-Dcrochet.eagerClasses=...) is re-resolved
         // per class (with a cached parse); the annotation check is deferred
         // to visitAnnotation below. Both are "OR" — presence via either is
         // sufficient.
         Set<String> opted = eagerClassInternalNames();
         if (!opted.isEmpty() && opted.contains(name)) {
+            this.eagerMode = true;
+        }
+        // Final classes cannot host a FastProxy (the proxy would need to
+        // extend them, which the verifier rejects). Without a proxy the
+        // klass-swap mechanism can't trigger {@code fastAccess}, so the
+        // lazy snap/restore path never runs. Force eager mode so
+        // $$crochetCheckpoint takes the snapshot directly and
+        // $$crochetRollback restores it directly. Paper §5.1's replication
+        // depends on this: {@link java.util.HashMap$Node},
+        // {@link java.util.TreeMap$Entry}, {@link java.util.LinkedHashMap$Entry}
+        // and {@link java.util.concurrent.ConcurrentHashMap$Node} are all
+        // final — without this forcing, none of them can be rolled back.
+        if ((access & Opcodes.ACC_FINAL) != 0) {
             this.eagerMode = true;
         }
         String[] newIfaces = interfaces;
@@ -332,7 +347,21 @@ public final class FieldAdder extends ClassVisitor {
         } else if (SNAP_FIELD.equals(name)) {
             hasSnapField = true;
         } else if ((access & Opcodes.ACC_STATIC) == 0
+                && (access & Opcodes.ACC_FINAL) == 0
                 && !name.startsWith("$$crochet")) {
+            // Skip final instance fields: the JVM rejects PUTFIELD on a
+            // final field from any method other than {@code <init>}, and
+            // the $$crochetCopyFieldsTo / $$crochetCopyFieldsFrom
+            // surfaces we emit live outside the constructor. Final fields
+            // are also invariant by design — there is no post-{@code <init>}
+            // value change to snapshot, so skipping them is semantically
+            // lossless for normal code paths. The only way to mutate a
+            // final field is via Unsafe.putX, which bypasses our entire
+            // instrumentation machinery anyway; we accept that
+            // unreachable-for-rollback corner in exchange for bootstrap
+            // correctness on JDK classes that expose final fields
+            // ({@code HashMap$Node.hash}, {@code HashMap$Node.key},
+            // {@code ConcurrentHashMap$Node.hash}, etc.).
             instanceFields.add(new InstrumentedSurfaceEmitter.FieldRef(name, descriptor));
         }
         return super.visitField(access, name, descriptor, signature, value);
@@ -449,17 +478,17 @@ public final class FieldAdder extends ClassVisitor {
             // through the FieldAdder's own visitMethod -> ClassVisitor.cv
             // delegation chain, identical to the previous super.visitMethod
             // calls inlined into this file.
-            InstrumentedSurfaceEmitter.emitCopyFieldsTo(this, className, instanceFields);
-            InstrumentedSurfaceEmitter.emitCopyFieldsFrom(this, className, instanceFields);
+            InstrumentedSurfaceEmitter.emitCopyFieldsTo(this, className, superName, instanceFields);
+            InstrumentedSurfaceEmitter.emitCopyFieldsFrom(this, className, superName, instanceFields);
             emitCheckpoint();
             emitRollback();
             InstrumentedSurfaceEmitter.emitGetVersion(this, className);
             InstrumentedSurfaceEmitter.emitSetVersion(this, className);
             InstrumentedSurfaceEmitter.emitGetSnap(this, className);
             InstrumentedSurfaceEmitter.emitSetSnap(this, className);
-            InstrumentedSurfaceEmitter.emitPropagateRefFields(this, className,
+            InstrumentedSurfaceEmitter.emitPropagateRefFields(this, className, superName,
                     "$$crochetPropagateCheckpoint", "$$crochetCheckpoint", instanceFields);
-            InstrumentedSurfaceEmitter.emitPropagateRefFields(this, className,
+            InstrumentedSurfaceEmitter.emitPropagateRefFields(this, className, superName,
                     "$$crochetPropagateRollback", "$$crochetRollback", instanceFields);
             InstrumentedSurfaceEmitter.emitAccessNoop(this);
             InstrumentedSurfaceEmitter.emitIsRollbackStateSentinel(this, className);
@@ -648,6 +677,21 @@ public final class FieldAdder extends ClassVisitor {
                     "Ljava/lang/Object;");
             mv.visitLabel(snapNull);
         }
+        // Eager propagation: classes in eager mode (either opted-in via
+        // {@code @CrochetEager} / {@code -Dcrochet.eagerClasses}, or
+        // forced by {@link #isUnproxyable(Class)} for final classes like
+        // {@link java.util.TreeMap$Entry} and {@link java.util.HashMap$Node}
+        // that cannot host a FastProxy) must propagate to their reference
+        // children directly from inside {@code $$crochetCheckpoint} /
+        // {@code $$crochetRollback}, because there is no klass-swap-triggered
+        // fastAccess path to take over the work lazily. Without this call,
+        // nested state ({@code Entry.left}, {@code Entry.right}, etc.) is
+        // never snapshotted and rollback can only restore the direct object.
+        mv.visitVarInsn(Opcodes.ALOAD, 0);
+        mv.visitVarInsn(Opcodes.ILOAD, 1);
+        mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, className,
+                checkpoint ? "$$crochetPropagateCheckpoint" : "$$crochetPropagateRollback",
+                "(I)V", false);
         mv.visitLabel(tryEnd);
         mv.visitJumpInsn(Opcodes.GOTO, afterHandler);
 

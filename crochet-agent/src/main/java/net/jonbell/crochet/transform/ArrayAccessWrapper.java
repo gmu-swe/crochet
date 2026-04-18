@@ -24,7 +24,15 @@ import org.objectweb.asm.Type;
  */
 public final class ArrayAccessWrapper extends ClassVisitor {
 
-    private static final String REGISTRY_INTERNAL = "net/jonbell/crochet/runtime/ArrayRegistry";
+    /**
+     * Bootstrap-safe forwarder. See {@code RuntimeReady} javadoc for
+     * why we route through it instead of calling
+     * {@code ArrayRegistry.beforeStore} directly: early-JVM
+     * invocations from instrumented JDK classes observe
+     * {@code READY == false} and return immediately, avoiding
+     * re-entry into {@code ArrayRegistry}'s class-init chain.
+     */
+    private static final String REGISTRY_INTERNAL = "net/jonbell/crochet/runtime/RuntimeReady";
     private static final String BEFORE_STORE_DESC = "(Ljava/lang/Object;)V";
 
     private final SharedLocalsProvider locals;

@@ -136,8 +136,28 @@ public final class ArrayRegistry {
                 return;
             }
             m.ckptVersion = v;
-            m.snapshot = null;
-            m.dirty = false;
+            // Eager snapshot. The per-slot xASTORE pre-hook
+            // ({@link #beforeStore}) handles the common case, but JDK
+            // classes reach into arrays through {@code Unsafe.compareAndSet*}
+            // and {@code VarHandle.set*} — both of which bypass xASTORE
+            // entirely. {@link java.util.concurrent.ConcurrentHashMap#casTabAt}
+            // is the motivating example: every table-slot mutation goes
+            // through {@code U.compareAndSetReference}, so a lazy "snap on
+            // first write" strategy would miss all of them and rollback
+            // would return the current array contents unchanged.
+            //
+            // Paying the {@link System#arraycopy} up front guarantees we
+            // have the pre-state regardless of which write mechanism the
+            // owner uses. For small backing arrays (paper §5.1 sizes 10-100,
+            // which correspond to CHM tables of 16-128 slots) the copy is a
+            // handful of words; for large arrays this is an eager-mode
+            // perf trade, but correctness is the gating concern this round.
+            int len = java.lang.reflect.Array.getLength(array);
+            Class<?> componentType = array.getClass().getComponentType();
+            Object copy = java.lang.reflect.Array.newInstance(componentType, len);
+            System.arraycopy(array, 0, copy, 0, len);
+            m.snapshot = copy;
+            m.dirty = true;
         }
     }
 
@@ -212,6 +232,7 @@ public final class ArrayRegistry {
         }
         if (root.getClass().isArray()) {
             registerForCheckpoint(root, v);
+            propagateArrayElementsCheckpoint(root, v);
             return;
         }
         List<java.lang.reflect.Field> fields = arrayFieldsOf(root.getClass());
@@ -220,6 +241,7 @@ public final class ArrayRegistry {
                 Object val = f.get(root);
                 if (val != null) {
                     registerForCheckpoint(val, v);
+                    propagateArrayElementsCheckpoint(val, v);
                 }
             } catch (ReflectiveOperationException ignore) {
             }
@@ -237,11 +259,29 @@ public final class ArrayRegistry {
         }
     }
 
-    public static void propagateRollback(Object root, int v) {
+    /**
+     * Walk {@code root}'s array-typed fields, restore each registered array
+     * from its checkpoint snapshot, and propagate {@code $$crochetRollback}
+     * into the (now-restored) array's elements.
+     *
+     * @param v  the checkpoint version the array snapshot was registered
+     *           under. Used to match {@link #rollback(Object, int)}'s
+     *           {@code m.ckptVersion == v} guard.
+     * @param rv the rollback version just issued by
+     *           {@link VersionCounter#nextRollbackVersion}. Passed through
+     *           to each element's {@code $$crochetRollback(rv)} so the
+     *           I2 monotone-guard inside the element's version-guarded
+     *           entry admits the call (its node.version was bumped to
+     *           {@code v} at checkpoint time, and the rollback needs a
+     *           strictly-greater version to pass the {@code realV < rv}
+     *           guard).
+     */
+    public static void propagateRollback(Object root, int v, int rv) {
         if (root == null) {
             return;
         }
         if (root.getClass().isArray()) {
+            propagateArrayElementsRollback(root, rv);
             rollback(root, v);
             return;
         }
@@ -250,6 +290,13 @@ public final class ArrayRegistry {
             try {
                 Object val = f.get(root);
                 if (val != null) {
+                    // Propagate into the CURRENT (possibly mutated) array
+                    // contents first so any element-level $$crochetRollback
+                    // runs before the array itself is restored to its
+                    // snapshot state. Restoring the array reference to the
+                    // snapshot before walking it would leave post-checkpoint
+                    // writes on the restored entries un-rolled-back.
+                    propagateArrayElementsRollback(val, rv);
                     rollback(val, v);
                 }
             } catch (ReflectiveOperationException ignore) {
@@ -263,6 +310,104 @@ public final class ArrayRegistry {
                     Object val = f.get(root);
                     reflectiveWalkRollback(val, v, seen, 1);
                 } catch (ReflectiveOperationException ignore) {
+                }
+            }
+        }
+    }
+
+    /**
+     * Overload preserved for existing callers (e.g. tests / legacy code
+     * paths) that don't have a rollback version on hand. Synthesises
+     * {@code rv} as {@code v + 1} — correct only when the caller is
+     * dispatching outside the {@link CheckpointRollbackAgent#rollback}
+     * orchestration. Prefer the 3-arg overload from the main rollback path.
+     */
+    public static void propagateRollback(Object root, int v) {
+        propagateRollback(root, v, v + 1);
+    }
+
+    /**
+     * Walk {@code arr}'s elements and call {@code $$crochetCheckpoint(v)} on
+     * each {@link CRIJInstrumented} entry. For {@code HashMap.table},
+     * {@code ConcurrentHashMap.table}, {@code ArrayList.elementData}, etc.
+     * the entries hold the live object state — without this, rollback would
+     * only restore the array slots, leaving any post-checkpoint writes on
+     * the entries themselves (e.g. {@code Node.value = newValue}, linked-list
+     * {@code next} rewiring) unreverted.
+     *
+     * <p>Primitive-element arrays and non-reference arrays have no
+     * instrumented elements, so we early-out via the component-type check.
+     */
+    /**
+     * Called from the emitted {@code $$crochetPropagateCheckpoint} body for
+     * reference-element array fields. Registers the array for snapshot
+     * capture and propagates {@code $$crochetCheckpoint(v)} into each
+     * {@link CRIJInstrumented} element — mirrors the direct-field branch
+     * of {@link #propagateCheckpoint} but reachable through instance-level
+     * propagation (so e.g. a user class holding a {@code HashMap} walks
+     * into that HashMap's {@code table} array too).
+     */
+    public static void propagateArrayCheckpoint(Object arr, int v) {
+        if (arr == null) {
+            return;
+        }
+        registerForCheckpoint(arr, v);
+        propagateArrayElementsCheckpoint(arr, v);
+    }
+
+    public static void propagateArrayRollback(Object arr, int v) {
+        if (arr == null) {
+            return;
+        }
+        propagateArrayElementsRollback(arr, v);
+        rollback(arr, v - 1); // checkpoint version was rv - 1
+    }
+
+    private static void propagateArrayElementsCheckpoint(Object arr, int v) {
+        if (arr == null) {
+            return;
+        }
+        Class<?> c = arr.getClass();
+        if (!c.isArray()) {
+            return;
+        }
+        Class<?> comp = c.getComponentType();
+        if (comp == null || comp.isPrimitive()) {
+            return;
+        }
+        Object[] elems = (Object[]) arr;
+        for (Object e : elems) {
+            if (e instanceof CRIJInstrumented i) {
+                try {
+                    i.$$crochetCheckpoint(v);
+                } catch (Throwable ignore) {
+                    // A per-element failure (e.g. a hostile override throwing
+                    // from $$crochetCheckpoint) must not abort the walk — the
+                    // remaining entries still need propagation for rollback
+                    // correctness.
+                }
+            }
+        }
+    }
+
+    private static void propagateArrayElementsRollback(Object arr, int v) {
+        if (arr == null) {
+            return;
+        }
+        Class<?> c = arr.getClass();
+        if (!c.isArray()) {
+            return;
+        }
+        Class<?> comp = c.getComponentType();
+        if (comp == null || comp.isPrimitive()) {
+            return;
+        }
+        Object[] elems = (Object[]) arr;
+        for (Object e : elems) {
+            if (e instanceof CRIJInstrumented i) {
+                try {
+                    i.$$crochetRollback(v);
+                } catch (Throwable ignore) {
                 }
             }
         }

@@ -58,6 +58,14 @@ public final class Specializer {
     }
 
     public static Lookup lookupFromUserClass(Class<?> userClass) throws Throwable {
-        return (Lookup) userClass.getDeclaredMethod("$$crochetLookup").invoke(null);
+        java.lang.reflect.Method m = userClass.getDeclaredMethod("$$crochetLookup");
+        // Package-private classes (e.g. java.util.HashMap$Node,
+        // java.util.concurrent.ConcurrentHashMap$Node) reject reflective
+        // invocation of even public static members from outside the package.
+        // setAccessible bypasses the language-level access check so the
+        // packed agent runtime can reach the injected lookup factory
+        // regardless of the user class's declared visibility.
+        m.setAccessible(true);
+        return (Lookup) m.invoke(null);
     }
 }

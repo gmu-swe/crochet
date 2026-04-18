@@ -136,12 +136,42 @@ final class InstrumentedSurfaceEmitter {
     // fields for StaticFieldHelperTemplate).
     // ---------------------------------------------------------------------
 
-    static void emitCopyFieldsTo(ClassVisitor cv, String owner, List<FieldRef> fields) {
+    /**
+     * True iff {@code superInternal} refers to an instrumented super that
+     * carries the $$crochet* surface. {@link java.lang.Object} and the
+     * handful of classes in {@link CrochetTransformer#shouldSkip} are
+     * bypassed: calling {@code super.$$crochetCopyFieldsTo} on them would
+     * land on {@link java.lang.Object}'s non-existent method and fail
+     * verification / linkage at runtime.
+     */
+    private static boolean superIsInstrumented(String superInternal) {
+        if (superInternal == null || "java/lang/Object".equals(superInternal)) {
+            return false;
+        }
+        if (CrochetTransformer.shouldSkip(superInternal)) {
+            return false;
+        }
+        return true;
+    }
+
+    static void emitCopyFieldsTo(ClassVisitor cv, String owner, String superName,
+                                 List<FieldRef> fields) {
         MethodVisitor mv = cv.visitMethod(
                 Opcodes.ACC_PUBLIC | Opcodes.ACC_SYNTHETIC,
                 "$$crochetCopyFieldsTo", "(Ljava/lang/Object;)V", null, null);
         mv.visitCode();
-        // ((Owner) arg).field = this.field    for each field
+        if (superIsInstrumented(superName)) {
+            // super.$$crochetCopyFieldsTo(arg) — ensures inherited fields
+            // are also copied to the shadow. Without this chain, a subclass
+            // like {@code LinkedHashMap$Entry} would skip its own {@code
+            // HashMap$Node}-inherited {@code value} / {@code next} fields,
+            // and rollback would not restore them.
+            mv.visitVarInsn(Opcodes.ALOAD, 0);
+            mv.visitVarInsn(Opcodes.ALOAD, 1);
+            mv.visitMethodInsn(Opcodes.INVOKESPECIAL, superName,
+                    "$$crochetCopyFieldsTo", "(Ljava/lang/Object;)V", false);
+        }
+        // ((Owner) arg).field = this.field    for each field declared here
         for (FieldRef f : fields) {
             mv.visitVarInsn(Opcodes.ALOAD, 1);
             mv.visitTypeInsn(Opcodes.CHECKCAST, owner);
@@ -154,12 +184,19 @@ final class InstrumentedSurfaceEmitter {
         mv.visitEnd();
     }
 
-    static void emitCopyFieldsFrom(ClassVisitor cv, String owner, List<FieldRef> fields) {
+    static void emitCopyFieldsFrom(ClassVisitor cv, String owner, String superName,
+                                   List<FieldRef> fields) {
         MethodVisitor mv = cv.visitMethod(
                 Opcodes.ACC_PUBLIC | Opcodes.ACC_SYNTHETIC,
                 "$$crochetCopyFieldsFrom", "(Ljava/lang/Object;)V", null, null);
         mv.visitCode();
-        // this.field = ((Owner) arg).field    for each field
+        if (superIsInstrumented(superName)) {
+            mv.visitVarInsn(Opcodes.ALOAD, 0);
+            mv.visitVarInsn(Opcodes.ALOAD, 1);
+            mv.visitMethodInsn(Opcodes.INVOKESPECIAL, superName,
+                    "$$crochetCopyFieldsFrom", "(Ljava/lang/Object;)V", false);
+        }
+        // this.field = ((Owner) arg).field    for each field declared here
         for (FieldRef f : fields) {
             mv.visitVarInsn(Opcodes.ALOAD, 0);
             mv.visitVarInsn(Opcodes.ALOAD, 1);
@@ -170,6 +207,16 @@ final class InstrumentedSurfaceEmitter {
         mv.visitInsn(Opcodes.RETURN);
         mv.visitMaxs(0, 0);
         mv.visitEnd();
+    }
+
+    // Back-compat overloads for StaticFieldHelperTemplate callers that have
+    // no real super chain to walk (helper class extends Object directly).
+    static void emitCopyFieldsTo(ClassVisitor cv, String owner, List<FieldRef> fields) {
+        emitCopyFieldsTo(cv, owner, "java/lang/Object", fields);
+    }
+
+    static void emitCopyFieldsFrom(ClassVisitor cv, String owner, List<FieldRef> fields) {
+        emitCopyFieldsFrom(cv, owner, "java/lang/Object", fields);
     }
 
     // ---------------------------------------------------------------------
@@ -184,35 +231,74 @@ final class InstrumentedSurfaceEmitter {
     // The helper class has no referents to walk and emits an empty body.
     // ---------------------------------------------------------------------
 
-    static void emitPropagateRefFields(ClassVisitor cv, String owner,
+    static void emitPropagateRefFields(ClassVisitor cv, String owner, String superName,
                                        String methodName, String iMethodName,
                                        List<FieldRef> fields) {
         MethodVisitor mv = cv.visitMethod(
                 Opcodes.ACC_PUBLIC | Opcodes.ACC_SYNTHETIC,
                 methodName, "(I)V", null, null);
         mv.visitCode();
-        for (FieldRef f : fields) {
-            if (!f.descriptor.startsWith("L")) {
-                continue;
-            }
-            Label skip = new Label();
-            Label after = new Label();
+        if (superIsInstrumented(superName)) {
             mv.visitVarInsn(Opcodes.ALOAD, 0);
-            mv.visitFieldInsn(Opcodes.GETFIELD, owner, f.name, f.descriptor);
-            mv.visitInsn(Opcodes.DUP);
-            mv.visitTypeInsn(Opcodes.INSTANCEOF, INSTRUMENTED);
-            mv.visitJumpInsn(Opcodes.IFEQ, skip);
-            mv.visitTypeInsn(Opcodes.CHECKCAST, INSTRUMENTED);
             mv.visitVarInsn(Opcodes.ILOAD, 1);
-            mv.visitMethodInsn(Opcodes.INVOKEINTERFACE, INSTRUMENTED, iMethodName, "(I)V", true);
-            mv.visitJumpInsn(Opcodes.GOTO, after);
-            mv.visitLabel(skip);
-            mv.visitInsn(Opcodes.POP);
-            mv.visitLabel(after);
+            mv.visitMethodInsn(Opcodes.INVOKESPECIAL, superName,
+                    methodName, "(I)V", false);
+        }
+        for (FieldRef f : fields) {
+            if (f.descriptor.startsWith("L")) {
+                Label skip = new Label();
+                Label after = new Label();
+                mv.visitVarInsn(Opcodes.ALOAD, 0);
+                mv.visitFieldInsn(Opcodes.GETFIELD, owner, f.name, f.descriptor);
+                mv.visitInsn(Opcodes.DUP);
+                mv.visitTypeInsn(Opcodes.INSTANCEOF, INSTRUMENTED);
+                mv.visitJumpInsn(Opcodes.IFEQ, skip);
+                mv.visitTypeInsn(Opcodes.CHECKCAST, INSTRUMENTED);
+                mv.visitVarInsn(Opcodes.ILOAD, 1);
+                mv.visitMethodInsn(Opcodes.INVOKEINTERFACE, INSTRUMENTED, iMethodName, "(I)V", true);
+                mv.visitJumpInsn(Opcodes.GOTO, after);
+                mv.visitLabel(skip);
+                mv.visitInsn(Opcodes.POP);
+                mv.visitLabel(after);
+            } else if (isReferenceArrayDescriptor(f.descriptor)) {
+                // Reference-element array field: delegate iteration to
+                // the runtime helper so we don't inflate emitted bytecode
+                // with a loop per array field. The helper handles null and
+                // non-CRIJInstrumented elements uniformly.
+                mv.visitVarInsn(Opcodes.ALOAD, 0);
+                mv.visitFieldInsn(Opcodes.GETFIELD, owner, f.name, f.descriptor);
+                mv.visitVarInsn(Opcodes.ILOAD, 1);
+                boolean checkpoint = "$$crochetCheckpoint".equals(iMethodName);
+                mv.visitMethodInsn(Opcodes.INVOKESTATIC,
+                        "net/jonbell/crochet/runtime/ArrayRegistry",
+                        checkpoint ? "propagateArrayCheckpoint" : "propagateArrayRollback",
+                        "(Ljava/lang/Object;I)V", false);
+            }
+            // Primitive-element arrays ([I, [Z, ...): nothing to propagate.
         }
         mv.visitInsn(Opcodes.RETURN);
         mv.visitMaxs(0, 0);
         mv.visitEnd();
+    }
+
+    /**
+     * Back-compat overload: used by {@link StaticFieldHelperTemplate} which
+     * doesn't have a super chain to walk.
+     */
+    static void emitPropagateRefFields(ClassVisitor cv, String owner,
+                                       String methodName, String iMethodName,
+                                       List<FieldRef> fields) {
+        emitPropagateRefFields(cv, owner, "java/lang/Object", methodName, iMethodName, fields);
+    }
+
+    /** True iff the descriptor is an array of reference elements (e.g. {@code [Ljava/util/HashMap$Node;}). */
+    private static boolean isReferenceArrayDescriptor(String descriptor) {
+        if (descriptor == null) return false;
+        int i = 0;
+        while (i < descriptor.length() && descriptor.charAt(i) == '[') i++;
+        if (i == 0 || i >= descriptor.length()) return false;
+        char c = descriptor.charAt(i);
+        return c == 'L';
     }
 
     static void emitPropagateNoop(ClassVisitor cv, String methodName) {

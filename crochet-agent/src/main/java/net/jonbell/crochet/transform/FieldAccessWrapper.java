@@ -175,10 +175,21 @@ public final class FieldAccessWrapper extends ClassVisitor {
             if (owner == null) {
                 return false;
             }
-            if (owner.startsWith("java/") || owner.startsWith("jdk/")
-                    || owner.startsWith("sun/") || owner.startsWith("com/sun/")) {
-                return false;
-            }
+            // Gap 7 / paper-level correctness: JDK classes participate in
+            // the field-wrap chain so HashMap's internal {@code this.size++},
+            // {@code this.table = newTable}, etc. fire the
+            // {@code $$crochetAccess} pre-hook, which lets {@code fastAccess}
+            // snapshot the receiver before the write. Without this wrap,
+            // checkpoint/rollback on JDK collections could not recover the
+            // pre-mutation state — demo scenario 15-hashmap-instrumented
+            // and paper §5.1 rely on it.
+            //
+            // Bootstrap safety: the emitted pre-hook is
+            // {@code INVOKEVIRTUAL owner.$$crochetAccess()V}. Until a class's
+            // first checkpoint ever fires, every instance's klass is the
+            // stock user class whose {@code $$crochetAccess} body is a
+            // single RETURN (emitted by InstrumentedSurfaceEmitter.emitAccessNoop),
+            // so this is a no-op at JDK-bootstrap time.
             if (owner.startsWith("net/jonbell/crochet/")) {
                 return false;
             }

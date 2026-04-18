@@ -3,6 +3,7 @@ package net.jonbell.crochet.agent;
 import java.lang.instrument.Instrumentation;
 
 import net.jonbell.crochet.runtime.CheckpointRollbackAgent;
+import net.jonbell.crochet.runtime.RuntimeReady;
 
 public final class CrochetAgent {
 
@@ -31,5 +32,19 @@ public final class CrochetAgent {
             // INITIALIZED_CLASSES as root sources.
         }
         inst.addTransformer(new TransformerWrapper(), true);
+        // Gap 7 closure: flip the RuntimeReady flag now that the agent
+        // runtime's dependency closure is installed and reachable. Before
+        // this point, pre-hooks emitted in JDK bytecode (HashMap.put,
+        // TreeMap.remove, etc. on the instrumented java.base) took the
+        // RuntimeReady.READY==false branch and returned immediately,
+        // avoiding re-entry into CheckpointRollbackAgent /
+        // ArrayRegistry during JVM bootstrap. After this flip, the
+        // hooks become live and full lazy-snapshot behaviour is in
+        // effect. Wrapped in try/catch for the same reason as the
+        // setInstrumentation call above — early-load ordering.
+        try {
+            RuntimeReady.markReady();
+        } catch (Throwable ignored) {
+        }
     }
 }
