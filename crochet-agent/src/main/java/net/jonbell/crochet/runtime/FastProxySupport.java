@@ -346,12 +346,26 @@ final class FastProxySupport {
         // the previous synchronized(userClass) which serialized across all
         // instances of the same class. See FastAccessCoordinator javadoc for
         // the invariant-preservation argument (I1, I2, sentinel handling).
-        Object stripe = FastAccessCoordinator.lockFor(obj);
-        synchronized (stripe) {
+        //
+        // Tapestry stripefix: the stripe acquire is a ReentrantLock, NOT a
+        // JVM-level synchronized block. The synchronized form deadlocked when
+        // Crochet was layered under Fray's scheduler — Crochet's premain
+        // forces FastProxySupport / FastAccessCoordinator to load before
+        // Fray's transformer registers, so the bytecode's monitorenter never
+        // got wrapped with Fray's scheduling hook. ReentrantLock routes the
+        // contended path through LockSupport.park (in java.base, transformed
+        // by Fray's JlinkPlugin at the time the instrumented JDK is built),
+        // which Fray's scheduler does see. See FastAccessCoordinator javadoc
+        // for the full mechanism + correctness argument; from the lock
+        // semantics side this swap is happens-before equivalent (JLS §17.4.5).
+        FastAccessCoordinator.Stripe stripe = FastAccessCoordinator.lockFor(obj);
+        stripe.lock.lock();
+        try {
             // Re-check under the lock: a peer may have won the klass CAS
             // while we were blocked acquiring the stripe, in which case the
             // work is done and we just return. Happens-before is established
-            // by the stripe monitor's release-acquire.
+            // by the stripe lock's release-acquire pair (ReentrantLock
+            // unlock/lock has the same memory semantics as monitorexit/enter).
             if (!CRIJFast.class.isAssignableFrom(obj.getClass())) {
                 return;
             }
@@ -398,9 +412,11 @@ final class FastProxySupport {
                 throw new RollbackException(RollbackException.POISON_VERSION, t);
             }
             // Work done: CAS klass proxy→user. This is the race-winner
-            // transition — any peer still blocked on the stripe monitor will
+            // transition — any peer still blocked on the stripe lock will
             // re-check CRIJFast after release and return cheaply.
             swapKlassProxyToUser(obj, userClass);
+        } finally {
+            stripe.lock.unlock();
         }
     }
 

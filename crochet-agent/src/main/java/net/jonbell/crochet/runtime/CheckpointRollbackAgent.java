@@ -250,6 +250,41 @@ public final class CheckpointRollbackAgent {
      * user-classes-touched-so-far. Callers with their own static root
      * collections should checkpoint those explicitly before or after.
      *
+     * <p><b>What gets snapped per class</b>: the <em>reference values</em>
+     * of each user class's mutable non-final static fields (see
+     * {@link net.jonbell.crochet.transform.StaticFieldHelperTemplate}).
+     * {@code checkpointAll} does <em>not</em> transitively snapshot the
+     * state of objects those static references point at — the per-object
+     * snapshot in {@link CRIJInstrumented} fires only when the object's
+     * klass has been swapped to a Fast proxy, which
+     * {@link #checkpoint(Object)} does explicitly. If your program mutates
+     * fields of an object reachable through a static reference and expects
+     * {@code rollbackAll} to reverse those mutations, you must
+     * <em>also</em> call {@link #checkpoint(Object)} on that referent (or
+     * annotate/opt-in via {@link CrochetEager} so its static initialiser
+     * captures one proactively). {@code rollbackAll} only restores the
+     * static field's reference slot; the referent's internal fields stay
+     * at their post-mutation values.
+     *
+     * <p><b>One-shot per checkpoint phase</b>: like all per-target
+     * {@link #checkpoint(Object)} calls, each {@code checkpointAll()} /
+     * {@code rollbackAll(v)} pair corresponds to one version bump — after
+     * rolling back to version {@code v} the registered snapshots are
+     * consumed. Code that wants to roll back to the same logical state
+     * multiple times must take a fresh checkpoint after each rollback:
+     * <pre>
+     *   int v = checkpointAll();
+     *   for (int i = 0; i &lt; N; i++) {
+     *     mutate();
+     *     rollbackAll(v);
+     *     v = checkpointAll(); // re-checkpoint between iterations
+     *   }
+     * </pre>
+     * This matches the paper's flat-nested semantics (§3.1): a second
+     * checkpoint discards the first, and rollback restores to the most
+     * recent checkpoint only. The same rule applies to the per-object API
+     * (see demo scenario 05-rollback-then-checkpoint).
+     *
      * <p><b>Escape hatch</b>: {@code -Dcrochet.checkpointAll.skipSystem=true}
      * elides the thread-list and classloader walks.
      */

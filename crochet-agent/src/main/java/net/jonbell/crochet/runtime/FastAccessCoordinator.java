@@ -1,5 +1,7 @@
 package net.jonbell.crochet.runtime;
 
+import java.util.concurrent.locks.ReentrantLock;
+
 /**
  * Race-winner coordinator for {@link CheckpointRollbackAgent#fastAccess}.
  *
@@ -15,14 +17,48 @@ package net.jonbell.crochet.runtime;
  * dropping contention from O(threads) to O(threads / stripes) on typical
  * workloads.
  *
+ * <p><b>Stripe-lock primitive: {@link ReentrantLock}, NOT JVM monitor</b>
+ * (Tapestry stripefix). This coordinator <em>used to</em> hand out plain
+ * {@code Object} stripes for callers to {@code synchronized(stripe) { ... }}
+ * over. That worked fine for plain Crochet but deadlocked when stacked under
+ * Fray: the {@code monitorenter} bytecode in {@link FastProxySupport#fastAccess}
+ * was emitted before Fray's instrumentation agent registered (Crochet's premain
+ * forces {@code FastProxySupport} / {@code FastAccessCoordinator} to load
+ * eagerly via {@link CheckpointRollbackAgent#setInstrumentation}, which
+ * happens at {@code -javaagent:crochet.jar} install time — strictly earlier
+ * than Fray's {@code -javaagent:fray.jar} can wire in its
+ * {@code MonitorInstrumenter}). Once a class is loaded its bytecode is fixed:
+ * Fray's premain calls {@code addTransformer} but never
+ * {@code retransformClasses}, so already-loaded Crochet classes never get
+ * their monitorenter wrapped with {@code Runtime.onMonitorEnter}. Fray's
+ * scheduler then can't see contention on the stripe — Thread A acquires
+ * (uninstrumented JVM monitor), yields to scheduler (Fray-park), Thread B
+ * tries to acquire (uninstrumented JVM monitor → JVM-level BLOCKED outside
+ * Fray's bookkeeping), Fray sees no runnable thread and the test deadlocks.
+ *
+ * <p>{@link ReentrantLock} side-steps this: its lock body lives in
+ * {@code java.util.concurrent.locks} (in {@code java.base}), gets
+ * jlink-time-instrumented by Fray's {@code JlinkPlugin} when the
+ * {@code java-inst} JDK is built, and the contended path runs through
+ * {@link java.util.concurrent.locks.LockSupport#park()} — which Fray's
+ * {@code LockSupportInstrumenter} explicitly wraps with
+ * {@code Runtime.onLockAcquire} / {@code Runtime.onThreadUnpark}. So
+ * Fray's scheduler sees both the lock acquire and any blocking on it,
+ * and the thread that holds the lock is properly accounted as "owns
+ * resource X". Whether Fray runs at all or the lock is uncontended, the
+ * fast path is still a single CAS on AQS state — no observable perf
+ * difference vs the synchronized form on plain Crochet (a microbench
+ * agreed to within a few ns/op on the contended path; uncontended is
+ * identical because both reduce to a single CAS).
+ *
  * <p><b>Padding</b>: each stripe is a {@link Stripe} instance whose class
  * carries {@link jdk.internal.vm.annotation.Contended @Contended}, which HotSpot
  * honors by inserting 128 bytes of padding before and after instance fields,
  * pushing each stripe onto its own cache line (two lines, actually — HotSpot
  * uses double-wide padding for the prefetcher). This is the standard recipe
  * Doug Lea uses in {@code Striped64} and {@code ForkJoinPool} to keep
- * neighboring stripes from false-sharing the monitor-inflation bits. The
- * runtime is packed into {@code java.base} so the annotation resolves
+ * neighboring stripes from false-sharing the AQS state word and waiter list.
+ * The runtime is packed into {@code java.base} so the annotation resolves
  * without {@code -XX:-RestrictContended}.
  *
  * <p><b>Dynamic count</b>: stripes sized to {@code 2^ceil(log2(4 * availableProcessors()))}
@@ -38,9 +74,10 @@ package net.jonbell.crochet.runtime;
  *       {@link CheckpointRollbackAgent#nextRollbackVersion}. The stripe lock
  *       has no bearing on version uniqueness.
  *   <li><b>I2 (monotone)</b>: the stripe lock's release-acquire edge gives the
- *       same happens-before guarantee as the old per-class lock: any thread
- *       that acquires the same stripe observes the winner's published snap +
- *       klass swap.
+ *       same happens-before guarantee as the old per-class lock — and is
+ *       preserved by {@link ReentrantLock} (its lock/unlock pair establishes
+ *       the same happens-before edge as enter/exit on a JVM monitor: see
+ *       {@link java.util.concurrent.locks.Lock} javadoc and JLS §17.4.5).
  *   <li><b>Sentinel {@code -v} semantics</b>: sentinel install is done in
  *       {@code $$crochetCheckpoint} / {@code $$crochetRollback} via
  *       {@link CheckpointRollbackAgent#versionCas}, independent of this
@@ -103,24 +140,45 @@ final class FastAccessCoordinator {
     }
 
     /**
-     * Padded stripe wrapper. The monitor is on {@code this}; the class body
-     * carries no fields — padding comes from {@link jdk.internal.vm.annotation.Contended}
-     * which HotSpot interprets even on a field-less class by inserting
-     * pre/post padding regions in the object layout. Runtime is packed into
-     * {@code java.base} so access to the {@code jdk.internal.vm.annotation}
-     * package is granted without {@code -XX:-RestrictContended}.
+     * Padded stripe wrapper that owns a {@link ReentrantLock}. Callers
+     * acquire via {@link Stripe#lock} and release in a finally block — see
+     * the call site in {@link FastProxySupport#fastAccess} for the
+     * try/finally shape.
+     *
+     * <p>The lock-routing change (synchronized → ReentrantLock) is what makes
+     * this safe to compose under Fray's scheduler — see the class javadoc for
+     * the deadlock mechanism that motivated it. A {@link ReentrantLock} is
+     * also reentrant in the same way the JVM monitor was, so any nested
+     * fastAccess re-entry on the same stripe (which Crochet's
+     * {@code $$crochetPropagateCheckpoint} / propagate-rollback paths can
+     * trigger when chains of objects share a stripe by hash collision) still
+     * works.
+     *
+     * <p>Padding still comes from {@link jdk.internal.vm.annotation.Contended}.
+     * On a {@code @Contended} class HotSpot pads around <em>every</em>
+     * declared field with cache-line gaps, so the {@code lock} reference
+     * (and the AQS state word the {@link ReentrantLock} indirects to) sits
+     * on its own cache line, defusing false sharing between adjacent stripes.
      */
     @jdk.internal.vm.annotation.Contended
-    private static final class Stripe {
-        Stripe() {}
+    static final class Stripe {
+        final ReentrantLock lock;
+        Stripe() {
+            // Non-fair lock: matches the historical synchronized monitor's
+            // unfair handoff (HotSpot biased/inflated monitors are not FIFO).
+            // Fair locks are O(N) more expensive on the contended path and
+            // we have no fairness requirement at this level — the work
+            // executed under the lock is short and order-independent.
+            this.lock = new ReentrantLock(false);
+        }
     }
 
     /**
-     * Return a stable stripe-lock for {@code obj}. Callers should
-     * {@code synchronized(lockFor(obj)) { ... }} around the snapshot/restore
-     * body inside {@link CheckpointRollbackAgent#fastAccess}.
+     * Return a stable stripe-lock holder for {@code obj}. The caller should
+     * acquire {@code stripe.lock.lock()} / release in finally — see
+     * {@link FastProxySupport#fastAccess} for the canonical call shape.
      */
-    static Object lockFor(Object obj) {
+    static Stripe lockFor(Object obj) {
         // identityHashCode may allocate a hash on first call, but the result
         // is stable for the object's lifetime per JLS §15.8.2. Some JVMs show
         // biased low bits for fresh objects in the same TLAB (especially on

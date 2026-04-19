@@ -1,6 +1,9 @@
 package net.jonbell.crochet.transform;
 
+import java.util.concurrent.ConcurrentHashMap;
+
 import org.objectweb.asm.ClassVisitor;
+import org.objectweb.asm.Label;
 import org.objectweb.asm.MethodVisitor;
 import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.Type;
@@ -23,6 +26,28 @@ import org.objectweb.asm.Type;
  * <p>See {@link WrapAccessesMV#emitPreHook} for the emit-shape design
  * rationale (INVOKEVIRTUAL vs INVOKESTATIC-with-instanceof trade-off).
  *
+ * <p><b>Skipped-owner guard (gmu-swe/crochet#5)</b>: {@link CrochetTransformer}
+ * skips classes flagged {@code ACC_ENUM} / {@code ACC_INTERFACE} /
+ * {@code ACC_ANNOTATION} / {@code ACC_MODULE} (and direct enum-constant
+ * subclasses whose super is {@code java/lang/Enum}) because the JVM rejects
+ * instance-field/method injection on those forms. But field reads/writes on a
+ * receiver of one of those static types still get wrapped here — without care,
+ * the emitted {@code INVOKEVIRTUAL fOwner.$$crochetAccess()V} fails to link at
+ * runtime ({@code NoSuchMethodError}). When {@code fOwner} resolves to one of
+ * those skipped forms via {@link #ownerIsSuspicious}, we emit the guarded
+ * form instead: {@code DUP / INSTANCEOF CRIJInstrumented / IFEQ skip /
+ * INVOKEINTERFACE $$crochetAccess / GOTO end / skip: POP / end:}. The guard is
+ * elided for all other owners to preserve the fast path (see the perf trade-
+ * off note on {@link WrapAccessesMV#emitPreHook}).
+ *
+ * <p>Resolution uses {@link ClassLoader#getResourceAsStream} to read the
+ * target class file's modifier bits without triggering a recursive
+ * {@link Class#forName} from inside the transformer chain. {@code forName}
+ * during transform either bypasses our own transformer for the recursively-
+ * loaded inner class (so the inner class never gets {@code $$crochetAccess}
+ * injected — which then breaks every subsequent field access on it) or
+ * deadlocks on the loader monitor.
+ *
  * <p>{@code <clinit>} takes the full skip — static initialisers are special
  * because our own {@code $$crochet*} field initialisers would recurse into
  * the static rewriter. {@code <init>} is handled via
@@ -32,13 +57,43 @@ import org.objectweb.asm.Type;
  */
 public final class FieldAccessWrapper extends ClassVisitor {
 
+    /**
+     * Internal name of the marker interface whose instances accept
+     * {@code $$crochetAccess()}. Used by the guarded emit shape below and by
+     * the {@link #ownerIsSuspicious} resolver to decide when to emit it.
+     */
+    static final String INSTRUMENTED_INTERNAL = "net/jonbell/crochet/runtime/CRIJInstrumented";
+
+    /**
+     * Per-owner-name cache of "is this fOwner a type that cannot host an
+     * instance {@code $$crochetAccess} method?" (i.e. interface / enum /
+     * annotation / module / direct enum-constant subclass). Populated by
+     * {@link #ownerIsSuspicious}; keyed by internal name only because the
+     * answer doesn't change with loader (the class file's own modifier bits
+     * are the source of truth). Entries are {@code Boolean.TRUE} (skipped
+     * form — emit the guard), {@code Boolean.FALSE} (ordinary class — emit
+     * the direct {@code INVOKEVIRTUAL}), or absent (not yet resolved — try
+     * again next call). We never cache a "lookup failed" outcome because a
+     * later transform-time call may see the class loaded in a different
+     * loader.
+     */
+    private static final ConcurrentHashMap<String, Boolean> OWNER_SUSPECT_CACHE =
+            new ConcurrentHashMap<>();
+
     private final SharedLocalsProvider locals;
+    private final ClassLoader loader;
     private String className;
     private String superName;
 
     public FieldAccessWrapper(int api, ClassVisitor delegate, SharedLocalsProvider locals) {
+        this(api, delegate, locals, null);
+    }
+
+    public FieldAccessWrapper(int api, ClassVisitor delegate, SharedLocalsProvider locals,
+                              ClassLoader loader) {
         super(api, delegate);
         this.locals = locals;
+        this.loader = loader;
     }
 
     @Override
@@ -60,21 +115,154 @@ public final class FieldAccessWrapper extends ClassVisitor {
             return base;
         }
         boolean isCtor = "<init>".equals(name);
-        return new WrapAccessesMV(api, base, locals, className, superName, isCtor);
+        return new WrapAccessesMV(api, base, locals, className, superName, isCtor, loader);
+    }
+
+    /**
+     * Returns {@code true} when {@code fOwner} is statically known to be a
+     * type {@link CrochetTransformer#transform} skips — i.e. it cannot carry
+     * an instance {@code $$crochetAccess} method.
+     *
+     * <p>Resolution reads the class file via
+     * {@link ClassLoader#getResourceAsStream} and parses only the access
+     * flags + super name (no class loading). Critically, this avoids
+     * {@link Class#forName}: calling {@code Class.forName} from inside our
+     * own {@code ClassFileTransformer} chain triggers a recursive load of
+     * the target class. The JVM detects the reentrancy and either bypasses
+     * our transformer for the inner load (so the inner class never gets
+     * {@code $$crochetAccess} injected) or deadlocks on the loader monitor.
+     * Resource-stream parsing reads the same on-disk class bytes that the
+     * loader would later hand to our transformer, but doesn't materialise
+     * the class.
+     *
+     * <p>The classification mirrors {@link CrochetTransformer#transform}'s
+     * skip flags: {@code ACC_INTERFACE}, {@code ACC_ENUM},
+     * {@code ACC_ANNOTATION}, {@code ACC_MODULE}, plus the
+     * "extends java/lang/Enum directly" form for enum-constant subclasses.
+     * Abstract classes are NOT included — the transformer happily injects
+     * {@code $$crochetAccess} into abstract user classes (their concrete
+     * subclasses inherit it, and any direct field access on an abstract
+     * receiver's instance fields is well-defined).
+     *
+     * <p>If the class file isn't resolvable through any loader we can see
+     * (e.g. it's a runtime-defined hidden class with no {@code .class}
+     * resource), we return {@code false} — the direct {@code INVOKEVIRTUAL}
+     * is retained, matching the pre-fix behaviour. The cache populates on
+     * the first successful lookup so subsequent callers benefit; we never
+     * cache a "lookup failed" outcome because a later loader may make the
+     * class file visible.
+     */
+    static boolean ownerIsSuspicious(ClassLoader loader, String fOwner) {
+        if (fOwner == null) {
+            return false;
+        }
+        // Our own runtime classes never appear as fOwner here (shouldWrap
+        // excludes them). java.lang.Object cannot be the field owner of a
+        // GETFIELD/PUTFIELD anyway. Skip cheap obviously-not-suspect prefixes
+        // before paying for the resource lookup.
+        if (fOwner.startsWith("net/jonbell/crochet/")) {
+            return false;
+        }
+        Boolean cached = OWNER_SUSPECT_CACHE.get(fOwner);
+        if (cached != null) {
+            return cached.booleanValue();
+        }
+        Boolean resolved = resolveSuspicious(loader, fOwner);
+        if (resolved != null) {
+            OWNER_SUSPECT_CACHE.putIfAbsent(fOwner, resolved);
+            return resolved.booleanValue();
+        }
+        return false;
+    }
+
+    private static Boolean resolveSuspicious(ClassLoader loader, String fOwner) {
+        String resource = fOwner + ".class";
+        ClassLoader effective = loader != null ? loader
+                : FieldAccessWrapper.class.getClassLoader();
+        for (ClassLoader l = effective; l != null; l = l.getParent()) {
+            Boolean r = readSuspectFlags(l, resource);
+            if (r != null) {
+                return r;
+            }
+        }
+        // Fall back to the system classloader for boot-loaded classes that
+        // don't show up via the agent's loader chain.
+        Boolean r = readSuspectFlags(null, resource);
+        return r;
+    }
+
+    private static Boolean readSuspectFlags(ClassLoader l, String resource) {
+        try (java.io.InputStream in = (l != null
+                ? l.getResourceAsStream(resource)
+                : ClassLoader.getSystemResourceAsStream(resource))) {
+            if (in == null) {
+                return null;
+            }
+            org.objectweb.asm.ClassReader reader = new org.objectweb.asm.ClassReader(in);
+            int access = reader.getAccess();
+            if ((access & (Opcodes.ACC_INTERFACE | Opcodes.ACC_ENUM
+                    | Opcodes.ACC_ANNOTATION | Opcodes.ACC_MODULE)) != 0) {
+                return Boolean.TRUE;
+            }
+            String superName = reader.getSuperName();
+            if ("java/lang/Enum".equals(superName)) {
+                return Boolean.TRUE;
+            }
+            return Boolean.FALSE;
+        } catch (java.io.IOException ignored) {
+            return null;
+        } catch (Throwable t) {
+            // A malformed class file or a broken classloader resource lookup
+            // shouldn't abort the whole transform. Fall back to the
+            // INVOKEVIRTUAL fast path.
+            return null;
+        }
     }
 
     private static final class WrapAccessesMV extends CtorAwareMv {
         private final SharedLocalsProvider locals;
+        private final ClassLoader loader;
 
         WrapAccessesMV(int api, MethodVisitor delegate, SharedLocalsProvider locals,
-                       String owner, String superName, boolean isCtor) {
+                       String owner, String superName, boolean isCtor, ClassLoader loader) {
             super(api, delegate, owner, superName, isCtor);
             this.locals = locals;
+            this.loader = loader;
         }
 
         /**
          * Emit the pre-hook for a GETFIELD/PUTFIELD receiver currently on
-         * top of stack: {@code INVOKEVIRTUAL owner.$$crochetAccess()V}.
+         * top of stack.
+         *
+         * <p><b>Fast path (ordinary user class {@code fOwner})</b>:
+         * emit {@code INVOKEVIRTUAL owner.$$crochetAccess()V} directly. This
+         * is the original shape and preserves the JIT devirtualisation the
+         * rest of this javadoc argues for.
+         *
+         * <p><b>Suspicious-owner path ({@code fOwner} is interface/enum/
+         * annotation/module)</b>: these are types {@link CrochetTransformer}
+         * skips — they cannot carry an instance {@code $$crochetAccess}
+         * method, so a direct {@code INVOKEVIRTUAL} fails to link at runtime
+         * with {@code NoSuchMethodError} (gmu-swe/crochet#5). For these
+         * owners we emit a guarded form:
+         *
+         * <pre>
+         *   DUP
+         *   INSTANCEOF CRIJInstrumented
+         *   IFEQ skipLabel
+         *   INVOKEINTERFACE CRIJInstrumented.$$crochetAccess()V
+         *   GOTO endLabel
+         *   skipLabel:
+         *   POP
+         *   endLabel:
+         * </pre>
+         *
+         * The guard costs a handful of extra instructions + a secondary-super
+         * check per emit site — the same cost {@link javadoc} below warns
+         * about — but only on receiver types whose static type already
+         * couldn't host the direct method. The ordinary-class fast path is
+         * unchanged. See {@link FieldAccessWrapper#ownerIsSuspicious} for the
+         * classification predicate.
          *
          * <p><b>Alternative evaluated and reverted:</b> a klass-guarded
          * static call of shape {@code INVOKESTATIC
@@ -104,9 +292,27 @@ public final class FieldAccessWrapper extends ClassVisitor {
          * CRIJFast.isProxy / IFEQ / ...}) was evaluated conceptually but
          * inflates per-site bytecode by ~6 instructions + a stackmap
          * frame — expensive for tradebeans-class-heavy workloads with
-         * &gt;10k emit sites. Not implemented.
+         * &gt;10k emit sites. Not implemented globally, only on the narrow
+         * suspicious-owner path above.
          */
-        private static void emitPreHook(MethodVisitor mv, String fOwner) {
+        private void emitPreHook(MethodVisitor mv, String fOwner) {
+            if (ownerIsSuspicious(loader, fOwner)) {
+                // Guarded form: the caller already DUPed the receiver, so
+                // on entry the stack top is the receiver (the extra copy
+                // we'll consume). See class javadoc for the exact shape.
+                Label skip = new Label();
+                Label after = new Label();
+                mv.visitInsn(Opcodes.DUP);
+                mv.visitTypeInsn(Opcodes.INSTANCEOF, INSTRUMENTED_INTERNAL);
+                mv.visitJumpInsn(Opcodes.IFEQ, skip);
+                mv.visitMethodInsn(Opcodes.INVOKEINTERFACE, INSTRUMENTED_INTERNAL,
+                        "$$crochetAccess", "()V", true);
+                mv.visitJumpInsn(Opcodes.GOTO, after);
+                mv.visitLabel(skip);
+                mv.visitInsn(Opcodes.POP);
+                mv.visitLabel(after);
+                return;
+            }
             mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, fOwner,
                     "$$crochetAccess", "()V", false);
         }
