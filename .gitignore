@@ -30,3 +30,7 @@ scratch/
 hs_err_pid*.log
 core.*
 crochet-agent/src/main/native/libcrochet-jvmti.so
+
+# eval harness outputs
+eval/*/results/
+eval/*/scratch/

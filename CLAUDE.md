@@ -16,7 +16,7 @@ Infrastructure pattern (jlink plugins, packer, Maven plugin) is a mechanical por
 # Build everything (installs all modules to ~/.m2)
 mvn install -DskipTests
 
-# Run unit tests (currently only crochet-agent has them: 5 tests)
+# Run unit tests (crochet-agent only, 35 tests across 7 classes)
 mvn -pl crochet-agent test
 
 # Run a single unit test
@@ -28,7 +28,7 @@ rm -rf /tmp/jdk-inst
 java -jar crochet-instrument/target/crochet-instrument-1.0.0-SNAPSHOT.jar \
     "$JAVA_HOME" /tmp/jdk-inst
 
-# Demo scenarios (17 numbered scenarios under demo/scenarios/*)
+# Demo scenarios (21 numbered scenarios under demo/scenarios/*)
 cd demo && bash run-all.sh                   # baseline JDK
 cd demo && bash run-all.sh --instrumented    # uses /tmp/jdk-inst by default
 INST_JDK=/path/to/other-jdk bash run-all.sh --instrumented
@@ -71,8 +71,9 @@ Four reactor modules (see top-level `pom.xml`):
 
 Additional read-only directories:
 
-- **`demo/scenarios/`** — 17 small checkpoint/rollback programs, numbered 01-basic through 17-arraycopy. Compiled and run by `demo/run-all.sh`. These are the fastest feedback loop.
-- **`designs/gap*/`** — per-gap design docs. Gaps 2-8 correspond to each work-item we addressed in the port; see `INTEGRATION_NOTES*.md` at the repo root for the landing write-ups.
+- **`demo/scenarios/`** — 21 small checkpoint/rollback programs, numbered 01-basic through 21-stack-roots. Compiled and run by `demo/run-all.sh`. These are the fastest feedback loop.
+- **`eval/`** — reproduction harnesses for every number in `BENCHMARK.md`: `microbench/` (paper §5.1 Table 1), `dacapo/` (full 22-bench perf sweep), `dacapo-func/` (functional-only sweep). Each harness is self-contained and respects env-var overrides (`AGENT_JAR`, `JDK_INST`, `DACAPO_JAR`, ...).
+- **`designs/gap*/`** — per-gap design docs from the port (Gaps 2–8 each cover one work-item addressed during the Java-21 migration).
 - **`spikes/`** — standalone probes that validated specific mechanisms (hidden-class CP patching, JVMTI single-step).
 - **`legacy/`** — original Java-8 CROCHET. Not built by Maven.
 
@@ -113,12 +114,10 @@ Injected instance fields on every non-skipped class: `private transient syntheti
 
 ## When to reach for which doc
 
-- `INTEGRATION_NOTES.md` — Gap 3/4 (statics + arrays) bytecode integration.
-- `INTEGRATION_NOTES_GAP6.md` — thread-safety / race-winner design (now superseded by stripe-lock, but explains the invariants).
-- `INTEGRATION_NOTES_GAP7.md` — jlink instrumentation of JDK classes.
-- `INTEGRATION_NOTES_DACAPO.md` — current DaCapo status, invocation lines for each benchmark, architecture changes per round, remaining-failure root-causes. Read this before touching the transform pipeline — it captures which changes broke which workload.
+- `README.md` — user-facing overview + reproduction instructions for every experimental number.
+- `BENCHMARK.md` — full performance evaluation: per-benchmark DaCapo table, optimization-round deltas, bottleneck traces, threats to validity. Read this before touching the transform pipeline — it captures which changes broke which workload and which ratios moved with which commit.
 - `crochet-instrument/PORT_NOTES.md` — Galette→Crochet file mapping and renames.
-- `designs/gap*/DESIGN.md` — original per-gap design docs.
+- `designs/gap*/DESIGN.md` — per-gap design docs from the port.
 - `crochet.pdf`, `fse25-galette.pdf` — the source papers (CROCHET 2018, Galette 2025).
 
 ## Committing
