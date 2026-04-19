@@ -124,7 +124,7 @@ public class CrochetTransformer {
         chain = new ArrayAccessWrapper(Opcodes.ASM9, chain, locals);
         chain = new StaticFieldRewriter(Opcodes.ASM9, chain, loader);
         chain = new ArrayCopyInterceptor(Opcodes.ASM9, chain);
-        chain = new FieldAccessWrapper(Opcodes.ASM9, chain, locals);
+        chain = new FieldAccessWrapper(Opcodes.ASM9, chain, locals, loader);
         // ReflectionRewriter sits at the top of the user-class chain.
         // It only rewrites INVOKEVIRTUAL/INVOKESTATIC on specific
         // reflection APIs into INVOKESTATIC helpers in ReflectionFilter,

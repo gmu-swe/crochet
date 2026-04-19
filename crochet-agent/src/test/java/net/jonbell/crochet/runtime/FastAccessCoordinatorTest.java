@@ -24,11 +24,22 @@ class FastAccessCoordinatorTest {
     @Test
     void lockForReturnsStableLock() {
         Object target = new Object();
-        Object a = FastAccessCoordinator.lockFor(target);
-        Object b = FastAccessCoordinator.lockFor(target);
+        FastAccessCoordinator.Stripe a = FastAccessCoordinator.lockFor(target);
+        FastAccessCoordinator.Stripe b = FastAccessCoordinator.lockFor(target);
         assertNotNull(a);
         // identityHashCode is stable so the stripe must be stable too.
         assertSame(a, b);
+        // Stripe must expose a usable ReentrantLock — see Tapestry stripefix
+        // memo on FastAccessCoordinator: the synchronized form deadlocked
+        // when stacked under Fray, so the lock primitive intentionally
+        // routes through LockSupport (via AQS) so Fray can see contention.
+        assertNotNull(a.lock);
+        a.lock.lock();
+        try {
+            assertTrue(a.lock.isHeldByCurrentThread());
+        } finally {
+            a.lock.unlock();
+        }
     }
 
     @Test
@@ -38,11 +49,12 @@ class FastAccessCoordinatorTest {
         // targets map to at least some diversity of stripes. Collision rate
         // under an ideal mixer is ~count/stripes.
         int samples = 10_000;
-        java.util.IdentityHashMap<Object, Integer> stripeIds = new java.util.IdentityHashMap<>();
+        java.util.IdentityHashMap<FastAccessCoordinator.Stripe, Integer> stripeIds =
+                new java.util.IdentityHashMap<>();
         int distinctStripes = 0;
         for (int i = 0; i < samples; i++) {
             Object o = new Object();
-            Object stripe = FastAccessCoordinator.lockFor(o);
+            FastAccessCoordinator.Stripe stripe = FastAccessCoordinator.lockFor(o);
             if (stripeIds.putIfAbsent(stripe, i) == null) {
                 distinctStripes++;
             }

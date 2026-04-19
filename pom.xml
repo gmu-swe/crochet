@@ -27,7 +27,7 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <maven.compiler.release>17</maven.compiler.release>
 
-        <asm.version>9.7.1</asm.version>
+        <asm.version>9.9</asm.version>
         <junit.version>5.11.3</junit.version>
 
         <maven-compiler-plugin.version>3.13.0</maven-compiler-plugin.version>
