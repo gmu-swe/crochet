@@ -28,6 +28,7 @@ for arg in "$@"; do
 done
 
 JAVA_CMD="java"
+JAVAC_CMD="javac"
 EXTRA_ARGS=""
 MODE="baseline"
 if [ "$USE_INSTRUMENTED" = "1" ]; then
@@ -39,6 +40,7 @@ if [ "$USE_INSTRUMENTED" = "1" ]; then
         exit 1
     fi
     JAVA_CMD="$INST_JDK/bin/java"
+    JAVAC_CMD="$INST_JDK/bin/javac"
     # The packed CheckpointRollbackAgent still references sun.misc.Unsafe
     # (jdk.unsupported); java.base cannot declare `requires jdk.unsupported`
     # so the runtime reads must be granted externally.
@@ -57,7 +59,7 @@ for dir in scenarios/*/; do
     scenario=$(basename "$dir")
     printf '=== %-40s ' "$scenario"
 
-    (cd "$dir" && rm -f *.class && javac -cp "$AGENT_JAR" *.java) >/tmp/compile.log 2>&1
+    (cd "$dir" && rm -f *.class && $JAVAC_CMD -cp "$AGENT_JAR" *.java) >/tmp/compile.log 2>&1
     if [ $? -ne 0 ]; then
         echo "COMPILE FAIL"
         cat /tmp/compile.log

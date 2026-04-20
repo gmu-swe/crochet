@@ -1,0 +1,27 @@
+diff --git a/core/src/main/kotlin/org/pastalab/fray/core/RunContext.kt b/core/src/main/kotlin/org/pastalab/fray/core/RunContext.kt
+index 580444c..8777930 100644
+--- a/core/src/main/kotlin/org/pastalab/fray/core/RunContext.kt
++++ b/core/src/main/kotlin/org/pastalab/fray/core/RunContext.kt
+@@ -424,6 +424,12 @@ class RunContext(val config: Configuration) {
+       while (t.isAlive) {
+         Thread.yield()
+       }
++      // Re-notify: the first objectNotifyAll above fires before the joiner has called
++      // addWaitingThread (joiner is still parked in scheduleNextOperation at that point).
++      // After native thread death the joiner is guaranteed to have reached Object.wait
++      // in the objectWaitDoneImpl spin-loop, so this notification lands on a real waiter
++      // and sets pendingOp=ObjectWakeBlocked — enabling the #424 race window test.
++      objectNotifyAll(t)
+       context.isExiting = false
+       lockUnlockDone(t)
+       unlockImpl(
+@@ -478,7 +484,8 @@ class RunContext(val config: Configuration) {
+     val spuriousWakeup = config.randomness.nextInt() % 2 == 0
+     // This is a spurious wakeup.
+     // https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/Object.html#wait(long,int)
+-    if (spuriousWakeup && config.scheduler !is FrayIdeaPluginScheduler) {
++    // Force spurious wakeup unconditionally to expose the #424 race window in testing.
++    if (config.scheduler !is FrayIdeaPluginScheduler) {
+       signalContext.unblockThread(t, InterruptionType.RESOURCE_AVAILABLE)
+     }
+ 

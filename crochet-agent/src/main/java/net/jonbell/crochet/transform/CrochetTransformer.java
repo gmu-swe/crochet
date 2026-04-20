@@ -380,6 +380,19 @@ public class CrochetTransformer {
         if (internalName.startsWith("net/jonbell/crochet/instrument/")) {
             return true;
         }
+        // Fray concurrency-testing runtime — skip at both agent-load time and
+        // jlink-instrument time. Fray's scheduler classes (RunContext,
+        // RuntimeDelegate, ThreadContext, …) must not acquire Crochet's
+        // stripe-lock inside scheduler hot paths, and Fray-internal Thread
+        // objects must not be checkpointed by checkpointAll(). Instrumenting
+        // them also makes them CRIJInstrumented, which causes checkpointAll's
+        // Thread.getAllStackTraces() loop to attempt fastAccess on Fray's
+        // internal threads — a ReentrantLock acquire inside the scheduler that
+        // deadlocks or confounds the state Fray is tracking. See Fray issue
+        // #424 investigation notes.
+        if (internalName.startsWith("org/pastalab/fray/")) {
+            return true;
+        }
         // JVM-fabricated classes: lambdas, proxies, reflection-generated
         // accessors. These have no ProtectionDomain; they're built after the
         // jlink pass, so they can never carry the @CrochetInstrumented marker
