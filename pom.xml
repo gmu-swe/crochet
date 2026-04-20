@@ -20,6 +20,7 @@
         <module>crochet-agent</module>
         <module>crochet-instrument</module>
         <module>crochet-maven-plugin</module>
+        <module>crochet-junit5</module>
         <module>crochet-integration-tests</module>
     </modules>
 
