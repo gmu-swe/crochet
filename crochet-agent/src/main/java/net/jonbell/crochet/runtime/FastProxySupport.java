@@ -388,14 +388,14 @@ final class FastProxySupport {
                     Object shadow = allocateShadow(userClass);
                     obj.$$crochetCopyFieldsTo(shadow);
                     obj.$$crochetSetSnap(shadow);
-                    obj.$$crochetPropagateCheckpoint(realV);
+                    PropagateWorklist.enqueueOrRun(obj, realV, true);
                 } else {
                     Object snap = obj.$$crochetGetSnap();
                     if (snap != null) {
                         obj.$$crochetCopyFieldsFrom(snap);
                         obj.$$crochetSetSnap(null);
                     }
-                    obj.$$crochetPropagateRollback(realV);
+                    PropagateWorklist.enqueueOrRun(obj, realV, false);
                 }
             } catch (Throwable t) {
                 // Gap 8: zero the version and snap to leave a consistent

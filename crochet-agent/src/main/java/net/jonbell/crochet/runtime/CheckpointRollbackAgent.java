@@ -494,6 +494,17 @@ public final class CheckpointRollbackAgent {
     }
 
     /**
+     * Iterative drain entry for eager $$crochetCheckpoint / $$crochetRollback
+     * bodies. Replaces a direct {@code this.$$crochetPropagate*(v)} call so
+     * deep reference chains (linked lists, tree spines) don't recurse the
+     * JVM stack into a {@link StackOverflowError}. See
+     * {@link PropagateWorklist}.
+     */
+    public static void propagate(Object target, int version, boolean checkpoint) {
+        PropagateWorklist.enqueueOrRun(target, version, checkpoint);
+    }
+
+    /**
      * Replacement for {@code System.arraycopy} emitted by
      * {@link net.jonbell.crochet.transform.ArrayCopyInterceptor}. Ensures the
      * destination array's snapshot is captured before the native bulk copy

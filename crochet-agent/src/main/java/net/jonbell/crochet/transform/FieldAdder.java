@@ -698,11 +698,18 @@ public final class FieldAdder extends ClassVisitor {
         // fastAccess path to take over the work lazily. Without this call,
         // nested state ({@code Entry.left}, {@code Entry.right}, etc.) is
         // never snapshotted and rollback can only restore the direct object.
+        //
+        // Routed through {@link CheckpointRollbackAgent#propagate} (a
+        // thread-local iterative drain) so that deep reference chains
+        // (linked lists, tree spines — Lucene's DocumentsWriterDeleteQueue
+        // is the motivating case) don't recurse the JVM stack into an SOE.
+        // Reentrant eager-eager nesting just enqueues; the outer drain
+        // pops and runs each propagate iteratively.
         mv.visitVarInsn(Opcodes.ALOAD, 0);
         mv.visitVarInsn(Opcodes.ILOAD, 1);
-        mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, className,
-                checkpoint ? "$$crochetPropagateCheckpoint" : "$$crochetPropagateRollback",
-                "(I)V", false);
+        mv.visitInsn(checkpoint ? Opcodes.ICONST_1 : Opcodes.ICONST_0);
+        mv.visitMethodInsn(Opcodes.INVOKESTATIC, AGENT, "propagate",
+                "(Ljava/lang/Object;IZ)V", false);
         mv.visitLabel(tryEnd);
         mv.visitJumpInsn(Opcodes.GOTO, afterHandler);
 
