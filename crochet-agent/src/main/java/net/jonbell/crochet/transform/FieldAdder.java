@@ -113,25 +113,31 @@ public final class FieldAdder extends ClassVisitor {
      * Emits a sentinel-aware body for {@code $$crochetCheckpoint} /
      * {@code $$crochetRollback} per paper Listing 3:
      * <pre>
+     *   loop:
      *   int cur   = Agent.versionVolatileGet(this, ThisClass.class);
-     *   int realV = (cur &lt; 0) ? -cur : cur;
-     *   if (realV &gt;= v) return;                                        // I2 guard
-     *   if (!Agent.versionCas(this, ThisClass.class, cur, -v)) return;   // peer won
+     *   int realV = Math.abs(cur);
+     *   if (realV &gt;= v) return;                                         // I2 guard
+     *   if (!Agent.versionCas(this, ThisClass.class, cur, -v)) goto loop; // retry
      *   try {
      *       Agent.swapToFastProxy(this, ThisClass.class);
      *   } catch (Throwable t) {
-     *       Agent.versionCas(this, ThisClass.class, -v, cur);            // best-effort restore
+     *       Agent.versionCas(this, ThisClass.class, -v, cur);             // best-effort restore
      *       throw new RollbackException(POISON_VERSION, t);
      *   }
-     *   Agent.versionCas(this, ThisClass.class, -v, v);                  // finalize
+     *   Agent.versionCas(this, ThisClass.class, -v, v);                   // finalize
      * </pre>
      *
      * <p>Sentinel value {@code -v} closes the "version bumped but klass not
      * yet swapped" race window: a concurrent reader that observes {@code -v}
      * decodes {@code realV = v} and sees the same parity/branch decision it
-     * would observe after the finalize. All CAS failures are benign — they
-     * mean a peer advanced past us, so paper invariants I1 (unique v) and I2
-     * (monotone) continue to hold.
+     * would observe after the finalize.
+     *
+     * <p>The CAS retry loop is required for correctness: if a lower-version
+     * peer wins the sentinel CAS first (e.g. v=5 beats v=7), the higher-version
+     * thread must retry rather than return — otherwise the object is permanently
+     * stuck at the lower version violating the "highest concurrent version wins"
+     * invariant that scenario 10-concurrent-checkpoint validates. The I2 guard
+     * at the top terminates the loop once {@code realV &ge; v}.
      *
      * <p>Gap 8 integration: a throw from {@code swapToFastProxy} (i.e., proxy
      * class generation failed) restores the pre-sentinel version via CAS so
@@ -143,6 +149,7 @@ public final class FieldAdder extends ClassVisitor {
      * {@code cur}, slot 3 is {@code realV}, slot 4 is the caught throwable.
      */
     private void emitVersionGuardedEntry(MethodVisitor mv) {
+        Label loopHead     = new Label();
         Label proceed      = new Label();
         Label gotSentinel  = new Label();
         Label tryStart     = new Label();
@@ -151,6 +158,7 @@ public final class FieldAdder extends ClassVisitor {
         Label afterHandler = new Label();
 
         // ---- cur = Agent.versionVolatileGet(this, ThisClass.class)
+        mv.visitLabel(loopHead);
         mv.visitVarInsn(Opcodes.ALOAD, 0);
         mv.visitLdcInsn(Type.getObjectType(className));
         mv.visitMethodInsn(Opcodes.INVOKESTATIC, AGENT, "versionVolatileGet",
@@ -179,7 +187,7 @@ public final class FieldAdder extends ClassVisitor {
         mv.visitInsn(Opcodes.RETURN);
         mv.visitLabel(proceed);
 
-        // ---- if (!Agent.versionCas(this, ThisClass.class, cur, -v)) return;
+        // ---- if (!Agent.versionCas(this, ThisClass.class, cur, -v)) retry;
         mv.visitVarInsn(Opcodes.ALOAD, 0);
         mv.visitLdcInsn(Type.getObjectType(className));
         mv.visitVarInsn(Opcodes.ILOAD, 2);                          // expect = cur
@@ -188,7 +196,7 @@ public final class FieldAdder extends ClassVisitor {
         mv.visitMethodInsn(Opcodes.INVOKESTATIC, AGENT, "versionCas",
                 "(Ljava/lang/Object;Ljava/lang/Class;II)Z", false);
         mv.visitJumpInsn(Opcodes.IFNE, gotSentinel);
-        mv.visitInsn(Opcodes.RETURN);
+        mv.visitJumpInsn(Opcodes.GOTO, loopHead);                    // retry: re-read cur
         mv.visitLabel(gotSentinel);
 
         // ---- try { Agent.swapToFastProxy(this, ThisClass.class); }
@@ -558,10 +566,11 @@ public final class FieldAdder extends ClassVisitor {
      * instance instead of swapping to a Fast proxy:
      *
      * <pre>
+     *   loop:
      *   int cur   = Agent.versionVolatileGet(this, ThisClass.class);
      *   int realV = Math.abs(cur);
-     *   if (realV &gt;= v) return;                                        // I2 guard
-     *   if (!Agent.versionCas(this, ThisClass.class, cur, -v)) return;   // peer won
+     *   if (realV &gt;= v) return;                                         // I2 guard
+     *   if (!Agent.versionCas(this, ThisClass.class, cur, -v)) goto loop; // retry
      *   try {
      *       if (checkpoint) {
      *           Object shadow = Agent.allocateShadow(ThisClass.class);
@@ -600,6 +609,7 @@ public final class FieldAdder extends ClassVisitor {
      * slot 5 is the shadow / snap reference.
      */
     private void emitEagerVersionGuardedEntry(MethodVisitor mv, boolean checkpoint) {
+        Label loopHead     = new Label();
         Label proceed      = new Label();
         Label gotSentinel  = new Label();
         Label tryStart     = new Label();
@@ -608,6 +618,7 @@ public final class FieldAdder extends ClassVisitor {
         Label afterHandler = new Label();
 
         // ---- cur = Agent.versionVolatileGet(this, ThisClass.class)
+        mv.visitLabel(loopHead);
         mv.visitVarInsn(Opcodes.ALOAD, 0);
         mv.visitLdcInsn(Type.getObjectType(className));
         mv.visitMethodInsn(Opcodes.INVOKESTATIC, AGENT, "versionVolatileGet",
@@ -627,7 +638,7 @@ public final class FieldAdder extends ClassVisitor {
         mv.visitInsn(Opcodes.RETURN);
         mv.visitLabel(proceed);
 
-        // ---- if (!Agent.versionCas(this, ThisClass.class, cur, -v)) return;
+        // ---- if (!Agent.versionCas(this, ThisClass.class, cur, -v)) retry;
         mv.visitVarInsn(Opcodes.ALOAD, 0);
         mv.visitLdcInsn(Type.getObjectType(className));
         mv.visitVarInsn(Opcodes.ILOAD, 2);
@@ -636,7 +647,7 @@ public final class FieldAdder extends ClassVisitor {
         mv.visitMethodInsn(Opcodes.INVOKESTATIC, AGENT, "versionCas",
                 "(Ljava/lang/Object;Ljava/lang/Class;II)Z", false);
         mv.visitJumpInsn(Opcodes.IFNE, gotSentinel);
-        mv.visitInsn(Opcodes.RETURN);
+        mv.visitJumpInsn(Opcodes.GOTO, loopHead);                    // retry: re-read cur
         mv.visitLabel(gotSentinel);
 
         // ---- try { ... eager body ... }
@@ -687,11 +698,18 @@ public final class FieldAdder extends ClassVisitor {
         // fastAccess path to take over the work lazily. Without this call,
         // nested state ({@code Entry.left}, {@code Entry.right}, etc.) is
         // never snapshotted and rollback can only restore the direct object.
+        //
+        // Routed through {@link CheckpointRollbackAgent#propagate} (a
+        // thread-local iterative drain) so that deep reference chains
+        // (linked lists, tree spines — Lucene's DocumentsWriterDeleteQueue
+        // is the motivating case) don't recurse the JVM stack into an SOE.
+        // Reentrant eager-eager nesting just enqueues; the outer drain
+        // pops and runs each propagate iteratively.
         mv.visitVarInsn(Opcodes.ALOAD, 0);
         mv.visitVarInsn(Opcodes.ILOAD, 1);
-        mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, className,
-                checkpoint ? "$$crochetPropagateCheckpoint" : "$$crochetPropagateRollback",
-                "(I)V", false);
+        mv.visitInsn(checkpoint ? Opcodes.ICONST_1 : Opcodes.ICONST_0);
+        mv.visitMethodInsn(Opcodes.INVOKESTATIC, AGENT, "propagate",
+                "(Ljava/lang/Object;IZ)V", false);
         mv.visitLabel(tryEnd);
         mv.visitJumpInsn(Opcodes.GOTO, afterHandler);
 

@@ -7,7 +7,7 @@
     <parent>
         <groupId>net.jonbell.crochet</groupId>
         <artifactId>crochet-parent</artifactId>
-        <version>1.0.0-SNAPSHOT</version>
+        <version>1.0.0-tapestry-bytebuddy-SNAPSHOT</version>
     </parent>
 
     <artifactId>crochet-agent</artifactId>

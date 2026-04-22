@@ -125,6 +125,27 @@ public class CrochetTransformer {
         chain = new StaticFieldRewriter(Opcodes.ASM9, chain, loader);
         chain = new ArrayCopyInterceptor(Opcodes.ASM9, chain);
         chain = new FieldAccessWrapper(Opcodes.ASM9, chain, locals, loader);
+        // ByteBuddy's private classloaders ({@code ByteArrayClassLoader},
+        // {@code MultipleParentClassLoader}) define dynamically-generated
+        // classes (Mockito mocks, etc.) and inherit Crochet's
+        // {@code implements CRIJInstrumented} stamp on each. Their
+        // {@code parent} chain doesn't include the agent classloader, so
+        // resolving {@code net.jonbell.crochet.runtime.CRIJInstrumented}
+        // from a dynamically-defined mock class fails with CNFE. The
+        // patcher prepends a fallback to the loader's resolution method
+        // that routes Crochet runtime types through the agent loader. See
+        // {@link ByteBuddyClassLoaderPatcher} for the bytecode shape and
+        // the broader bug-shape rationale. Sits above
+        // {@link FieldAccessWrapper} so the prelude bytes flow straight to
+        // the writer without being wrapped — the prelude has no field
+        // accesses, so this is purely a cleanliness preference.
+        ByteBuddyClassLoaderPatcher.Target bbTarget =
+                ByteBuddyClassLoaderPatcher.targetFor(name);
+        if (bbTarget != null) {
+            chain = new ByteBuddyClassLoaderPatcher(Opcodes.ASM9, chain,
+                    bbTarget.internalName, bbTarget.methodName,
+                    bbTarget.methodDesc, bbTarget.nameLocalSlot);
+        }
         // ReflectionRewriter sits at the top of the user-class chain.
         // It only rewrites INVOKEVIRTUAL/INVOKESTATIC on specific
         // reflection APIs into INVOKESTATIC helpers in ReflectionFilter,
@@ -380,6 +401,19 @@ public class CrochetTransformer {
         if (internalName.startsWith("net/jonbell/crochet/instrument/")) {
             return true;
         }
+        // Fray concurrency-testing runtime — skip at both agent-load time and
+        // jlink-instrument time. Fray's scheduler classes (RunContext,
+        // RuntimeDelegate, ThreadContext, …) must not acquire Crochet's
+        // stripe-lock inside scheduler hot paths, and Fray-internal Thread
+        // objects must not be checkpointed by checkpointAll(). Instrumenting
+        // them also makes them CRIJInstrumented, which causes checkpointAll's
+        // Thread.getAllStackTraces() loop to attempt fastAccess on Fray's
+        // internal threads — a ReentrantLock acquire inside the scheduler that
+        // deadlocks or confounds the state Fray is tracking. See Fray issue
+        // #424 investigation notes.
+        if (internalName.startsWith("org/pastalab/fray/")) {
+            return true;
+        }
         // JVM-fabricated classes: lambdas, proxies, reflection-generated
         // accessors. These have no ProtectionDomain; they're built after the
         // jlink pass, so they can never carry the @CrochetInstrumented marker
@@ -414,6 +448,32 @@ public class CrochetTransformer {
         // is enabled), but we keep this skip until ReflectionRewriter is
         // default-on across the DaCapo matrix.
         if (internalName.contains("$ByteBuddy$")) {
+            return true;
+        }
+        // ByteBuddy synthesises {@code net.bytebuddy.mirror.<Type>} runtime
+        // classes as bytewise field-layout copies of JDK reflection types
+        // (currently just {@code java.lang.reflect.AccessibleObject}). It
+        // then computes a field offset on the mirror via
+        // {@code Unsafe.objectFieldOffset(mirror.field("override"))} and
+        // applies the SAME offset to real {@code Field} / {@code Method}
+        // instances via {@code Unsafe.putBoolean} — a trick used in
+        // {@code ClassInjector$UsingUnsafe$Dispatcher$CreationAction.run}
+        // to set {@code Field.override = true} without the reflection-
+        // permission check. If we add {@code $$crochetVersion} /
+        // {@code $$crochetSnap} fields to the mirror, the JVM may reorder
+        // the layout (4-byte / 8-byte packing), shifting {@code override}
+        // to a different offset on the mirror than on the JDK class. The
+        // wrong-offset {@code putBoolean} corrupts a different field on
+        // the real {@code Field} (typically {@code accessCheckCache} or
+        // {@code root}); the JIT-compiled {@code AccessibleObject.verifyAccess}
+        // then loads a bogus "compressed oop" value of {@code 0x1} from
+        // {@code accessCheckCache}, decompresses to address {@code 0x8},
+        // and SIGSEGVs at {@code [0x10]} when reading the
+        // {@code WeakReference.referent} field. Skip the entire
+        // {@code net/bytebuddy/mirror/} package — these classes have no
+        // crochet-relevant state of their own (they only exist for layout
+        // mirroring), so we lose nothing by leaving them alone.
+        if (internalName.startsWith("net/bytebuddy/mirror/")) {
             return true;
         }
         // Hibernate runtime proxies (e.g. Pet$HibernateProxy$FyMglsPZ) extend
