@@ -6,7 +6,7 @@
 
     <groupId>net.jonbell.crochet</groupId>
     <artifactId>crochet-parent</artifactId>
-    <version>1.0.0-SNAPSHOT</version>
+    <version>1.0.0-tapestry-bytebuddy-SNAPSHOT</version>
     <packaging>pom</packaging>
 
     <name>Crochet (Java 24 port)</name>
