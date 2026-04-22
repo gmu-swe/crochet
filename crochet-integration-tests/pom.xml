@@ -5,9 +5,9 @@
     <modelVersion>4.0.0</modelVersion>
 
     <parent>
-        <groupId>net.jonbell.crochet</groupId>
+        <groupId>edu.neu.ccs.prl.crochet</groupId>
         <artifactId>crochet-parent</artifactId>
-        <version>1.0.0-SNAPSHOT</version>
+        <version>2.0.0-SNAPSHOT</version>
     </parent>
 
     <artifactId>crochet-integration-tests</artifactId>
@@ -17,7 +17,7 @@
 
     <dependencies>
         <dependency>
-            <groupId>net.jonbell.crochet</groupId>
+            <groupId>edu.neu.ccs.prl.crochet</groupId>
             <artifactId>crochet-agent</artifactId>
             <version>${project.version}</version>
             <scope>test</scope>
