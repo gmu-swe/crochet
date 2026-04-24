@@ -118,16 +118,35 @@ public final class Ttd {
      * immediately without prompting.
      */
     public static void breakpoint() {
+        hitInternal(null);
+    }
+
+    /**
+     * Auto-instrumentation entry point: emitted by
+     * {@link LineMarkerTransformer} at every line of any
+     * {@link TimeTravelBody}-annotated method. Same semantics as
+     * {@link #breakpoint()} but carries source-location context for the
+     * REPL to display. Outside a {@link #session} this is a silent
+     * no-op so instrumented classes loaded outside a session pay no
+     * runtime cost beyond the static call.
+     */
+    public static void lineHit(String ownerInternal, String methodSig, int line) {
+        TtdContext ctx = CTX.get();
+        if (ctx == null) return;
+        hitInternal(ownerInternal + "." + methodSig + ":" + line);
+    }
+
+    private static void hitInternal(String lineCtx) {
         TtdContext ctx = CTX.get();
         if (ctx == null) {
             throw new IllegalStateException(
                     "Ttd.breakpoint() called outside a Ttd.session()");
         }
         ctx.currentIdx++;
+        ctx.currentLineCtx = lineCtx;
         if (ctx.currentIdx < ctx.targetStop) {
             return;  // silent replay
         }
-        // Hit. Drop to REPL.
         Repl.Action a = ctx.repl.prompt(ctx, /*atEnd=*/false);
         switch (a.kind) {
             case CONTINUE:
@@ -153,6 +172,7 @@ public final class Ttd {
         int checkpointVersion;
         int currentIdx;          // breakpoint index of the most recent hit
         int targetStop = 1;      // next stop target (default: pause at first BP)
+        String currentLineCtx;   // "owner.method:line" if from lineHit, else null
 
         TtdContext(Object root, Repl repl) {
             this.root = root;

@@ -1,10 +1,16 @@
 # crochet-ttd
 
 Time-travel debugger primitive on top of Crochet's checkpoint/rollback.
-Phase 0: within-method backward stepping via explicit `Ttd.breakpoint()`
-calls. Single-threaded; deterministic body required.
+Single-threaded; deterministic body required.
+
+- **Phase 0** — programmatic `Ttd.breakpoint()` calls in user code.
+- **Phase 1** — `@TimeTravelBody` annotation + javaagent that
+  auto-instruments every line of the annotated method as an implicit
+  pause point. No source edits beyond the one annotation.
 
 ## Use
+
+### Phase 0 — explicit breakpoints
 
 ```java
 import edu.neu.ccs.prl.crochet.ttd.Ttd;
@@ -39,6 +45,46 @@ Run with the Crochet agent attached:
 ```bash
 java -javaagent:crochet-agent.jar --add-reads java.base=jdk.unsupported MyDebugSession
 ```
+
+### Phase 1 — auto-instrumented every-line stepping
+
+```java
+import edu.neu.ccs.prl.crochet.ttd.Ttd;
+import edu.neu.ccs.prl.crochet.ttd.TimeTravelBody;
+
+class MyDebugSession {
+    static final class State { int value; String tag; }
+
+    @TimeTravelBody
+    static void instrumentedBody(State state) {
+        state.value = 1;        // line marker fires here
+        state.tag = "first";    // line marker fires here
+        state.value = 2;        // line marker fires here
+        state.tag = "second";   // line marker fires here
+    }
+
+    static void main(String[] args) {
+        State state = new State();
+        Ttd.session(state, () -> instrumentedBody(state));
+    }
+}
+```
+
+Run with BOTH agents (TTD first so it transforms before Crochet sees the bytecode):
+
+```bash
+java -javaagent:crochet-ttd.jar \
+     -javaagent:crochet-agent.jar \
+     --add-reads java.base=jdk.unsupported \
+     MyDebugSession
+```
+
+The TTD agent inserts a `Ttd.lineHit` call at every entry in the
+method's `LineNumberTable`. The REPL announces `at step N
+ClassName.method(desc):line` instead of the Phase-0 `at breakpoint K`.
+Outside a `Ttd.session`, `lineHit` is a silent no-op so production
+code (or other tests) loaded with the TTD agent attached pays only
+the cost of a static call per line.
 
 At each `Ttd.breakpoint()` the REPL takes over:
 

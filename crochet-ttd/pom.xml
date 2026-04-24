@@ -15,9 +15,10 @@
 
     <description>
         Time-travel debugger primitive built on Crochet's checkpoint/rollback.
-        Phase 0: within-method backward stepping via Ttd.session() +
-        explicit Ttd.breakpoint() calls. Single-threaded; deterministic
-        body required (no currentTimeMillis, Random, IO).
+        Phase 0: programmatic Ttd.breakpoint() in user code.
+        Phase 1: @TimeTravelBody annotation + javaagent that auto-instruments
+        each source line as an implicit pause point. Single-threaded;
+        deterministic body required (no currentTimeMillis, Random, IO).
     </description>
 
     <dependencies>
@@ -25,6 +26,10 @@
             <groupId>edu.neu.ccs.prl.crochet</groupId>
             <artifactId>crochet-agent</artifactId>
             <version>${project.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.ow2.asm</groupId>
+            <artifactId>asm</artifactId>
         </dependency>
         <dependency>
             <groupId>org.junit.jupiter</groupId>
@@ -36,9 +41,47 @@
     <build>
         <plugins>
             <plugin>
+                <artifactId>maven-jar-plugin</artifactId>
+                <configuration>
+                    <archive>
+                        <manifestEntries>
+                            <Premain-Class>edu.neu.ccs.prl.crochet.ttd.TtdAgent</Premain-Class>
+                            <Agent-Class>edu.neu.ccs.prl.crochet.ttd.TtdAgent</Agent-Class>
+                            <Can-Redefine-Classes>true</Can-Redefine-Classes>
+                            <Can-Retransform-Classes>true</Can-Retransform-Classes>
+                        </manifestEntries>
+                    </archive>
+                </configuration>
+            </plugin>
+            <plugin>
+                <artifactId>maven-shade-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>shade</goal>
+                        </goals>
+                        <configuration>
+                            <createDependencyReducedPom>false</createDependencyReducedPom>
+                            <relocations>
+                                <relocation>
+                                    <pattern>org.objectweb.asm</pattern>
+                                    <shadedPattern>edu.neu.ccs.prl.crochet.ttd.shaded.asm</shadedPattern>
+                                </relocation>
+                            </relocations>
+                            <artifactSet>
+                                <includes>
+                                    <include>org.ow2.asm:*</include>
+                                </includes>
+                            </artifactSet>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
                 <artifactId>maven-surefire-plugin</artifactId>
                 <configuration>
-                    <argLine>-javaagent:${project.basedir}/../crochet-agent/target/crochet-agent-${project.version}.jar --add-reads java.base=jdk.unsupported</argLine>
+                    <argLine>-javaagent:${project.basedir}/target/crochet-ttd-${project.version}.jar -javaagent:${project.basedir}/../crochet-agent/target/crochet-agent-${project.version}.jar --add-reads java.base=jdk.unsupported</argLine>
                 </configuration>
             </plugin>
         </plugins>

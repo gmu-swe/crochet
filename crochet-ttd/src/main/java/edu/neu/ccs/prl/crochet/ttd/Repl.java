@@ -57,8 +57,13 @@ public final class Repl {
      * @return user's chosen action
      */
     Action prompt(Ttd.TtdContext ctx, boolean atEnd) {
-        out.printf("[ttd] at breakpoint %d%s%n", ctx.currentIdx,
-                atEnd ? " (end of body)" : "");
+        String suffix = atEnd ? " (end of body)" : "";
+        if (ctx.currentLineCtx != null) {
+            out.printf("[ttd] at step %d  %s%s%n",
+                    ctx.currentIdx, ctx.currentLineCtx, suffix);
+        } else {
+            out.printf("[ttd] at breakpoint %d%s%n", ctx.currentIdx, suffix);
+        }
         out.flush();
         while (true) {
             out.print("(ttd) ");
@@ -115,8 +120,14 @@ public final class Repl {
                         printRoot(ctx.root);
                         continue;
                     case "w": case "where":
-                        out.printf("[ttd] breakpoint %d%s%n", ctx.currentIdx,
-                                atEnd ? " (end of body)" : "");
+                        if (ctx.currentLineCtx != null) {
+                            out.printf("[ttd] step %d  %s%s%n",
+                                    ctx.currentIdx, ctx.currentLineCtx,
+                                    atEnd ? " (end of body)" : "");
+                        } else {
+                            out.printf("[ttd] breakpoint %d%s%n", ctx.currentIdx,
+                                    atEnd ? " (end of body)" : "");
+                        }
                         continue;
                     case "q": case "quit":
                         return Action.quit();
