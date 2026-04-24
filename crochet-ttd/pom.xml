@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>edu.neu.ccs.prl.crochet</groupId>
+        <artifactId>crochet-parent</artifactId>
+        <version>2.0.0-SNAPSHOT</version>
+    </parent>
+
+    <artifactId>crochet-ttd</artifactId>
+    <packaging>jar</packaging>
+
+    <description>
+        Time-travel debugger primitive built on Crochet's checkpoint/rollback.
+        Phase 0: within-method backward stepping via Ttd.session() +
+        explicit Ttd.breakpoint() calls. Single-threaded; deterministic
+        body required (no currentTimeMillis, Random, IO).
+    </description>
+
+    <dependencies>
+        <dependency>
+            <groupId>edu.neu.ccs.prl.crochet</groupId>
+            <artifactId>crochet-agent</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <configuration>
+                    <argLine>-javaagent:${project.basedir}/../crochet-agent/target/crochet-agent-${project.version}.jar --add-reads java.base=jdk.unsupported</argLine>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
+</project>
