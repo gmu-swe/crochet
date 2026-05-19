@@ -1,0 +1,27 @@
+## fastAccess
+4376	java.lang.Thread$$crochetFast/0x00000008000c4c00
+
+## sfHelperFor
+2945004	H2OSnapBench
+15	java.lang.Thread
+7	jdk.internal.loader.ClassLoaders$AppClassLoader
+7	java.lang.ref.Finalizer$FinalizerThread
+7	java.lang.ref.Reference$ReferenceHandler
+3	jdk.internal.misc.InnocuousThread
+3	java.lang.ref.Reference$ReferenceHandler$$crochetFast/0x00000008000c5400
+3	jdk.internal.loader.ClassLoaders$AppClassLoader$$crochetFast/0x00000008000c6800
+3	java.lang.ref.Finalizer$FinalizerThread$$crochetFast/0x00000008000c5c00
+3	java.lang.Thread$$crochetFast/0x00000008000c4c00
+
+## combined
+2945004	H2OSnapBench
+4379	java.lang.Thread$$crochetFast/0x00000008000c4c00
+15	java.lang.Thread
+7	jdk.internal.loader.ClassLoaders$AppClassLoader
+7	java.lang.ref.Finalizer$FinalizerThread
+7	java.lang.ref.Reference$ReferenceHandler
+3	jdk.internal.misc.InnocuousThread
+3	jdk.internal.loader.ClassLoaders$AppClassLoader$$crochetFast/0x00000008000c6800
+3	java.lang.ref.Reference$ReferenceHandler$$crochetFast/0x00000008000c5400
+3	java.lang.ref.Finalizer$FinalizerThread$$crochetFast/0x00000008000c5c00
+

@@ -1,0 +1,12 @@
+## fastAccess
+2381	java.util.HashMap$Node$$crochetFast/0x00000008000c5c00
+40	java.util.HashMap$$crochetFast/0x00000008000c4000
+
+## sfHelperFor
+20	java.util.HashMap
+
+## combined
+2381	java.util.HashMap$Node$$crochetFast/0x00000008000c5c00
+40	java.util.HashMap$$crochetFast/0x00000008000c4000
+20	java.util.HashMap
+
