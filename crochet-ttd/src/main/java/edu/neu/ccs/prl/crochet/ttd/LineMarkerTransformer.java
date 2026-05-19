@@ -114,14 +114,12 @@ final class LineMarkerTransformer implements ClassFileTransformer {
     static final String ANNOTATION_DESC = "Ledu/neu/ccs/prl/crochet/ttd/TimeTravelBody;";
 
     /**
-     * Descriptor of {@code Ttd.TTD_ACTIVE_SESSIONS} static field.
-     * Used by the B.4 no-session guard: emits a GETSTATIC + get() + IFEQ skip
-     * around save-frame snippets so array allocation is skipped outside sessions.
+     * Descriptor of {@code Ttd.TTD_GEN} static field (C.1).
+     * Used by the no-session guard: emits a GETSTATIC + LCONST_0 + LCMP + IFEQ skip
+     * around save-frame snippets so array allocation is skipped when no session
+     * has ever fired (TTD_GEN == 0 pristine state).
      */
-    private static final String TTD_ACTIVE_SESSIONS_DESC =
-            "Ljava/util/concurrent/atomic/AtomicInteger;";
-    private static final String ATOMIC_INT_OWNER =
-            "java/util/concurrent/atomic/AtomicInteger";
+    private static final String TTD_GEN_DESC = "J";
 
     /** Name of the synthetic class-init helper emitted at {@code visitEnd()}. */
     static final String REGISTER_ALL_METHOD = "$ttd$registerAll";
@@ -1199,10 +1197,10 @@ final class LineMarkerTransformer implements ClassFileTransformer {
 
                 if (callsiteSp != null) {
                     // Emit the save-frame BEFORE the arg-loading sequence.
-                    // B.4: the shim label (bodyLabel) doubles as the skipSaveLabel —
-                    // when TTD_ACTIVE_SESSIONS == 0 the guard jumps directly to the
-                    // shim label, bypassing save-frame allocs while still executing
-                    // the arg-loads + INVOKE normally.
+                    // C.1: the shim label (bodyLabel) doubles as the skipSaveLabel —
+                    // when TTD_GEN == 0 the guard jumps directly to the shim label,
+                    // bypassing save-frame allocs while still executing the arg-loads
+                    // + INVOKE normally.
                     Label shimLabel = bodyLabels.get(callsiteSp.bci);
                     emitSaveFrameSnippet(callsiteSp, shimLabel);
                     // Emit the shim label (body label) — this is the LOOKUPSWITCH target.
@@ -1216,8 +1214,8 @@ final class LineMarkerTransformer implements ClassFileTransformer {
                     // Place the body label BEFORE the instruction (jump target for restore blocks).
                     mv.visitLabel(bodyLabels.get(lineSp.bci));
                     // Emit save-frame snippet BEFORE the original instruction.
-                    // B.4: use a fresh skip label placed between the save-frame and lineHit
-                    // so that when TTD_ACTIVE_SESSIONS == 0 the save-frame allocs are skipped
+                    // C.1: use a fresh skip label placed between the save-frame and lineHit
+                    // so that when TTD_GEN == 0 the save-frame allocs are skipped
                     // but lineHit still executes (lineHit has its own CTX null-check).
                     Label afterSaveLabel = new Label();
                     emitSaveFrameSnippet(lineSp, afterSaveLabel);
@@ -1252,31 +1250,32 @@ final class LineMarkerTransformer implements ClassFileTransformer {
          * INVOKESTATIC Ttd.saveFrame(int, int, long[], Object[]) : void
          * </pre>
          *
-         * <p><b>B.4 no-session guard:</b> the array allocations ({@code NEWARRAY},
+         * <p><b>C.1 no-session guard:</b> the array allocations ({@code NEWARRAY},
          * {@code ANEWARRAY}) and the {@code saveFrame} call are wrapped in a
-         * {@code TTD_ACTIVE_SESSIONS == 0} early-exit:
+         * {@code TTD_GEN == 0} early-exit:
          * <pre>
-         * GETSTATIC Ttd.TTD_ACTIVE_SESSIONS
-         * INVOKEVIRTUAL AtomicInteger.get() : int
-         * IFEQ skip_save_frame        ← jump if no session active
+         * GETSTATIC Ttd.TTD_GEN         ← long on stack
+         * LCONST_0
+         * LCMP                           ← int result (0 if equal)
+         * IFEQ skip_save_frame           ← jump if TTD_GEN == 0 (no session ever fired)
          * [array allocs + saveFrame]
          * skip_save_frame:
          * </pre>
-         * This prevents array allocation on the no-session hot path.  The guard
-         * executes before {@code NEWARRAY}/{@code ANEWARRAY}, so the arrays are
-         * never created when {@code TTD_ACTIVE_SESSIONS == 0}.
+         * This prevents array allocation on the no-session pristine hot path.
+         * The guard executes before {@code NEWARRAY}/{@code ANEWARRAY}, so the
+         * arrays are never created when {@code TTD_GEN == 0}.
          *
          * @param sp            the save point to emit
-         * @param skipSaveLabel the label to jump to when {@code TTD_ACTIVE_SESSIONS == 0};
+         * @param skipSaveLabel the label to jump to when {@code TTD_GEN == 0};
          *                      the caller places this label after the snippet to allow
          *                      fall-through in the session-active case
          */
         private void emitSaveFrameSnippet(SavePoint sp, Label skipSaveLabel) {
-            // B.4 no-session guard: GETSTATIC + get() + IFEQ skip.
+            // C.1 no-session guard: GETSTATIC TTD_GEN (J) + LCONST_0 + LCMP + IFEQ skip.
             mv.visitFieldInsn(Opcodes.GETSTATIC, TTD_OWNER,
-                    "TTD_ACTIVE_SESSIONS", TTD_ACTIVE_SESSIONS_DESC);
-            mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, ATOMIC_INT_OWNER,
-                    "get", "()I", false);
+                    "TTD_GEN", TTD_GEN_DESC);
+            mv.visitInsn(Opcodes.LCONST_0);
+            mv.visitInsn(Opcodes.LCMP);
             mv.visitJumpInsn(Opcodes.IFEQ, skipSaveLabel);
 
             // C.2: GETSTATIC $$ttd$mid$N replaces LDC + INVOKESTATIC internMethodId.

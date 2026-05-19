@@ -15,7 +15,7 @@ import org.junit.jupiter.api.Test;
  * <p>Each test:
  * <ol>
  *   <li>Runs a {@link TimeTravelBody}-annotated method with
- *       {@link Ttd#TTD_ACTIVE_SESSIONS}{@code = 1} so that
+ *       {@link Ttd#TTD_GEN} set to an odd value so that
  *       {@link Ttd#saveFrame} actually pushes frames.</li>
  *   <li>Collects all pushed {@link ResumeFrame} objects via
  *       {@link Ttd#testPeekDeque()} — the TAIL frame corresponds to the
@@ -67,13 +67,14 @@ class CpsDispatchRoundtripTest {
         COUNTER = 0;
         Ttd.testClearDeque();
         // Activate session so saveFrame / popResumeFrame take the live path.
-        Ttd.TTD_ACTIVE_SESSIONS.set(1);
+        // TTD_GEN must be odd (1) to simulate an active session.
+        Ttd.testSetTtdGen(1L);
     }
 
     @AfterEach
     void teardown() {
         Ttd.testClearDeque();
-        Ttd.TTD_ACTIVE_SESSIONS.set(0);
+        Ttd.testSetTtdGen(0L);
     }
 
     // =========================================================================
