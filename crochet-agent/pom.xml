@@ -98,7 +98,7 @@
                             <relocations>
                                 <relocation>
                                     <pattern>org.objectweb.asm</pattern>
-                                    <shadedPattern>net.jonbell.crochet.agent.shaded.asm</shadedPattern>
+                                    <shadedPattern>edu.neu.ccs.prl.crochet.agent.shaded.asm</shadedPattern>
                                 </relocation>
                             </relocations>
                         </configuration>
