@@ -65,6 +65,15 @@ public final class FieldAccessWrapper extends ClassVisitor {
     static final String INSTRUMENTED_INTERNAL = "net/jonbell/crochet/runtime/CRIJInstrumented";
 
     /**
+     * Name of the F.1 dirty-bit field injected by {@link FieldAdder}. The PUTFIELD
+     * pre-hook sets this to {@code 1} on the receiver <em>before</em> calling
+     * {@code $$crochetAccess()} so that any concurrent {@code fastAccess} call that
+     * reads the dirty-bit under the stripe lock observes {@code dirty == 1} and
+     * materializes a shadow rather than incorrectly skipping.
+     */
+    static final String DIRTY_FIELD = FieldAdder.DIRTY_FIELD;
+
+    /**
      * Per-owner-name cache of "is this fOwner a type that cannot host an
      * instance {@code $$crochetAccess} method?" (i.e. interface / enum /
      * annotation / module / direct enum-constant subclass). Populated by
@@ -329,6 +338,36 @@ public final class FieldAccessWrapper extends ClassVisitor {
         }
 
         /**
+         * F.1: emit the dirty-bit set for a PUTFIELD receiver.
+         *
+         * <p>On entry the stack top is the receiver reference (1 copy — we will
+         * consume it). On exit the stack top is consumed and nothing is pushed.
+         * The caller must have already DUPed the receiver before this call so
+         * that another copy remains for the subsequent {@link #emitPreHook} call.
+         *
+         * <p>Emits:
+         * <pre>
+         *   INVOKESTATIC CheckpointRollbackAgent.noteDirty(Ljava/lang/Object;)V
+         * </pre>
+         *
+         * which sets {@code $$crochetDirty = 1} on the receiver via its
+         * per-class VarHandle, tolerating null and pre-F.1 classes. The
+         * INVOKESTATIC is cheaper than the inline INSTANCEOF + PUTFIELD
+         * alternative because the noteDirty body is a simple null-check +
+         * VarHandle.set, JIT-inlined to ~4 instructions on the hot path after
+         * the class loader resolves the VersionHandles.dirty handle.
+         *
+         * <p>Timing: this fires BEFORE {@link #emitPreHook}, establishing
+         * the pre-hook timing invariant: "dirty==1 before any concurrent
+         * fastAccess can observe the object" (SOUNDNESS.md §5).
+         */
+        private static void emitDirtySet(MethodVisitor mv) {
+            mv.visitMethodInsn(Opcodes.INVOKESTATIC,
+                    "net/jonbell/crochet/runtime/CheckpointRollbackAgent",
+                    "noteDirty", "(Ljava/lang/Object;)V", false);
+        }
+
+        /**
          * Emit the {@code GETSTATIC VERSION_GATE; IFEQ skip} prefix. Caller
          * supplies the {@code skip} label and emits the pre-hook body between
          * it and the label.
@@ -371,6 +410,13 @@ public final class FieldAccessWrapper extends ClassVisitor {
                     // stack: [..., value, objref]
                     mv.visitInsn(Opcodes.DUP);
                     // stack: [..., value, objref, objref]
+                    // F.1: set dirty bit BEFORE calling $$crochetAccess so that any
+                    // concurrent fastAccess observes dirty==1 and materializes a shadow
+                    // (SOUNDNESS.md §5: pre-hook timing invariant).
+                    emitDirtySet(mv);
+                    // stack: [..., value, objref]
+                    mv.visitInsn(Opcodes.DUP);
+                    // stack: [..., value, objref, objref]
                     emitPreHook(mv, fOwner);
                     // stack: [..., value, objref]
                     mv.visitInsn(Opcodes.SWAP);
@@ -390,6 +436,11 @@ public final class FieldAccessWrapper extends ClassVisitor {
                 emitGatePrefix(mv, skip);
                 // stack: [..., objref, v_hi, v_lo]
                 locals.emitVarInsn(storeOp, slot);
+                // stack: [..., objref]
+                mv.visitInsn(Opcodes.DUP);
+                // stack: [..., objref, objref]
+                // F.1: set dirty bit BEFORE calling $$crochetAccess.
+                emitDirtySet(mv);
                 // stack: [..., objref]
                 mv.visitInsn(Opcodes.DUP);
                 // stack: [..., objref, objref]

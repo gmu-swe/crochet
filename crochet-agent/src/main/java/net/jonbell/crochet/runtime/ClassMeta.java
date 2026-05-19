@@ -78,18 +78,30 @@ public final class ClassMeta {
 
     /**
      * Cached {@link VarHandle} accessors for the injected {@code $$crochetVersion}
-     * field. Resolved via the user class's own {@code $$crochetLookup()} so
-     * that the handle carries private-member access — the field is emitted
-     * {@code ACC_PRIVATE | ACC_SYNTHETIC | ACC_TRANSIENT} and is otherwise
-     * unreachable from outside the class. Published via {@code final} fields
-     * on this immutable holder, so any non-null observation of
+     * and {@code $$crochetDirty} fields. Resolved via the user class's own
+     * {@code $$crochetLookup()} so that the handles carry private-member access —
+     * both fields are emitted {@code ACC_PRIVATE | ACC_SYNTHETIC | ACC_TRANSIENT}
+     * and are otherwise unreachable from outside the class. Published via
+     * {@code final} fields on this immutable holder, so any non-null observation of
      * {@link ClassMeta#versionHandles} guarantees all slots are fully initialised.
+     *
+     * <p>The {@code dirty} VarHandle backs the F.1 dirty-bit optimization.
+     * {@code $$crochetDirty} is set to 1 by the PUTFIELD pre-hook (in
+     * {@code FieldAccessWrapper}) and read/cleared by {@code FastProxySupport.fastAccess}
+     * under the stripe lock. Volatile access semantics on the read side (via
+     * {@link VarHandle#getVolatile}) pair with the stripe-lock release-acquire to
+     * establish happens-before between the dirty-bit clear at one checkpoint and the
+     * dirty-bit read at the next checkpoint.
      */
     public static final class VersionHandles {
         public final VarHandle version;
+        /** VarHandle for {@code $$crochetDirty} (F.1 dirty-bit). May be null if the
+         *  user class predates F.1 instrumentation (fallback: treat as always dirty). */
+        public final VarHandle dirty;
 
-        VersionHandles(VarHandle version) {
+        VersionHandles(VarHandle version, VarHandle dirty) {
             this.version = version;
+            this.dirty = dirty;
         }
     }
 
@@ -272,7 +284,18 @@ public final class ClassMeta {
             try {
                 MethodHandles.Lookup lookup = resolveLookup();
                 VarHandle vh = lookup.findVarHandle(userClass, "$$crochetVersion", int.class);
-                h = new VersionHandles(vh);
+                // F.1: also resolve $$crochetDirty if present. Classes instrumented
+                // before F.1 (or classes that failed dirty-field injection) will not have
+                // this field; we tolerate that by storing null and treating dirty as
+                // "always dirty" at checkpoint time (safe fallback — just no optimization).
+                VarHandle dirtyVh = null;
+                try {
+                    dirtyVh = lookup.findVarHandle(userClass, "$$crochetDirty", int.class);
+                } catch (NoSuchFieldException ignored) {
+                    // Pre-F.1 class or special class that didn't get the dirty field.
+                    // dirtyVh stays null; fastAccess will treat dirty as 1 (always shadow).
+                }
+                h = new VersionHandles(vh, dirtyVh);
                 versionHandles = h;
                 return h;
             } catch (NoSuchFieldException | IllegalAccessException e) {
