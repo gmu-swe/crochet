@@ -13,25 +13,30 @@ import java.util.Set;
  * Java side knows the native is available.
  *
  * <p>When engaged, {@link #iterateAndCheckpoint(int, Class[])} suspends all
- * mutator threads ({@code SuspendThreadList}), then calls
- * {@code $$crochetCheckpoint(v)} on every live {@link CRIJInstrumented}
- * instance in the heap (via {@code IterateThroughHeapInstance} per class),
- * then resumes threads. Because the heap is frozen during the walk, no
+ * mutator threads ({@code SuspendThreadList}), then checkpoints every live
+ * {@link CRIJInstrumented} instance in the heap using a two-phase algorithm,
+ * then resumes threads. Because the heap is frozen during the entire walk, no
  * torn-snap scenario is possible — every instance is checkpointed at a
  * coherent moment in time.
+ *
+ * <p><b>Two-phase algorithm</b> (see {@code designs/E.1/SOUNDNESS.md §9}):
+ * <ul>
+ *   <li><b>Phase A</b> — inside {@code IterateOverInstancesOfClass} callbacks:
+ *       the heap callback only <em>tags</em> matching instances. No JNI calls
+ *       are made here; the JVMTI spec forbids {@code CallVoidMethod} from
+ *       within a {@code jvmtiHeapObjectCallback}.
+ *   <li><b>Phase B</b> — outside any callback but still inside the STW window,
+ *       on the iteration thread: {@code GetObjectsWithTags(...)} retrieves a
+ *       stable {@code jobject[]} of all tagged instances, then the iteration
+ *       thread loops calling
+ *       {@code env->CallVoidMethod(obj, $$crochetCheckpointMethodID, V)} on
+ *       each one.
+ * </ul>
  *
  * <p>When not engaged (native not loaded), {@link #checkpointWorldSafe(int)}
  * falls back to {@link CheckpointRollbackAgent#checkpointAll()} after emitting
  * a structured warning. See the fallback decision documented in
  * {@code designs/E.1/SOUNDNESS.md §8}.
- *
- * <p><b>Architecture note:</b> unlike {@link StackRoots} (which returns an
- * {@code Object[]} and then iterates in Java), {@code HeapWalker} calls
- * {@code $$crochetCheckpoint} directly from the native callback. This is
- * because the set of instances may be large (all live objects) and building
- * a Java array for them would require prohibitive heap allocation during the
- * STW window. Instead, each callback invocation makes a JNI
- * {@code CallVoidMethod} to {@code $$crochetCheckpoint(v)}.
  *
  * @see StackRoots
  * @see CheckpointRollbackAgent#checkpointAll()
@@ -64,14 +69,18 @@ public final class HeapWalker {
     }
 
     /**
-     * STW heap iteration + checkpoint. Suspends all threads, calls
-     * {@code $$crochetCheckpoint(v)} on every live {@link CRIJInstrumented}
-     * instance in the heap, then resumes threads.
+     * STW heap iteration + checkpoint. Suspends all threads, runs a two-phase
+     * heap walk (Phase A: tag via {@code IterateOverInstancesOfClass}; Phase B:
+     * call {@code $$crochetCheckpoint(v)} via {@code GetObjectsWithTags} +
+     * {@code CallVoidMethod}), then resumes threads.
      *
      * <p>The {@code classes} argument is the snapshot of all known
      * {@link CRIJInstrumented} classes to iterate. Passing an empty array is
      * safe but produces no checkpoints. The native implementation calls
-     * {@code IterateThroughHeapInstance} once per class.
+     * {@code IterateOverInstancesOfClass} once per class in Phase A (tagging
+     * only), then retrieves all tagged instances via {@code GetObjectsWithTags}
+     * and calls {@code $$crochetCheckpoint(V)} on each in Phase B. See
+     * {@code designs/E.1/SOUNDNESS.md §9} for the full algorithm.
      *
      * <p>Returns {@code true} on success, {@code false} if the native call
      * reported an error (threads are always resumed before returning regardless
@@ -137,10 +146,10 @@ public final class HeapWalker {
                     // classes AND their fast-proxy variants (the klass swap
                     // happens in-place, so the runtime klass of an object
                     // currently in Fast-proxy mode is the proxy klass). The
-                    // native side handles this by filtering via
-                    // IterateThroughHeapInstance with the proxy klass as well
-                    // when it is passed; Java-side we pass both so neither is
-                    // missed.
+                    // native side handles this by calling
+                    // IterateOverInstancesOfClass with both the user klass and
+                    // the proxy klass; Java-side we pass both so neither is
+                    // missed (see SOUNDNESS.md §3.4 for the idempotency argument).
                     result.add(c);
                 }
             } catch (Throwable ignored) {
