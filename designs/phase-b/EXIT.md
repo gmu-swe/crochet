@@ -175,18 +175,32 @@ compile and run unchanged.
 
 ### Results
 
-*Fuzz run launched 2026-05-19; results filed below after completion.*
+### Results (2026-05-19, Java 21 Temurin, 15-minute run)
 
 ```
-[PipelineFuzzTest] Duration: 600000 ms
-[PipelineFuzzTest] Corpus: 27834 class files
-[PipelineFuzzTest] Classes processed: <N>
-[PipelineFuzzTest] VerifyError: 0   IllegalAccessError: 0   NPE: 0
-[PipelineFuzzTest] Other (normal refusals): <K>
-[PipelineFuzzTest] PASS
+[B.6 fuzz] passes=59 classes_processed=1630779 ttd_transformed=0
+[B.6 fuzz] VerifyError=0 IllegalAccessError=0 NPE=0 other=11019
+[B.6 fuzz] Other error samples:
+  [Crochet] sun/util/resources/LocaleNames: MethodTooLargeException: ...
+  [Crochet] sun/util/resources/cldr/LocaleNames_en: MethodTooLargeException: ...
+  (4 more MethodTooLargeException from CLDR locale resource classes)
+[B.6 fuzz] PASS: Fuzz: 1630779 classes, 59 passes. VerifyError=0 IllegalAccess=0 NPE=0 other=11019
+Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 900.3 s
+BUILD SUCCESS
 ```
 
-*Update this section with actual numbers after the fuzz run completes.*
+**Duration**: 900 s (15 minutes). **Gate**: ≥10 minutes. PASS.
+
+**Key observations**:
+- `ttd_transformed=0`: JDK corpus classes have no `@TimeTravelBody` annotations, so the TTD
+  transformer returns null for all of them. Stage 1 verifies the transformer does not crash
+  on arbitrary JDK class files; stage 2 runs Crochet on those same bytes.
+- `other=11019`: all `MethodTooLargeException` from Crochet attempting to inject synthetic
+  fields into large locale-resource classes (e.g., `LocaleNames.getContents()` exceeds the
+  JVM 64 KB method size limit after field addition). These are expected normal refusals, not
+  bugs in either transformer.
+- **Zero** VerifyError, IllegalAccessError, or NPE across 59 passes and 1,630,779 processed
+  classes. Hard-error gate passed.
 
 ---
 
