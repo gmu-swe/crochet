@@ -7,6 +7,9 @@ import java.io.PrintStream;
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
 
+import edu.neu.ccs.prl.crochet.ttd.nondet.NondetDivergenceEvent;
+import edu.neu.ccs.prl.crochet.ttd.nondet.NondetRecorder;
+
 /**
  * REPL frontend for {@link Ttd}. Phase 0: line-oriented stdin/stdout.
  *
@@ -41,6 +44,40 @@ public final class Repl {
     /** Default REPL bound to {@link System#in} / {@link System#out}. */
     public static Repl fromStdin() {
         return new Repl(System.in, System.out);
+    }
+
+    /**
+     * Install this REPL's output stream as the nondet divergence handler.
+     * Call once per session; divergence events will be printed to the REPL
+     * output alongside normal REPL output.
+     *
+     * <p>The previous handler is restored by {@link #uninstallDivergenceHandler}.
+     */
+    void installDivergenceHandler() {
+        NondetRecorder.setDivergenceHandler(event -> {
+            out.println("[ttd-nondet] " + event.toString());
+            out.flush();
+        });
+    }
+
+    /**
+     * Restore the default divergence handler (stderr).
+     */
+    void uninstallDivergenceHandler() {
+        NondetRecorder.setDivergenceHandler(
+                event -> System.err.println(event.toString()));
+    }
+
+    /**
+     * Emit a structured nondet divergence event to the REPL output stream.
+     * May be called from outside the prompt loop (e.g., from a recording
+     * session's divergence callback).
+     *
+     * @param event the divergence event to display
+     */
+    public void emitDivergence(NondetDivergenceEvent event) {
+        out.println("[ttd-nondet] " + event.toString());
+        out.flush();
     }
 
     void println(String s) {
