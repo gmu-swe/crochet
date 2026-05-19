@@ -64,7 +64,7 @@ INST_JDK=/path/to/other-jdk bash run-all.sh --instrumented
 
 Four reactor modules (see top-level `pom.xml`):
 
-- **`crochet-agent`** — runtime support (`net.jonbell.crochet.runtime.*`) + bytecode pipeline (`net.jonbell.crochet.transform.*`) + `java.lang.instrument` agent (`net.jonbell.crochet.agent.*`). Shaded uber-jar relocates ASM into `net.jonbell.crochet.agent.shaded.asm`. The SAME jar is attached via `-javaagent` at runtime and packed into `java.base` at jlink time.
+- **`crochet-agent`** — runtime support (`net.jonbell.crochet.runtime.*`) + bytecode pipeline (`net.jonbell.crochet.transform.*`) + `java.lang.instrument` agent (`net.jonbell.crochet.agent.*`). Shaded uber-jar relocates ASM into `edu.neu.ccs.prl.crochet.agent.shaded.asm`. The SAME jar is attached via `-javaagent` at runtime and packed into `java.base` at jlink time.
 - **`crochet-instrument`** — jlink-plugin wrapper that invokes the agent's transformer on every `.class` in the base JDK image, then packs the runtime classes into `java.base`. Runnable via `java -jar crochet-instrument-*.jar $JAVA_HOME <out>`. Ports `InstrumentJLinkPlugin` + `PackJLinkPlugin` from Galette (credits in `PORT_NOTES.md`).
 - **`crochet-maven-plugin`** — Maven wrapper around the same instrumenter, for projects that want it as a build step.
 - **`crochet-integration-tests`** — Failsafe / Surefire integration tests.
