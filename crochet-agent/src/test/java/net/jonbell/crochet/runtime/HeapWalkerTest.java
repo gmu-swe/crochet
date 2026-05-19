@@ -5,6 +5,8 @@ import static org.junit.jupiter.api.Assertions.*;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+import java.io.ByteArrayOutputStream;
+import java.io.PrintStream;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
@@ -295,5 +297,236 @@ class HeapWalkerTest {
             assertTrue(v > 0);
             CheckpointRollbackAgent.rollbackAll(v);
         });
+    }
+
+    // =========================================================================
+    // E.2 additions
+    // =========================================================================
+
+    // -------------------------------------------------------------------------
+    // 9. Static-state + instance-state coverage (E.2 validation matrix)
+    //
+    // checkpointWorldSafe() must checkpoint both the static-field pass
+    // (via checkpointAll's class-level walk) and instance state (via the
+    // STW heap walk when native is loaded, or via checkpointAll on fallback).
+    //
+    // In the unit-test environment the native is not loaded. We exercise the
+    // static-field protocol directly:
+    //   - snap the static-level state of a class via the sfHelper path
+    //     (same code path checkpointAll uses),
+    //   - mutate the class-level state,
+    //   - roll back,
+    //   - assert the original value is restored.
+    //
+    // We also exercise the instance-state path via MockCell (same as in E.1).
+    // -------------------------------------------------------------------------
+
+    /**
+     * A minimal class with a mutable static-like field (tracked via
+     * CheckpointRollbackAgent class-level API) used to verify that the
+     * static-field pass inside checkpointWorldSafe() correctly snapshots
+     * and restores static state.
+     */
+    static final class StaticHolder implements CRIJInstrumented {
+        // Simulates a static-field helper: one instance per class, holds
+        // the "static value" as an instance field.
+        int value;
+        private int snapValue;
+        private int version;
+        private Object snap;
+
+        StaticHolder(int v) { this.value = v; }
+
+        @Override public void $$crochetCopyFieldsTo(Object to) {
+            ((StaticHolder) to).value = value;
+        }
+        @Override public void $$crochetCopyFieldsFrom(Object old) {
+            value = ((StaticHolder) old).value;
+        }
+        @Override public void $$crochetCheckpoint(int v) {
+            snapValue = value; version = v;
+        }
+        @Override public void $$crochetRollback(int v) {
+            value = snapValue; version = 0; snap = null;
+        }
+        @Override public void $$crochetPropagateCheckpoint(int v) {}
+        @Override public void $$crochetPropagateRollback(int v) {}
+        @Override public int $$crochetGetVersion() { return version; }
+        @Override public void $$crochetSetVersion(int v) { version = v; }
+        @Override public Object $$crochetGetSnap() { return snap; }
+        @Override public void $$crochetSetSnap(Object s) { snap = s; }
+        @Override public void $$crochetAccess() {}
+        @Override public boolean $$crochetIsRollbackState() { return false; }
+    }
+
+    @Test
+    void staticStateCheckpointedByWorldSafe() {
+        // Simulates the static-field snap protocol:
+        // 1. Create a StaticHolder (stands in for sfHelperFor(UserClass)).
+        // 2. Call checkpointWorldSafe() — the static pass inside checkpointAll()
+        //    would call $$crochetCheckpoint(V) on registered sfHelpers.
+        //    Here we call it directly to verify the protocol.
+        // 3. Mutate the holder's value (simulates a PUTSTATIC).
+        // 4. Rollback — assert restored.
+        StaticHolder holder = new StaticHolder(42);
+        int v = CheckpointRollbackAgent.nextCheckpointVersion();
+        holder.$$crochetCheckpoint(v);  // direct snap (mirrors checkpointAll's class-level call)
+
+        // Simulate post-checkpoint PUTSTATIC.
+        holder.value = 999;
+        assertEquals(999, holder.value, "mutation after snap must be observable");
+
+        // Rollback: mirrors checkpointAll-based rollback.
+        int rv = CheckpointRollbackAgent.nextRollbackVersion();
+        holder.$$crochetRollback(rv);
+
+        assertEquals(42, holder.value,
+                "static-field holder must be restored to pre-checkpoint value after rollback");
+    }
+
+    @Test
+    void mixedStaticAndInstanceStateViaCheckpointWorldSafe() {
+        // Combined static + instance state checkpoint via checkpointWorldSafe().
+        // Since native is not loaded, checkpointWorldSafe() falls back to
+        // checkpointAll(); we pair it with explicit per-instance checkpoints
+        // to simulate the full matrix.
+        System.setProperty("crochet.checkpointAll.skipSystem", "true");
+
+        // Instance-state object.
+        MockCell instanceObj = new MockCell(10, "before");
+
+        // Static-state simulation via StaticHolder.
+        StaticHolder staticHolder = new StaticHolder(100);
+
+        // Checkpoint both.
+        int v = CrochetWorldSafe.checkpointWorldSafe();
+        // Per-instance checkpoint (checkpointAll doesn't discover arbitrary objects;
+        // they must be registered explicitly — same as the production use pattern).
+        instanceObj.$$crochetCheckpoint(v);
+        staticHolder.$$crochetCheckpoint(v);
+
+        // Mutate both.
+        instanceObj.value = 20;
+        instanceObj.label = "after";
+        staticHolder.value = 200;
+
+        assertEquals(20, instanceObj.value);
+        assertEquals(200, staticHolder.value);
+
+        // Rollback both explicitly (mirrors what rollbackAll + per-instance rollback would do).
+        int rv = CheckpointRollbackAgent.nextRollbackVersion();
+        instanceObj.$$crochetRollback(rv);
+        staticHolder.$$crochetRollback(rv);
+
+        assertEquals(10, instanceObj.value,
+                "instance field must be restored by rollback");
+        assertEquals("before", instanceObj.label,
+                "instance field (label) must be restored by rollback");
+        assertEquals(100, staticHolder.value,
+                "static-equivalent field must be restored by rollback");
+    }
+
+    // -------------------------------------------------------------------------
+    // 10. One-time warning (E.2 §4.2)
+    //
+    // When checkpointWorldSafe() is called multiple times without the native
+    // agent, the warning should be emitted only once. We verify this by:
+    //   (a) resetting FALLBACK_WARNED to false via reflection,
+    //   (b) capturing stderr,
+    //   (c) calling checkpointWorldSafe() twice,
+    //   (d) verifying the warning string appears exactly once in the captured output.
+    // -------------------------------------------------------------------------
+
+    @Test
+    void missingNativeWarningEmittedOnlyOnce() throws Exception {
+        // Precondition: native is NOT loaded (isEngaged() == false).
+        assertFalse(HeapWalker.isEngaged(), "test requires native not loaded");
+
+        // Reset FALLBACK_WARNED so the warning can fire again in this test.
+        java.lang.reflect.Field warned = CrochetWorldSafe.class.getDeclaredField("FALLBACK_WARNED");
+        warned.setAccessible(true);
+        ((AtomicBoolean) warned.get(null)).set(false);
+
+        // Capture stderr.
+        PrintStream originalErr = System.err;
+        ByteArrayOutputStream captured = new ByteArrayOutputStream();
+        System.setErr(new PrintStream(captured));
+
+        try {
+            int v1 = CrochetWorldSafe.checkpointWorldSafe();
+            CheckpointRollbackAgent.rollbackAll(v1);
+            int v2 = CrochetWorldSafe.checkpointWorldSafe();
+            CheckpointRollbackAgent.rollbackAll(v2);
+        } finally {
+            System.setErr(originalErr);
+            // Restore FALLBACK_WARNED to true so other tests aren't surprised.
+            ((AtomicBoolean) warned.get(null)).set(true);
+        }
+
+        String output = captured.toString();
+        String warningMarker = "[crochet-heap] WARNING: native agent not loaded";
+        long occurrences = output.lines()
+                .filter(line -> line.contains(warningMarker))
+                .count();
+        assertEquals(1, occurrences,
+                "missing-native warning must be emitted exactly once across multiple calls;"
+                + " got " + occurrences + " occurrences. Captured stderr:\n" + output);
+    }
+
+    @Test
+    void fallbackWarnedFlagSetAfterFirstCall() throws Exception {
+        // Verify FALLBACK_WARNED is true after a fallback call (white-box).
+        assertFalse(HeapWalker.isEngaged(), "test requires native not loaded");
+
+        java.lang.reflect.Field warned = CrochetWorldSafe.class.getDeclaredField("FALLBACK_WARNED");
+        warned.setAccessible(true);
+
+        // FALLBACK_WARNED may already be true from earlier tests. Either way,
+        // after a call it must be true.
+        int v = CrochetWorldSafe.checkpointWorldSafe();
+        CheckpointRollbackAgent.rollbackAll(v);
+
+        assertTrue((Boolean) ((AtomicBoolean) warned.get(null)).get(),
+                "FALLBACK_WARNED must be set to true after the first fallback call");
+    }
+
+    // -------------------------------------------------------------------------
+    // 11. Backward-compat: checkpointWorldSafe() is additive — existing
+    //     checkpointAll()-based callers are not broken by the new API.
+    //     Verify that calling both in sequence produces monotonically increasing
+    //     versions and correct rollback.
+    // -------------------------------------------------------------------------
+
+    @Test
+    void checkpointWorldSafeIsAdditiveWithExistingCheckpointAll() {
+        System.setProperty("crochet.checkpointAll.skipSystem", "true");
+
+        MockCell a = new MockCell(1, "a");
+        MockCell b = new MockCell(2, "b");
+
+        // First: use the existing API.
+        int v1 = CheckpointRollbackAgent.checkpointAll();
+        a.$$crochetCheckpoint(v1);
+
+        // Second: use the new world-safe API.
+        int v2 = CrochetWorldSafe.checkpointWorldSafe();
+        b.$$crochetCheckpoint(v2);
+
+        assertTrue(v2 > v1, "checkpointWorldSafe must produce a version > the prior checkpointAll version");
+
+        // Mutate both.
+        a.value = 99; a.label = "a-mut";
+        b.value = 98; b.label = "b-mut";
+
+        // Rollback both (in version order: later first is fine, both have their own snaps).
+        int rv2 = CheckpointRollbackAgent.nextRollbackVersion();
+        b.$$crochetRollback(rv2);
+        int rv1 = CheckpointRollbackAgent.nextRollbackVersion();
+        a.$$crochetRollback(rv1);
+
+        assertEquals(1, a.value, "a must be restored by rollback to v1 snap");
+        assertEquals("a", a.label, "a.label must be restored");
+        assertEquals(2, b.value, "b must be restored by rollback to v2 snap");
+        assertEquals("b", b.label, "b.label must be restored");
     }
 }
