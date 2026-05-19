@@ -150,9 +150,14 @@ emitted.** For line-marker save points, this is guaranteed by the Java
 compiler: the stack is empty at statement boundaries (which is where line
 numbers are emitted). For callsite save points, the save-frame is emitted at
 `argStartBci`, which is the instruction immediately before the argument-loading
-sequence. At this point the stack is also empty, because `argStartBci` is the
-BCI of the first arg-loading instruction — which by definition has nothing
-below it on the stack (the argument sequence starts from an empty stack).
+sequence. At this point the stack is also empty; this is enforced by the
+`argBase > 0` guard: any INVOKE where `stackAtInvoke.length > totalSlots`
+(i.e., values sit below the arg frame on the stack) is **silently excluded**
+from the save-point set rather than producing a save-frame at a non-empty
+stack position. Excluding such callsites does not throw at instrumentation
+time; a one-time `WARN` is emitted per method. This is consistent with the
+policy for other non-reconstructible callsites: the method still keeps all
+save points at other BCIs, so partial coverage is better than a hard failure.
 
 **Claim (a) — packing preserves all live values.**
 
@@ -486,15 +491,17 @@ effectively deterministic.
    Phase B limits the practical depth to a few dozen frames; E.2 will address
    tail-call optimization if needed.
 
-4. **Args inline-computed at callsite → refused at instrumentation time (silent
-   skip).** Callsites whose arguments are computed by inline expressions (e.g.,
+4. **Args inline-computed at callsite → silently excluded from save-point set.**
+   Callsites whose arguments are computed by inline expressions (e.g.,
    `f(g() + 1)` where `g()`'s return is used directly, or `f(a + b)` with
-   arithmetic) are silently excluded from the callsite save-point set.  These
-   calls can still be reached on forward paths; they just cannot be resume
-   targets.  The user cannot back-step to the exact moment just before such a
-   call.  *Mitigation:* in practice, `javac -g` stores local variable values
-   before most calls for debuggability, so the majority of real-world callsites
-   are reconstructible.
+   arithmetic, or any INVOKE where `argBase > 0`) are silently excluded from
+   the callsite save-point set rather than throwing at instrumentation time.
+   A one-time `WARN` is emitted per method when at least one callsite is
+   skipped, regardless of `-Dcrochet.ttd.debug`.  These calls can still be
+   reached on forward paths; they just cannot be resume targets.  The user
+   cannot back-step to the exact moment just before such a call.  *Mitigation:*
+   in practice, `javac -g` stores local variable values before most calls for
+   debuggability, so the majority of real-world callsites are reconstructible.
 
 5. **Interaction with `@CrochetSkip`.** If a `@TimeTravelBody` method is also
    effectively skipped by Crochet's transformer (because its class is in the
