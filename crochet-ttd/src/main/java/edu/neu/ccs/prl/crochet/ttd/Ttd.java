@@ -69,13 +69,15 @@ public final class Ttd {
      * zero-alloc early-return path in {@link #saveFrame} /
      * {@link #popResumeFrame}".
      *
-     * <p>Incremented on session entry immediately after the session context is
-     * set up; decremented unconditionally in the {@code finally} block so the
-     * counter reaches 0 even if the body throws.
+     * <p>Backed by an {@link AtomicInteger} to prevent lost updates when multiple
+     * threads start sessions concurrently. The public field exposes the backing
+     * {@link AtomicInteger} directly; callers should use {@code .get()} for reads
+     * and should not mutate it except through {@code sessionWithRepl}.
+     * Tests may call {@code .set(0)} to reset the counter after a test.
      *
      * <p>TODO: annotate with {@code @Internal} once unit A.4 merges.
      */
-    public static volatile int TTD_ACTIVE_SESSIONS = 0;
+    public static final AtomicInteger TTD_ACTIVE_SESSIONS = new AtomicInteger(0);
 
     /**
      * Per-thread deque of {@link ResumeFrame} records pushed by
@@ -258,7 +260,7 @@ public final class Ttd {
      * @return mutable snapshot list, innermost frame first; never null
      */
     public static List<StackEntry> captureStack() {
-        if (TTD_ACTIVE_SESSIONS == 0) return new ArrayList<>(0);
+        if (TTD_ACTIVE_SESSIONS.get() == 0) return new ArrayList<>(0);
         ArrayDeque<ResumeFrame> deque = FRAME_DEQUE.get();
         if (deque.isEmpty()) return new ArrayList<>(0);
 
@@ -377,7 +379,7 @@ public final class Ttd {
     public static void saveFrame(int methodId, int bci, long[] prims, Object[] refs) {
         // Zero-alloc early return: guard BEFORE any ThreadLocal.get() or alloc.
         // C.1 will replace this check with a TTD_GEN generation test.
-        if (TTD_ACTIVE_SESSIONS == 0) return;
+        if (TTD_ACTIVE_SESSIONS.get() == 0) return;
         FRAME_DEQUE.get().push(new ResumeFrame(methodId, bci, prims, refs));
     }
 
@@ -405,7 +407,7 @@ public final class Ttd {
      * TODO: annotate with {@code @Internal} once unit A.4 merges.
      */
     public static ResumeFrame popResumeFrame(int methodId) {
-        if (TTD_ACTIVE_SESSIONS == 0) return null;
+        if (TTD_ACTIVE_SESSIONS.get() == 0) return null;
         ArrayDeque<ResumeFrame> deque = FRAME_DEQUE.get();
         ResumeFrame top = deque.peek();
         if (top == null || top.methodId != methodId) return null;
@@ -425,6 +427,36 @@ public final class Ttd {
         ArrayDeque<ResumeFrame> deque = FRAME_DEQUE.get();
         deque.clear();
         FRAME_DEQUE.remove();
+    }
+
+    // =========================================================================
+    // @VisibleForTesting helpers — package-private, tests only
+    // =========================================================================
+
+    /**
+     * Clear the current thread's resume deque without removing the thread-local.
+     * For use by tests that manage the deque lifecycle manually.
+     */
+    static void testClearDeque() {
+        FRAME_DEQUE.get().clear();
+    }
+
+    /**
+     * Return a snapshot list of all frames currently in the thread-local deque,
+     * HEAD first, for test assertions.  The returned list is a copy; it is
+     * decoupled from the live deque.
+     */
+    static List<ResumeFrame> testPeekDeque() {
+        return new ArrayList<>(FRAME_DEQUE.get());
+    }
+
+    /**
+     * Push a frame directly onto the thread-local deque (HEAD), bypassing the
+     * {@code TTD_ACTIVE_SESSIONS} guard.  For use by tests that need to stage
+     * a resume frame before invoking an instrumented method.
+     */
+    static void testPushFrame(ResumeFrame frame) {
+        FRAME_DEQUE.get().push(frame);
     }
 
     // =========================================================================
@@ -471,8 +503,9 @@ public final class Ttd {
         // Increment active-sessions counter so saveFrame / popResumeFrame
         // take their live paths.  Decremented in the finally block below
         // (normal and exceptional exit).  C.1 will replace this plain counter
-        // with a TTD_GEN generation counter.
-        TTD_ACTIVE_SESSIONS++;
+        // with a TTD_GEN generation counter.  AtomicInteger ensures the
+        // increment/decrement are not lost under concurrent sessions.
+        TTD_ACTIVE_SESSIONS.getAndIncrement();
         try {
             while (true) {
                 ctx.currentIdx = 0;
@@ -503,7 +536,7 @@ public final class Ttd {
             // call races on another thread, clearSessionState is complete before
             // TTD_ACTIVE_SESSIONS drops to 0.
             clearSessionState();
-            TTD_ACTIVE_SESSIONS--;
+            TTD_ACTIVE_SESSIONS.getAndDecrement();
         }
     }
 

@@ -77,9 +77,22 @@ import edu.neu.ccs.prl.crochet.ttd.cps.LivenessAnalyzer.LiveLocal;
  *   <li>An {@code LDC} / {@code ACONST_NULL} / {@code *CONST_*} instruction
  *       (an inline constant).</li>
  * </ul>
- * If any argument fails this test, the callsite is refused: an
- * {@link IllegalStateException} is thrown at instrumentation time naming the
- * offending method, callsite BCI, and argument position.
+ * If any argument fails this test, the callsite is <b>silently excluded</b> from
+ * the save-point set; it is NOT an error. A method with one non-reconstructible
+ * callsite still keeps all its other save points. A one-time {@code WARN}
+ * message is emitted to {@code System.err} per method when at least one callsite
+ * is skipped, <em>regardless</em> of the {@code -Dcrochet.ttd.debug} setting:
+ * <pre>
+ * WARN [Crochet TTD]: @TimeTravelBody method &lt;Owner&gt;.&lt;name&gt;&lt;desc&gt; has &lt;N&gt;
+ *     callsite(s) skipped from save-point set (args not reconstructible from
+ *     locals); back-step from those callsites is not supported
+ * </pre>
+ *
+ * <p>MONITORENTER refusal is different: if a {@link TimeTravelBody} method
+ * contains a {@code MONITORENTER} inside a save-point region, an
+ * {@link IllegalStateException} is thrown at instrumentation time. That
+ * situation means the method cannot be safely instrumented at all — it is not
+ * a per-callsite issue.
  *
  * <p>Methods without the annotation are passed through unchanged. Constructors,
  * static initializers, synthetic methods (lambdas, accessor bridges), abstract
@@ -103,6 +116,16 @@ final class LineMarkerTransformer implements ClassFileTransformer {
     /** Name of the synthetic class-init helper emitted at {@code visitEnd()}. */
     private static final String REGISTER_ALL_METHOD = "$ttd$registerAll";
     private static final String REGISTER_ALL_DESC = "()V";
+
+    /**
+     * Set of fully-qualified method FQNs ({@code "owner.name+desc"}) for which a
+     * callsite-skipped WARN has already been emitted.  Prevents duplicate warnings
+     * when the same class is retransformed or the transformer is applied multiple times.
+     * Uses {@code Boolean.TRUE} as the sentinel value (ConcurrentHashMap does not
+     * support Set semantics directly).
+     */
+    private static final ConcurrentHashMap<String, Boolean> WARNED_METHODS =
+            new ConcurrentHashMap<>();
 
     // -------------------------------------------------------------------------
     // ClassFileTransformer entry point
@@ -457,10 +480,13 @@ final class LineMarkerTransformer implements ClassFileTransformer {
         }
 
         // Second: callsite save points (only when sourceFrames is available).
+        int callsiteCandidateCount = 0; // total non-TTD INVOKE insns considered
+        int callsiteAcceptedCount = 0;  // those that became save points
         if (includeCallsites && sourceFrames != null) {
             bci = 0;
             for (AbstractInsnNode insn : mn.instructions) {
                 if (isNonTtdInvokeInsn(insn) && !usedBcis.contains(bci)) {
+                    callsiteCandidateCount++;
                     // This is a callsite BCI not already used as a line-marker save point.
                     int invokeBci = bci;
                     List<LiveLocal> live = liveness.get(invokeBci);
@@ -495,6 +521,20 @@ final class LineMarkerTransformer implements ClassFileTransformer {
                     // Stack layout: bottommost slot is the deepest (oldest pushed) value.
                     // The top |totalSlots| entries are the args for this INVOKE.
                     int argBase = stackAtInvoke.length - totalSlots;
+
+                    // If argBase > 0, there are stack values BELOW the argument frame at
+                    // the INVOKE bci. The save-frame snippet is inserted at argStartBci
+                    // (the first arg-loading instruction), but if the stack is non-empty
+                    // there, the emitted bytecode fails the verifier (save-frame requires
+                    // an empty operand stack). Silently refuse this callsite.
+                    //
+                    // Example: `ICONST_1; ALOAD_0; INVOKEVIRTUAL hashCode; IADD`
+                    // At the INVOKEVIRTUAL, argBase = 1 (ICONST_1 sits below ALOAD_0).
+                    // The argStartBci is ALOAD_0's bci, but the stack already has [1].
+                    if (argBase > 0) {
+                        bci++;
+                        continue; // silently refuse — consistent with other refusal policies
+                    }
 
                     boolean reconstructible = true;
                     int argStartBciCandidate = invokeBci; // will be min of all arg-producing bcis
@@ -548,8 +588,24 @@ final class LineMarkerTransformer implements ClassFileTransformer {
                     savePoints.add(sp);
                     usedBcis.add(invokeBci);
                     usedArgStartBcis.add(argStartBciCandidate);
+                    callsiteAcceptedCount++;
                 }
                 bci++;
+            }
+        }
+
+        // Emit a one-time WARN per method when callsites were skipped.
+        // This fires regardless of -Dcrochet.ttd.debug (users on default logging
+        // still see the heads-up that some back-step targets are not available).
+        int callsiteSkippedCount = callsiteCandidateCount - callsiteAcceptedCount;
+        if (callsiteSkippedCount > 0) {
+            String methodFqn = ownerInternalName + "." + mn.name + mn.desc;
+            if (WARNED_METHODS.putIfAbsent(methodFqn, Boolean.TRUE) == null) {
+                System.err.println("WARN [Crochet TTD]: @TimeTravelBody method "
+                        + methodFqn + " has " + callsiteSkippedCount
+                        + " callsite(s) skipped from save-point set"
+                        + " (args not reconstructible from locals);"
+                        + " back-step from those callsites is not supported");
             }
         }
 
