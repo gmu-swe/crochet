@@ -111,6 +111,7 @@
                         <configuration>
                             <excludes>
                                 <exclude>**/cps/CorpusLivenessTest.java</exclude>
+<<<<<<< HEAD
                                 <!-- PipelineFuzzTest: long-running; activated via -Pfuzz profile. -->
                                 <exclude>**/PipelineFuzzTest.java</exclude>
                                 <!-- InternedLineConstantsTest belongs to unit C.2
@@ -122,6 +123,11 @@
                                      default-test execution does not run it (the C.2
                                      pom will include it in its own execution). -->
                                 <exclude>**/InternedLineConstantsTest.java</exclude>
+=======
+                                <!-- InternedLineConstantsTest (C.2) is now included
+                                     in this C.3 branch which merges both C.1 and C.2.
+                                     The test is run under the default-test execution. -->
+>>>>>>> origin/unit/C.3-overhead-gate
                             </excludes>
                             <argLine>-Xverify:all -javaagent:${project.basedir}/target/crochet-ttd-${project.version}.jar -javaagent:${project.basedir}/../crochet-agent/target/crochet-agent-${project.version}.jar --add-reads java.base=jdk.unsupported</argLine>
                         </configuration>
@@ -150,6 +156,7 @@
 
     <profiles>
         <!--
+<<<<<<< HEAD
           Fuzz profile: runs PipelineFuzzTest for ≥1 hour against the JDK
           base image corpus. Activate with: mvn -pl crochet-ttd test -Pfuzz
           The default fuzz duration is 60 minutes (3600000 ms). Override with
@@ -182,16 +189,52 @@
                                     <systemPropertyVariables>
                                         <crochet.ttd.fuzzDuration>${crochet.ttd.fuzzDuration}</crochet.ttd.fuzzDuration>
                                     </systemPropertyVariables>
+=======
+          jmh profile: compile src/jmh/java benchmarks into the main jar
+          so they can be run with -cp crochet-ttd-*.jar.
+
+          Activate with: mvn -P jmh package -pl crochet-agent,crochet-ttd
+
+          Then run:
+            JAVA_HOME=/usr/lib/jvm/java-21-openjdk-amd64
+            TTD_JAR=crochet-ttd/target/crochet-ttd-2.0.0-SNAPSHOT.jar
+            AGENT_JAR=crochet-agent/target/crochet-agent-2.0.0-SNAPSHOT.jar
+            $JAVA_HOME/bin/java \
+              -javaagent:$TTD_JAR \
+              -javaagent:$AGENT_JAR \
+              -cp $TTD_JAR \
+              edu.neu.ccs.prl.crochet.ttd.jmh.overhead.OverheadBenchmark
+        -->
+        <profile>
+            <id>jmh</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <artifactId>maven-compiler-plugin</artifactId>
+                        <executions>
+                            <execution>
+                                <id>compile-jmh-benchmarks</id>
+                                <phase>compile</phase>
+                                <goals><goal>compile</goal></goals>
+                                <configuration>
+                                    <compileSourceRoots>
+                                        <compileSourceRoot>${project.basedir}/src/main/java</compileSourceRoot>
+                                        <compileSourceRoot>${project.basedir}/src/jmh/java</compileSourceRoot>
+                                    </compileSourceRoots>
+>>>>>>> origin/unit/C.3-overhead-gate
                                 </configuration>
                             </execution>
                         </executions>
                     </plugin>
                 </plugins>
             </build>
+<<<<<<< HEAD
             <properties>
                 <!-- Default 60-minute fuzz run. Override on command line. -->
                 <crochet.ttd.fuzzDuration>3600000</crochet.ttd.fuzzDuration>
             </properties>
+=======
+>>>>>>> origin/unit/C.3-overhead-gate
         </profile>
     </profiles>
 </project>
