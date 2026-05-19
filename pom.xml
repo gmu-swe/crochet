@@ -21,6 +21,7 @@
         <module>crochet-instrument</module>
         <module>crochet-maven-plugin</module>
         <module>crochet-junit5</module>
+        <module>crochet-ttd</module>
         <module>crochet-integration-tests</module>
     </modules>
 

@@ -6,6 +6,9 @@ import org.objectweb.asm.ClassVisitor;
 import org.objectweb.asm.ClassWriter;
 import org.objectweb.asm.Opcodes;
 
+import net.jonbell.crochet.annotation.Internal;
+
+@Internal
 public class CrochetTransformer {
 
     public static final String RUNTIME_PACKAGE_PREFIX = "net/jonbell/crochet/runtime/";
@@ -17,6 +20,10 @@ public class CrochetTransformer {
     private static final String PATCH_PACKAGE_PREFIX = "net/jonbell/crochet/patch/";
 
     private static final String ANNOTATION_PACKAGE_PREFIX = "net/jonbell/crochet/annotation/";
+
+    /** Descriptor of {@link net.jonbell.crochet.annotation.CrochetSkip}. */
+    static final String CROCHET_SKIP_DESC =
+            "Lnet/jonbell/crochet/annotation/CrochetSkip;";
 
     /** Descriptor of the marker annotation added to every transformed class. */
     public static final String CROCHET_INSTRUMENTED_DESC =
@@ -53,6 +60,14 @@ public class CrochetTransformer {
         ClassReader reader = new ClassReader(classFileBuffer);
         String name = reader.getClassName();
         if (shouldSkip(name)) {
+            return null;
+        }
+        // User-class opt-out via @CrochetSkip: check the class file's own
+        // annotation table and walk the superclass chain. This fires after the
+        // hardcoded shouldSkip list (which already short-circuits for JDK /
+        // framework incompatibilities the user cannot annotate) — the two
+        // mechanisms are ORed together.
+        if (hasSkipAnnotation(classFileBuffer, loader)) {
             return null;
         }
         // Enum classes, interfaces, annotations, and modules reject the
@@ -545,6 +560,106 @@ public class CrochetTransformer {
         @Override
         public AnnotationVisitor visitAnnotation(String descriptor, boolean visible) {
             if (CROCHET_INSTRUMENTED_DESC.equals(descriptor)) {
+                found = true;
+            }
+            return null;
+        }
+    }
+
+    /**
+     * Returns {@code true} if the class (or any of its superclasses, excluding
+     * {@code java.lang.Object}) carries {@code @CrochetSkip}.
+     *
+     * <p>Java's {@link java.lang.annotation.Inherited} meta-annotation is not
+     * used because it operates on the reflective layer and requires the
+     * annotated class to be loaded. The transformer runs before classes are
+     * loaded, so inheritance is implemented explicitly by walking the superclass
+     * chain via class-file resource reads — the same technique used by
+     * {@link SafeClassWriter#superOfUncached}.
+     *
+     * <p>The class file passed as {@code classFileBuffer} is the bytes already
+     * available in the caller (no re-read). For each ancestor we re-read from
+     * the class loader's resource stream. The walk stops at {@code java/lang/Object}
+     * (which can never carry {@code @CrochetSkip} — it lives in the hardcoded
+     * list), at a name that {@link #shouldSkip} would already suppress, or when
+     * the resource stream can't locate the ancestor class file.
+     *
+     * @param classFileBuffer bytes of the class being transformed (non-null)
+     * @param loader          the classloader active at transform time, or
+     *                        {@code null} for the boot loader
+     * @return {@code true} to suppress instrumentation of this class
+     */
+    static boolean hasSkipAnnotation(byte[] classFileBuffer, ClassLoader loader) {
+        // Check the class itself first.
+        if (classFileHasSkipAnnotation(classFileBuffer)) {
+            return true;
+        }
+        // Walk superclasses.
+        ClassReader root = new ClassReader(classFileBuffer);
+        String superName = root.getSuperName();
+        while (superName != null
+                && !superName.equals("java/lang/Object")
+                && !shouldSkip(superName)) {
+            byte[] superBytes = loadClassBytes(superName, loader);
+            if (superBytes == null) {
+                break;
+            }
+            if (classFileHasSkipAnnotation(superBytes)) {
+                return true;
+            }
+            superName = new ClassReader(superBytes).getSuperName();
+        }
+        return false;
+    }
+
+    /**
+     * Checks whether the given raw class-file bytes carry
+     * {@code @CrochetSkip} (RUNTIME-retained, so {@code visible=true}).
+     */
+    private static boolean classFileHasSkipAnnotation(byte[] classBytes) {
+        SkipAnnotationVisitor v = new SkipAnnotationVisitor();
+        new ClassReader(classBytes).accept(
+                v, ClassReader.SKIP_CODE | ClassReader.SKIP_DEBUG | ClassReader.SKIP_FRAMES);
+        return v.found;
+    }
+
+    /**
+     * Loads the raw class-file bytes for {@code internalName} from the given
+     * class loader's resource stream, falling back to the system class loader.
+     * Returns {@code null} if the resource is not found.
+     */
+    private static byte[] loadClassBytes(String internalName, ClassLoader loader) {
+        String resource = internalName + ".class";
+        // Walk the loader chain so user-jar classes and JDK classes both resolve.
+        ClassLoader effective = loader != null ? loader
+                : SafeClassWriter.class.getClassLoader();
+        for (ClassLoader l = effective; l != null; l = l.getParent()) {
+            try (java.io.InputStream in = l.getResourceAsStream(resource)) {
+                if (in != null) {
+                    return in.readAllBytes();
+                }
+            } catch (java.io.IOException ignored) {
+            }
+        }
+        try (java.io.InputStream in = ClassLoader.getSystemResourceAsStream(resource)) {
+            if (in != null) {
+                return in.readAllBytes();
+            }
+        } catch (java.io.IOException ignored) {
+        }
+        return null;
+    }
+
+    private static final class SkipAnnotationVisitor extends ClassVisitor {
+        boolean found;
+
+        SkipAnnotationVisitor() {
+            super(Opcodes.ASM9);
+        }
+
+        @Override
+        public AnnotationVisitor visitAnnotation(String descriptor, boolean visible) {
+            if (CROCHET_SKIP_DESC.equals(descriptor)) {
                 found = true;
             }
             return null;
