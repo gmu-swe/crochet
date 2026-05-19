@@ -290,6 +290,10 @@ public final class CheckpointRollbackAgent {
      */
     public static int checkpointAll() {
         int v = nextCheckpointVersion();
+        // Fire external-state snapshots BEFORE the root walk so hooks see
+        // the pre-checkpoint heap. If any hook throws, the exception
+        // propagates immediately and the root walk is skipped.
+        ExternalStateRegistry.fireSnapshots();
         // Snapshot all root sets before iterating — a new $$crochetAccess
         // from a peer thread can populate TOUCHED_CLASSES mid-iteration
         // otherwise and we'd capture a class at the wrong version. The
@@ -401,6 +405,12 @@ public final class CheckpointRollbackAgent {
                 System.err.println("rollbackAll: stack roots skipped: " + t);
             }
         }
+        // Fire external-state restore hooks AFTER the heap has been restored
+        // so hooks see the post-rollback heap. Throws a
+        // RollbackException.HookFailure (with all hook exceptions suppressed)
+        // if any hook's restore threw; the heap is already restored at that
+        // point.
+        ExternalStateRegistry.fireRestores();
     }
 
     /**
