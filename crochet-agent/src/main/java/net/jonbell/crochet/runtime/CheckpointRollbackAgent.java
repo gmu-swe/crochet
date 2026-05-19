@@ -181,6 +181,15 @@ public final class CheckpointRollbackAgent {
     }
 
     /**
+     * Package-private accessor for {@link HeapWalker} to read the
+     * Instrumentation handle without reflection. Both classes live in
+     * {@code net.jonbell.crochet.runtime} so package-private access suffices.
+     */
+    static Instrumentation getInstrumentation() {
+        return INSTRUMENTATION_HANDLE;
+    }
+
+    /**
      * Registration call emitted by {@link net.jonbell.crochet.transform.FieldAdder}
      * at the top of every user class's {@code <clinit>} (synthesised if
      * absent). Captures every class whose {@code <clinit>} runs on the
