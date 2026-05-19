@@ -460,6 +460,29 @@ public final class Ttd {
     }
 
     // =========================================================================
+    // B.4: Back-step mechanism selection
+    // =========================================================================
+
+    /**
+     * When {@code true} (the default), back-stepping uses the CPS-driven
+     * mechanism: rollback, pre-stage a {@link ResumeFrame} chain on the deque,
+     * re-invoke the body.  The body's dispatch prelude then table-jumps to the
+     * target save-point BCI and resumes from there.
+     *
+     * <p>When {@code false} (set via {@code -Dcrochet.ttd.backstep=restart}),
+     * the legacy {@link Restart}-throw path is used: back-stepping throws
+     * {@link Restart} to unwind the body, the session loop catches it, performs
+     * rollback, and re-invokes the body which replays silently until the target
+     * breakpoint.  This path is preserved for Phase B duration so existing tests
+     * continue to pass under the legacy protocol; it is removed in C.1.
+     *
+     * <p>Evaluated once at class-load time.  The system property must be set
+     * before any {@code Ttd.session} call (ideally on the JVM command line).
+     */
+    static final boolean USE_CPS_BACKSTEP =
+            !"restart".equals(System.getProperty("crochet.ttd.backstep"));
+
+    // =========================================================================
     // Session lifecycle
     // =========================================================================
 
@@ -483,6 +506,15 @@ public final class Ttd {
      * a custom REPL frontend. Used by tests to script command sequences;
      * may also be used by IDE integrations to substitute a non-stdin
      * frontend.
+     *
+     * <p><b>Back-step mechanism:</b> when {@link #USE_CPS_BACKSTEP} is true
+     * (default), back-stepping is driven by the CPS prelude in each
+     * {@link TimeTravelBody}-annotated method: the session snapshots the
+     * current resume-frame deque, performs rollback, clears the deque, pushes
+     * the snapshot as a resume chain (INNERMOST-FIRST so OUTERMOST lands at
+     * HEAD), and re-invokes the body.  When {@code false} (legacy mode via
+     * {@code -Dcrochet.ttd.backstep=restart}), back-stepping throws
+     * {@link Restart} to unwind the body stack, then replays from the start.
      */
     public static void sessionWithRepl(Object root, Repl repl, Runnable body) {
         if (root == null) {
@@ -517,14 +549,24 @@ public final class Ttd {
                             + " breakpoints hit)");
                     Repl.Action a = ctx.repl.prompt(ctx, /*atEnd=*/true);
                     if (a.kind == Repl.Action.Kind.RESTART) {
+                        // Back-step from end-of-body: legacy path always used here
+                        // (the CPS path requires a live deque at the moment of back-step;
+                        // at end-of-body the deque state from the last forward run is no
+                        // longer useful since body ran to completion).
                         rollbackAndRecheckpoint(ctx);
                         ctx.targetStop = a.targetIdx;
+                        FRAME_DEQUE.get().clear();
                         continue;
                     }
                     return;
+                } catch (CpsBackstep ignored) {
+                    // CPS path: rollback + deque staging already done inside hitInternal.
+                    // ctx.targetStop has been set by hitInternal before throw.
+                    // Just re-loop to invoke body.run() again with staged frames.
                 } catch (Restart r) {
                     rollbackAndRecheckpoint(ctx);
-                    // ctx.targetStop has been set by the REPL prior to throw
+                    // ctx.targetStop has been set by the REPL prior to throw.
+                    FRAME_DEQUE.get().clear();
                 } catch (Quit q) {
                     return;
                 }
@@ -583,10 +625,74 @@ public final class Ttd {
                 return;
             case RESTART:
                 ctx.targetStop = a.targetIdx;
-                throw new Restart();
+                if (USE_CPS_BACKSTEP) {
+                    backstepWithCps(ctx);
+                    // backstepWithCps never returns normally — always throws CpsBackstep.
+                } else {
+                    throw new Restart();
+                }
+                return; // unreachable
             case QUIT:
                 throw new Quit();
         }
+    }
+
+    /**
+     * CPS back-step implementation (B.4).
+     *
+     * <p>At back-step time, the current thread's resume deque contains all
+     * save-point frames accumulated since the last deque-clear, in LIFO order:
+     * HEAD = innermost (most recently pushed), TAIL = outermost.
+     *
+     * <p>This method:
+     * <ol>
+     *   <li>Snapshots the deque (as a list, HEAD at index 0).</li>
+     *   <li>Performs rollback + recheckpoint on the session root.</li>
+     *   <li>Clears the deque.</li>
+     *   <li>Pushes the snapshot frames in INNERMOST-FIRST order (index 0 first,
+     *       index N-1 last). Because {@code ArrayDeque.push = addFirst}, each
+     *       subsequent push becomes the new HEAD, so after all pushes the
+     *       OUTERMOST frame (snapshot[N-1]) is at HEAD.</li>
+     *   <li>Throws {@link CpsBackstep} to unwind to the session loop, which
+     *       re-invokes {@code body.run()} with the staged frames.</li>
+     * </ol>
+     *
+     * <p><b>Deque ordering invariant (SOUNDNESS.md §9):</b> on re-run,
+     * {@code outer}'s dispatch prelude calls {@code popResumeFrame(outer_id)}.
+     * HEAD = outer_frame → match → pop. outer re-executes forward from the
+     * callsite to {@code inner}.  {@code inner}'s prelude calls
+     * {@code popResumeFrame(inner_id)}.  HEAD = inner_frame → match → pop.
+     * inner resumes at the target BCI.
+     *
+     * <p><b>Empty-deque edge case:</b> when the deque is empty (no CPS frames
+     * were pushed, e.g., body does not have {@code @TimeTravelBody} methods or
+     * no save-point was hit yet), the chain is empty and nothing is pushed.
+     * The re-run fires a fresh forward execution, equivalent to the legacy
+     * {@link Restart} path.
+     */
+    private static void backstepWithCps(TtdContext ctx) {
+        // 1. Snapshot deque: HEAD at index 0, TAIL at index N-1.
+        ArrayDeque<ResumeFrame> deque = FRAME_DEQUE.get();
+        List<ResumeFrame> chain = new ArrayList<>(deque);
+
+        // 2. Rollback + recheckpoint.
+        rollbackAndRecheckpoint(ctx);
+
+        // 3. Clear deque.
+        deque.clear();
+
+        // 4. Push INNERMOST-FIRST:
+        //    chain.get(0) = HEAD (innermost) → push first → temporarily at HEAD.
+        //    chain.get(1) = next outer → push → becomes new HEAD.
+        //    ...
+        //    chain.get(N-1) = TAIL (outermost) → push last → OUTERMOST at HEAD.
+        // Result: HEAD=outermost ... TAIL=innermost.
+        for (int i = 0; i < chain.size(); i++) {
+            deque.push(chain.get(i));
+        }
+
+        // 5. Signal session loop to re-run body with staged frames.
+        throw new CpsBackstep();
     }
 
     private static void rollbackAndRecheckpoint(TtdContext ctx) {
@@ -609,7 +715,22 @@ public final class Ttd {
         }
     }
 
-    /** Thrown by breakpoint() to unwind the body for back-stepping. */
+    /**
+     * Thrown by {@link #backstepWithCps} to signal the session loop to
+     * re-invoke the body with a pre-staged resume-frame chain.
+     *
+     * <p>Unlike {@link Restart}, this exception is thrown AFTER rollback and
+     * deque staging have already been performed.  The session loop catches it
+     * and re-loops without performing additional rollback.
+     *
+     * <p>Not part of the public API; package-private for test access.
+     */
+    static final class CpsBackstep extends RuntimeException {
+        CpsBackstep() { super(null, null, true, false); }
+        @Override public synchronized Throwable fillInStackTrace() { return this; }
+    }
+
+    /** Thrown by breakpoint() to unwind the body for back-stepping (legacy path). */
     static final class Restart extends RuntimeException {
         Restart() { super(); }
         @Override public synchronized Throwable fillInStackTrace() { return this; }
