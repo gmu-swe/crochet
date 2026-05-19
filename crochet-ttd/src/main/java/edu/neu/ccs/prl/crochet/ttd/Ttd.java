@@ -1,6 +1,9 @@
 package edu.neu.ccs.prl.crochet.ttd;
 
 import java.util.ArrayDeque;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -120,6 +123,232 @@ public final class Ttd {
      */
     public static int internMethodId(String key) {
         return METHOD_IDS.computeIfAbsent(key, k -> NEXT_METHOD_ID.getAndIncrement());
+    }
+
+    // =========================================================================
+    // B.5: Debug table — (methodId, bci) → MethodLineInfo
+    // =========================================================================
+
+    /**
+     * Holder for per-save-point debug metadata registered by B.3 at class-load
+     * time.  Package-private; accessed only from within {@code Ttd}.
+     */
+    static final class MethodLineInfo {
+        /** {@code "InternalClassName.nameDesc:line"}, e.g. {@code "com/example/Foo.doWork(I)V:42"}. */
+        final String label;
+
+        /**
+         * Local names for primitive slots, indexed by prim-array position.
+         * {@code null} array or {@code null} entries fall back to {@code "$slotN"}.
+         */
+        final String[] primNames;
+
+        /** JVM field descriptors for primitive slots. {@code null} entries fall back to {@code "?"}. */
+        final String[] primDescs;
+
+        /** Local names for reference slots. */
+        final String[] refNames;
+
+        /** JVM field descriptors for reference slots. */
+        final String[] refDescs;
+
+        MethodLineInfo(String label,
+                       String[] primNames, String[] primDescs,
+                       String[] refNames,  String[] refDescs) {
+            this.label     = label;
+            this.primNames = primNames;
+            this.primDescs = primDescs;
+            this.refNames  = refNames;
+            this.refDescs  = refDescs;
+        }
+    }
+
+    /**
+     * Process-lifetime debug table: {@code (methodId << 32) | bci -> MethodLineInfo}.
+     *
+     * <p>Populated at class-load time by B.3 via {@link #registerMethodLine(int, int, String)}.
+     * Key is a packed {@code long} to avoid boxing a {@code (int,int)} tuple.
+     * Reads at capture time are lock-free.
+     */
+    private static final ConcurrentHashMap<Long, MethodLineInfo> METHOD_LINE_TABLE =
+            new ConcurrentHashMap<>();
+
+    /**
+     * Register debug metadata for a single save-point inside a
+     * {@link TimeTravelBody}-annotated method.  Called by B.3's class-init
+     * helper at class-load time, once per save-point per class load.
+     *
+     * <p>The key is {@code (methodId, bci)}; a method has one entry per
+     * save-point (each save-point corresponds to a distinct bci).
+     *
+     * <p>When {@code primNames}/{@code primDescs}/{@code refNames}/{@code refDescs}
+     * are {@code null}, the {@link LocalSnapshot} for that save-point will use
+     * {@code "$slotN"} and {@code "?"} fallback values — this is the correct
+     * behaviour for classes compiled with {@code -g:none}.
+     *
+     * <p>TODO: annotate with {@code @Internal} once unit A.4 merges.
+     *
+     * @param methodId  dense method id as returned by {@link #internMethodId(String)}
+     * @param bci       bytecode index of the save-point
+     * @param label     {@code "InternalClassName.nameDesc:line"} string
+     * @param primNames names of primitive locals, indexed by prim slot; may be null
+     * @param primDescs JVM descriptors of primitive locals; may be null
+     * @param refNames  names of reference locals, indexed by ref slot; may be null
+     * @param refDescs  JVM descriptors of reference locals; may be null
+     */
+    public static void registerMethodLine(int methodId, int bci, String label,
+                                          String[] primNames, String[] primDescs,
+                                          String[] refNames,  String[] refDescs) {
+        long key = ((long) methodId << 32) | (bci & 0xFFFFFFFFL);
+        METHOD_LINE_TABLE.putIfAbsent(key,
+                new MethodLineInfo(label, primNames, primDescs, refNames, refDescs));
+    }
+
+    /**
+     * Convenience overload of
+     * {@link #registerMethodLine(int, int, String, String[], String[], String[], String[])}
+     * that registers only the source-location label, with no local-variable info.
+     * All local snapshots for this save-point will use {@code "$slotN"} / {@code "?"}
+     * fallback names.
+     *
+     * <p>Intended for testing and for B.3's initial integration before full
+     * local-variable table emission is wired up.
+     *
+     * <p>TODO: annotate with {@code @Internal} once unit A.4 merges.
+     *
+     * @param methodId dense method id as returned by {@link #internMethodId(String)}
+     * @param bci      bytecode index of the save-point
+     * @param label    {@code "InternalClassName.nameDesc:line"} string
+     */
+    public static void registerMethodLine(int methodId, int bci, String label) {
+        registerMethodLine(methodId, bci, label, null, null, null, null);
+    }
+
+    // =========================================================================
+    // B.5: captureStack() — stack-as-data API
+    // =========================================================================
+
+    /**
+     * Capture the current thread's resume-frame deque as a list of
+     * {@link StackEntry} objects, innermost frame first.
+     *
+     * <p>The returned list is a <em>snapshot copy</em> — it is decoupled from
+     * the live deque.  Subsequent {@link #saveFrame} / {@link #popResumeFrame}
+     * calls on the current thread do not affect the returned list, and callers
+     * may mutate the list freely without affecting the runtime.
+     *
+     * <p>If no TTD session is currently active ({@link #TTD_ACTIVE_SESSIONS}
+     * {@code == 0}), returns an empty list without touching the thread-local.
+     *
+     * <p>For each {@link ResumeFrame} in the deque, the debug table is
+     * consulted for the {@code (methodId, bci)} pair.  If an entry exists,
+     * {@link StackEntry#classMethodLine()} is set to its label.  If no entry
+     * exists (e.g., because B.3 has not yet been integrated, or the class was
+     * not instrumented), the sentinel {@code "<methodId=N bci=M>"} is used.
+     *
+     * <p>Local variable snapshots are built from the frame's {@code prims} and
+     * {@code refs} arrays.  Primitive slots appear first (in ascending slot
+     * order), followed by reference slots.  Names and descriptors come from
+     * the registered {@link MethodLineInfo}; absent info falls back to
+     * {@code "$slotN"} / {@code "?"}.
+     *
+     * <p>TODO: annotate with {@code @Experimental} once unit A.4 merges and
+     * provides the annotation.
+     *
+     * @return mutable snapshot list, innermost frame first; never null
+     */
+    public static List<StackEntry> captureStack() {
+        if (TTD_ACTIVE_SESSIONS == 0) return new ArrayList<>(0);
+        ArrayDeque<ResumeFrame> deque = FRAME_DEQUE.get();
+        if (deque.isEmpty()) return new ArrayList<>(0);
+
+        // Iterate deque in push order (head = innermost frame).
+        // ArrayDeque iterator starts at the head (addFirst side).
+        List<StackEntry> result = new ArrayList<>(deque.size());
+        for (ResumeFrame frame : deque) {
+            result.add(buildEntry(frame));
+        }
+        return result;
+    }
+
+    /**
+     * Convert a {@link ResumeFrame} to a {@link StackEntry} by consulting
+     * the debug table.
+     */
+    private static StackEntry buildEntry(ResumeFrame frame) {
+        long key = ((long) frame.methodId << 32) | (frame.bci & 0xFFFFFFFFL);
+        MethodLineInfo info = METHOD_LINE_TABLE.get(key);
+
+        String label = (info != null)
+                ? info.label
+                : "<methodId=" + frame.methodId + " bci=" + frame.bci + ">";
+
+        List<LocalSnapshot> locals = new ArrayList<>(frame.prims.length + frame.refs.length);
+
+        // Primitive slots first.
+        for (int i = 0; i < frame.prims.length; i++) {
+            String name = (info != null && info.primNames != null && i < info.primNames.length
+                           && info.primNames[i] != null)
+                    ? info.primNames[i]
+                    : "$slot" + i;
+            String desc = (info != null && info.primDescs != null && i < info.primDescs.length
+                           && info.primDescs[i] != null)
+                    ? info.primDescs[i]
+                    : "?";
+            locals.add(new LocalSnapshot(name, desc, Long.toString(frame.prims[i])));
+        }
+
+        // Reference slots after.
+        for (int i = 0; i < frame.refs.length; i++) {
+            String name = (info != null && info.refNames != null && i < info.refNames.length
+                           && info.refNames[i] != null)
+                    ? info.refNames[i]
+                    : "$slot" + i;
+            String desc = (info != null && info.refDescs != null && i < info.refDescs.length
+                           && info.refDescs[i] != null)
+                    ? info.refDescs[i]
+                    : "?";
+            locals.add(new LocalSnapshot(name, desc, String.valueOf(frame.refs[i])));
+        }
+
+        return new StackEntry(label, Collections.unmodifiableList(locals));
+    }
+
+    /**
+     * Serialize a stack snapshot as a versioned JSON string.
+     *
+     * <p>Schema version 1:
+     * <pre>
+     * {
+     *   "schemaVersion": 1,
+     *   "frames": [
+     *     {
+     *       "classMethodLine": "com/example/Foo.doWork(I)V:42",
+     *       "locals": [
+     *         {"name": "x",   "descriptor": "I",               "value": "42"},
+     *         {"name": "s",   "descriptor": "Ljava/lang/String;", "value": "hello"}
+     *       ]
+     *     }
+     *   ]
+     * }
+     * </pre>
+     *
+     * <p>The serialized form is deterministic: the same {@code frames} list
+     * always produces a byte-identical string.  Values are human-readable
+     * strings, not round-trip-deserializable primitives.
+     *
+     * @param frames the list returned by {@link #captureStack()}
+     * @return JSON string with {@code schemaVersion} 1; never null
+     */
+    public static String serializeStack(List<StackEntry> frames) {
+        StringBuilder sb = new StringBuilder();
+        sb.append("{\"schemaVersion\":1,\"frames\":[");
+        for (int i = 0; i < frames.size(); i++) {
+            if (i > 0) sb.append(",");
+            sb.append(frames.get(i).toJson());
+        }
+        sb.append("]}");
+        return sb.toString();
     }
 
     /**
