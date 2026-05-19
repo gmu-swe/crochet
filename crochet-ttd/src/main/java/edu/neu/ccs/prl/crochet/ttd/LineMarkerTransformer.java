@@ -372,6 +372,50 @@ final class LineMarkerTransformer implements ClassFileTransformer {
      */
     static MethodAnalysis analyzeMethod(String ownerInternalName, MethodNode mn,
                                         boolean includeCallsites) {
+        // Collect catch-handler entry BCIs. A catch handler entry has an
+        // exception reference on the operand stack at entry; the dispatch
+        // prelude's GOTO to any such BCI would create a path with an empty
+        // stack arriving at a frame that expects {ExceptionType}, which the
+        // verifier (and COMPUTE_FRAMES) rejects with VerifyError. We exclude
+        // these BCIs from the save-point candidate set entirely.
+        //
+        // The handler Label objects in TryCatchBlockNode resolve to instruction
+        // indices at toByteArray() time, but we need BCI offsets in the
+        // MethodNode instruction list. We compute them by walking the list once.
+        Set<Integer> handlerBcis = new java.util.HashSet<>();
+        if (!mn.tryCatchBlocks.isEmpty()) {
+            // Collect handler LabelNode references.
+            Set<org.objectweb.asm.tree.LabelNode> handlerNodes = new java.util.HashSet<>();
+            for (org.objectweb.asm.tree.TryCatchBlockNode tcb : mn.tryCatchBlocks) {
+                if (tcb.handler != null) {
+                    handlerNodes.add(tcb.handler);
+                }
+            }
+            // Walk instruction list; whenever we encounter a LabelNode that
+            // is one of the handler nodes, record the current instruction index
+            // AND the NEXT instruction's index (the actual first instruction of
+            // the handler body, which is what the GOTO lands on after
+            // COMPUTE_FRAMES assigns it a stackmap entry with the exception on
+            // the stack). We exclude the label BCI itself AND the next BCI
+            // because the label pseudo-instruction has no bytecode width, so
+            // the label and the following real instruction share the same byte
+            // offset.
+            int scanBci = 0;
+            boolean nextIsHandler = false;
+            for (AbstractInsnNode scanInsn : mn.instructions) {
+                if (nextIsHandler) {
+                    handlerBcis.add(scanBci);
+                    nextIsHandler = false;
+                }
+                if (scanInsn.getType() == AbstractInsnNode.LABEL
+                        && handlerNodes.contains((org.objectweb.asm.tree.LabelNode) scanInsn)) {
+                    handlerBcis.add(scanBci);
+                    nextIsHandler = true; // also exclude the first real instruction
+                }
+                scanBci++;
+            }
+        }
+
         // Collect line-number BCIs and callsite candidate BCIs.
         // Also check for MONITORENTER violations.
         Set<Integer> lineBcis = new LinkedHashSet<>();
@@ -389,15 +433,23 @@ final class LineMarkerTransformer implements ClassFileTransformer {
                 if (monitorDepth > 0) {
                     throwMonitorenterRefusal(ownerInternalName, mn);
                 }
-                lineBcis.add(bci);
-                allCandidateBcis.add(bci);
+                // Exclude save points at catch-handler entry BCIs (B.3 §2
+                // soundness: handler entries have non-empty stack; a prelude
+                // GOTO to them creates a stack-mismatch VerifyError).
+                if (!handlerBcis.contains(bci)) {
+                    lineBcis.add(bci);
+                    allCandidateBcis.add(bci);
+                }
             }
             // Callsite candidates: non-TTD INVOKE instructions outside monitors.
             if (includeCallsites && isNonTtdInvokeInsn(insn)) {
                 if (monitorDepth > 0) {
                     throwMonitorenterRefusal(ownerInternalName, mn);
                 }
-                allCandidateBcis.add(bci);
+                // Same handler-BCI exclusion for callsite candidates.
+                if (!handlerBcis.contains(bci)) {
+                    allCandidateBcis.add(bci);
+                }
             }
             bci++;
         }

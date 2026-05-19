@@ -20,6 +20,20 @@ if [ -z "${AGENT_JAR:-}" ] || [ ! -f "$AGENT_JAR" ]; then
     AGENT_JAR=$(ls -t $AGENT_GLOB 2>/dev/null | head -1)
 fi
 
+# Resolve the optional TTD jar (crochet-ttd): required for scenarios 22-25.
+# If not present, build it; if crochet-ttd module doesn't exist, leave empty.
+TTD_GLOB="$(cd .. && pwd)/crochet-ttd/target/crochet-ttd-*.jar"
+TTD_JAR=$(ls -t $TTD_GLOB 2>/dev/null | grep -v original | head -1 || true)
+if [ -z "${TTD_JAR:-}" ] || [ ! -f "$TTD_JAR" ]; then
+    if [ -d "$(cd .. && pwd)/crochet-ttd" ]; then
+        echo "Building crochet-ttd..."
+        (cd .. && PATH=~/.local/bin:$PATH mvn -q -pl :crochet-ttd package -DskipTests) || {
+            echo "WARNING: crochet-ttd build failed; scenarios 22-25 will degrade gracefully"
+        }
+        TTD_JAR=$(ls -t $TTD_GLOB 2>/dev/null | grep -v original | head -1 || true)
+    fi
+fi
+
 USE_INSTRUMENTED=0
 for arg in "$@"; do
     case "$arg" in
@@ -59,7 +73,18 @@ for dir in scenarios/*/; do
     scenario=$(basename "$dir")
     printf '=== %-40s ' "$scenario"
 
-    (cd "$dir" && rm -f *.class && $JAVAC_CMD -cp "$AGENT_JAR" *.java) >/tmp/compile.log 2>&1
+    # Build compile-time and runtime classpaths.
+    # TTD jar is appended when present so TTD-annotated scenarios compile.
+    COMPILE_CP="$AGENT_JAR"
+    RUN_CP=".:$AGENT_JAR"
+    TTD_AGENTS=""
+    if [ -n "${TTD_JAR:-}" ] && [ -f "$TTD_JAR" ]; then
+        COMPILE_CP="$AGENT_JAR:$TTD_JAR"
+        RUN_CP=".:$AGENT_JAR:$TTD_JAR"
+        TTD_AGENTS="-javaagent:$TTD_JAR"
+    fi
+
+    (cd "$dir" && rm -f *.class && $JAVAC_CMD -cp "$COMPILE_CP" *.java) >/tmp/compile.log 2>&1
     if [ $? -ne 0 ]; then
         echo "COMPILE FAIL"
         cat /tmp/compile.log
@@ -68,7 +93,7 @@ for dir in scenarios/*/; do
         continue
     fi
 
-    out=$(cd "$dir" && $JAVA_CMD $EXTRA_ARGS -cp ".:$AGENT_JAR" -javaagent:"$AGENT_JAR" Main 2>&1)
+    out=$(cd "$dir" && $JAVA_CMD $EXTRA_ARGS -cp "$RUN_CP" $TTD_AGENTS -javaagent:"$AGENT_JAR" Main 2>&1)
     ec=$?
     if [ $ec -eq 0 ] && echo "$out" | grep -q "SCENARIO OK"; then
         echo "PASS"

@@ -55,6 +55,25 @@ public class CrochetTransformer {
         if (shouldSkip(name)) {
             return null;
         }
+        // @CrochetSkip: user-class opt-out annotation. Checked here (after the
+        // hardcoded shouldSkip list) so that user classes can explicitly exclude
+        // themselves from Crochet's field injection and wrapper emission.
+        // Subclass exclusion is enforced at transform time: when a class declares
+        // @CrochetSkip, its ClassReader exposes the annotation in the
+        // RuntimeVisibleAnnotations attribute; we detect it here and return null
+        // (unchanged bytes), exactly like shouldSkip(name) would for a hardcoded
+        // entry. Superclass walks are not needed at this layer because the
+        // hardcoded shouldSkip check already returns early for framework classes;
+        // for user-defined hierarchies, annotating the root class is sufficient
+        // because each subclass is independently transformed and individually
+        // presents the annotation in its own attribute (Java compiles
+        // @Inherited-lacking annotations separately per class file — but since
+        // @CrochetSkip lacks @Inherited, only directly-annotated classes carry it;
+        // subclass skipping requires annotating each subclass or adding to the
+        // hardcoded list). This is consistent with A.2's PLAN.md definition.
+        if (hasAnnotation(reader, "Lnet/jonbell/crochet/annotation/CrochetSkip;")) {
+            return null;
+        }
         // Enum classes, interfaces, annotations, and modules reject the
         // instance fields/methods we want to inject.
         int access = reader.getAccess();
@@ -483,21 +502,34 @@ public class CrochetTransformer {
      * only the header and attribute table are read.
      */
     private static boolean alreadyInstrumented(ClassReader reader) {
-        AnnotationPresenceVisitor v = new AnnotationPresenceVisitor();
+        return hasAnnotation(reader, CROCHET_INSTRUMENTED_DESC);
+    }
+
+    /**
+     * Cheap pre-scan that returns {@code true} iff the class file carries the
+     * named annotation descriptor (e.g.
+     * {@code "Lnet/jonbell/crochet/annotation/CrochetSkip;"}).
+     * Skips code, debug, and frame data; only the header and attribute table
+     * are read.
+     */
+    private static boolean hasAnnotation(ClassReader reader, String desc) {
+        AnnotationPresenceVisitor v = new AnnotationPresenceVisitor(desc);
         reader.accept(v, ClassReader.SKIP_CODE | ClassReader.SKIP_DEBUG | ClassReader.SKIP_FRAMES);
         return v.found;
     }
 
     private static final class AnnotationPresenceVisitor extends ClassVisitor {
+        private final String target;
         boolean found;
 
-        AnnotationPresenceVisitor() {
+        AnnotationPresenceVisitor(String target) {
             super(Opcodes.ASM9);
+            this.target = target;
         }
 
         @Override
         public AnnotationVisitor visitAnnotation(String descriptor, boolean visible) {
-            if (CROCHET_INSTRUMENTED_DESC.equals(descriptor)) {
+            if (target.equals(descriptor)) {
                 found = true;
             }
             return null;
