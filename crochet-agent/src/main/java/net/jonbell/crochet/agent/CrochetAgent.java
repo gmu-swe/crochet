@@ -49,6 +49,12 @@ public final class CrochetAgent {
         }
 
         inst.addTransformer(new TransformerWrapper(), true);
+        // Surface verifier: registered after TransformerWrapper so it sees
+        // the final class bytes (post all transformers). Enabled only when
+        // -Dcrochet.verifyInstrumented=true is set. Gate inside the verifier
+        // keeps this registration itself zero-cost when disabled — the JVM
+        // still calls the transformer but it exits at the ENABLED check.
+        inst.addTransformer(new InstrumentedSurfaceVerifier(), false);
         // Gap 7 closure: flip the RuntimeReady flag now that the agent
         // runtime's dependency closure is installed and reachable. Before
         // this point, pre-hooks emitted in JDK bytecode (HashMap.put,

@@ -3,6 +3,8 @@ package net.jonbell.crochet.runtime;
 import java.util.ArrayList;
 import java.util.List;
 
+import net.jonbell.crochet.annotation.Internal;
+
 /**
  * Optional stack-frame root collection via a native JVMTI agent.
  *
@@ -37,6 +39,7 @@ import java.util.List;
  * its frames currently include {@link #collectStackRoots} itself, which
  * would cycle back into propagation.
  */
+@Internal
 public final class StackRoots {
 
     private StackRoots() {}

@@ -47,6 +47,7 @@ import java.lang.annotation.Target;
  * no-op (a final class cannot be subclassed so the proxy cannot be
  * generated).
  */
+@Stable
 @Retention(RetentionPolicy.RUNTIME)
 @Target(ElementType.TYPE)
 public @interface CrochetEager {

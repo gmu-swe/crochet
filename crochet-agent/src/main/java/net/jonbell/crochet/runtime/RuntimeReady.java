@@ -1,5 +1,7 @@
 package net.jonbell.crochet.runtime;
 
+import net.jonbell.crochet.annotation.Internal;
+
 /**
  * Bootstrap-safety gate. Every pre-hook that instrumented JDK classes
  * may invoke during JVM bootstrap is routed through here; the
@@ -37,6 +39,7 @@ package net.jonbell.crochet.runtime;
  * — the JVM is still initialising. So there is no bootstrap-order
  * hazard on the fastAccess path.
  */
+@Internal
 public final class RuntimeReady {
 
     private RuntimeReady() {}

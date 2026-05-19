@@ -1,5 +1,8 @@
 package net.jonbell.crochet.runtime;
 
+import net.jonbell.crochet.annotation.Stable;
+
+@Stable
 public class RollbackException extends RuntimeException {
 
     private static final long serialVersionUID = 1486960037309581236L;

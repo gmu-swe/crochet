@@ -274,7 +274,7 @@ public class CrochetTransformer {
         return ((buf[6] & 0xFF) << 8) | (buf[7] & 0xFF);
     }
 
-    static boolean shouldSkip(String internalName) {
+    public static boolean shouldSkip(String internalName) {
         if (internalName == null) {
             return true;
         }
