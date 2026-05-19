@@ -256,6 +256,49 @@ final class FastProxySupport {
     /* ---------- F.1 dirty-bit: noteDirty ---------- */
 
     /**
+     * Reentrancy guard for {@link #noteDirty}.
+     *
+     * <p>Premerge audit (D.2+F.1 integration): when F.1's PUTFIELD pre-hook
+     * emits {@code INVOKESTATIC noteDirty(Object)} before every user PUTFIELD,
+     * and the Gap-7 {@code !isJdkClass} gate has been dropped so that JDK
+     * classes also receive PUTFIELD wrapping, a recursive cycle forms:
+     * {@code noteDirty} → {@link ClassMeta#of} → {@code ClassValue.get()} →
+     * internal PUTFIELD on {@code ClassValue$Version} → {@code noteDirty} → …
+     *
+     * <p>The cycle only activates after the first {@code Crochet.checkpoint()}
+     * call because {@code noteDirty} is guarded by {@code VERSION_GATE != 0}.
+     * Once active, it produces a {@code StackOverflowError} that hangs all 21
+     * demo scenarios.
+     *
+     * <p>Fix (Option A — lock-free array guard): use a fixed-size boolean array
+     * indexed by {@code (threadId & 0x1FF)} as a per-thread reentrancy flag.
+     * Array element access (AALOAD/BASTORE) is <em>not</em> intercepted by
+     * {@link net.jonbell.crochet.transform.FieldAccessWrapper}, which only wraps
+     * GETFIELD/PUTFIELD — so checking and setting this flag cannot itself
+     * trigger {@code noteDirty}, breaking the recursion at zero cost.
+     *
+     * <p>The 512-slot array means two threads sharing a slot (slot collision)
+     * produce a false-positive "already in noteDirty" — the real user PUTFIELD's
+     * dirty-bit notification is skipped for that call. This is the safe fallback:
+     * {@link FastProxySupport#fastAccess} treats a missing dirty-bit handle as
+     * always-dirty, so at most one shadow allocation is skipped and immediately
+     * re-triggered at the next PUTFIELD. Collisions are rare (probability ≈
+     * 1/512 per concurrent thread pair) and transient (the guard slot clears in
+     * the finally block). User-visible semantics are preserved.
+     *
+     * <p>The outermost call (the real user PUTFIELD) records dirty==1 before
+     * returning — so the user's mutation IS observed by the next checkpoint.
+     * The inner re-entrant calls (on {@code ClassValue} internals) are skipped.
+     * Those inner objects are not user-checkpoint-relevant; missing their
+     * dirty-bit is harmless.
+     *
+     * <p>Steady-state cost: two array element accesses (read + write) plus one
+     * call to {@link Thread#threadId()} per {@code noteDirty} invocation. No
+     * allocation; no lock; no {@code ThreadLocal} initialization path.
+     */
+    private static final boolean[] NOTE_DIRTY_GUARD = new boolean[512];
+
+    /**
      * F.1: set {@code $$crochetDirty = 1} on {@code inst}, using the
      * VarHandle resolved for the user class. Tolerates null {@code inst}
      * (no-op) and classes whose dirty VarHandle was not resolved (pre-F.1
@@ -268,26 +311,42 @@ final class FastProxySupport {
      * after this set, which either enters the stripe-lock (klass=proxy) or is a
      * no-op (klass=user). Either way, a subsequent stripe-lock holder's volatile
      * read of dirty observes dirty==1.
+     *
+     * <p>Re-entrant calls (detected via {@link #NOTE_DIRTY_GUARD}) return
+     * immediately. See the field's javadoc for the correctness argument.
      */
     static void noteDirty(Object inst) {
         if (inst == null) {
             return;
         }
-        Class<?> c = inst.getClass();
-        // Walk past any Fast proxy layer to the real user class.
-        while (c != null && CRIJFast.class.isAssignableFrom(c)) {
-            c = c.getSuperclass();
-        }
-        if (c == null) {
+        int slot = (int) (Thread.currentThread().threadId() & 0x1FFL);
+        if (NOTE_DIRTY_GUARD[slot]) {
+            // Re-entrant: a JDK-internal PUTFIELD (e.g. ClassValue$Version)
+            // was encountered while resolving the ClassMeta for the outermost
+            // call. Skip — the outermost call's dirty-set will complete on
+            // unwinding. See NOTE_DIRTY_GUARD javadoc for correctness argument.
             return;
         }
-        ClassMeta.VersionHandles handles = ClassMeta.of(c).versionHandles();
-        if (handles.dirty == null) {
-            // Pre-F.1 class or failed VarHandle resolution: no dirty field.
-            // Safe to skip — fastAccess treats missing dirty handle as always-dirty.
-            return;
+        NOTE_DIRTY_GUARD[slot] = true;
+        try {
+            Class<?> c = inst.getClass();
+            // Walk past any Fast proxy layer to the real user class.
+            while (c != null && CRIJFast.class.isAssignableFrom(c)) {
+                c = c.getSuperclass();
+            }
+            if (c == null) {
+                return;
+            }
+            ClassMeta.VersionHandles handles = ClassMeta.of(c).versionHandles();
+            if (handles.dirty == null) {
+                // Pre-F.1 class or failed VarHandle resolution: no dirty field.
+                // Safe to skip — fastAccess treats missing dirty handle as always-dirty.
+                return;
+            }
+            handles.dirty.set(inst, 1);
+        } finally {
+            NOTE_DIRTY_GUARD[slot] = false;
         }
-        handles.dirty.set(inst, 1);
     }
 
     /* ---------- fastAccess race-winner ---------- */
