@@ -7,6 +7,8 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
+import java.util.function.Consumer;
+import java.util.function.Supplier;
 
 /**
  * User-facing facade over Crochet's checkpoint/diff API.
@@ -68,6 +70,93 @@ import java.util.Objects;
 public final class Crochet {
 
     private Crochet() {}
+
+    // =========================================================================
+    // D.1: External-state hook registry
+    // =========================================================================
+
+    /**
+     * Registers an external-state hook under {@code name}.
+     *
+     * <p>The {@code snapshot} supplier is called <em>serially on the calling
+     * thread, before {@link CheckpointRollbackAgent#checkpointAll()}'s root
+     * walk</em>, so it sees the pre-checkpoint heap. Its return value —
+     * typically a "savepoint handle" (a cursor position, a transaction
+     * savepoint, a copy of a file-descriptor offset) — is stored and later
+     * passed to {@code restore}.
+     *
+     * <p>The {@code restore} consumer is called <em>after
+     * {@link CheckpointRollbackAgent#rollbackAll(int)}'s heap restore</em>, so
+     * it sees the post-rollback heap. It receives the value returned by the
+     * corresponding {@code snapshot} call.
+     *
+     * <p>If {@code snapshot} throws, the checkpoint is aborted (fail-fast; no
+     * subsequent hooks run). If {@code restore} throws, the remaining restore
+     * hooks still run, and a {@link RollbackException.HookFailure} is raised
+     * after all hooks have been attempted.
+     *
+     * <p>Hooks fire in <em>registration order</em> (oldest first) for both
+     * snapshot and restore passes. Registering a hook with the same {@code name}
+     * as an existing hook replaces it (with a warning logged); the hook's
+     * position in iteration order is preserved.
+     *
+     * <h2>No adapters in-tree</h2>
+     *
+     * <p><b>Crochet ships no JDBC, Redis, filesystem, or other adapters.</b>
+     * The adapter long-tail is unbounded, and coupling Crochet to third-party
+     * library ABIs would propagate breakage across unrelated users. This method
+     * is the hook point; users are expected to own their adapter code. A typical
+     * adapter is three lines:
+     *
+     * <pre>{@code
+     *   // DB savepoint adapter (user code, not in Crochet):
+     *   Crochet.registerExternalState("my-db",
+     *       () -> connection.setSavepoint("crochet"),   // snapshot
+     *       sp  -> connection.rollback(sp));            // restore
+     * }</pre>
+     *
+     * <h2>Stability</h2>
+     *
+     * <p>This method is {@code @Stable} user-facing API. Its signature and
+     * ordering contract will not change in a backwards-incompatible way.
+     *
+     * @param name     a unique name for this hook; used as the registry handle
+     *                 and appears in failure messages. Duplicate names replace
+     *                 the existing hook.
+     * @param snapshot called before {@code checkpointAll}'s root walk; the
+     *                 return value is passed to {@code restore}. Must not be
+     *                 {@code null}.
+     * @param restore  called after {@code rollbackAll}'s heap restore; receives
+     *                 the value returned by the corresponding {@code snapshot}.
+     *                 Must not be {@code null}.
+     * @throws NullPointerException if {@code name}, {@code snapshot}, or
+     *                              {@code restore} is {@code null}
+     */
+    public static void registerExternalState(String name,
+                                             Supplier<?> snapshot,
+                                             Consumer<?> restore) {
+        Objects.requireNonNull(name, "name");
+        Objects.requireNonNull(snapshot, "snapshot");
+        Objects.requireNonNull(restore, "restore");
+        ExternalStateRegistry.register(name, snapshot, restore);
+    }
+
+    /**
+     * Removes the external-state hook registered under {@code name}.
+     *
+     * <p>No-op if no hook with that name is currently registered. Thread-safe;
+     * may be called concurrently with {@link #registerExternalState}.
+     *
+     * <h2>Stability</h2>
+     *
+     * <p>This method is {@code @Stable} user-facing API.
+     *
+     * @param name the name passed to {@link #registerExternalState}; if
+     *             {@code null}, this method is a no-op.
+     */
+    public static void unregisterExternalState(String name) {
+        ExternalStateRegistry.unregister(name);
+    }
 
     /**
      * Returns the list of instance fields that differ between the live object
