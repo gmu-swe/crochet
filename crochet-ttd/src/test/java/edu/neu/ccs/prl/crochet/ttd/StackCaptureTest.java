@@ -45,14 +45,22 @@ class StackCaptureTest {
     // =========================================================================
 
     @BeforeEach
-    void resetCounter() {
-        Ttd.TTD_ACTIVE_SESSIONS.set(0);
+    void resetGen() {
+        // Reset TTD_GEN to 0 (pristine) so saveFrame / popResumeFrame take the
+        // early-return path.  Also clear any stale deque entries left by tests
+        // that bypass sessionWithRepl's clearSessionState() (e.g., tests that
+        // call testSetTtdGen() directly without running a full session).
+        Ttd.testSetTtdGen(0L);
+        Ttd.testClearDeque();
     }
 
     @AfterEach
-    void checkCounterZero() {
-        assertEquals(0, Ttd.TTD_ACTIVE_SESSIONS.get(),
-                "TTD_ACTIVE_SESSIONS must be 0 after each test");
+    void checkCounterEven() {
+        // After each test, TTD_GEN must be even (no session currently active).
+        // Sessions run during the test leave TTD_GEN at a positive even value.
+        assertEquals(0L, Ttd.TTD_GEN % 2,
+                "TTD_GEN must be even after each test (no session active); "
+                        + "actual=" + Ttd.TTD_GEN);
     }
 
     // =========================================================================

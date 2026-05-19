@@ -24,7 +24,7 @@ import org.junit.jupiter.api.Test;
 /**
  * Unit tests for the B.2 ResumeFrame runtime:
  * <ul>
- *   <li>Zero-alloc steady state ({@link Ttd#TTD_ACTIVE_SESSIONS} == 0)</li>
+ *   <li>Zero-alloc steady state ({@link Ttd#TTD_GEN} == 0)</li>
  *   <li>Pop semantics (methodId match / mismatch)</li>
  *   <li>Session-exit cleanup (memory-leak check via WeakReference)</li>
  *   <li>Cross-thread isolation</li>
@@ -57,14 +57,19 @@ class ResumeFrameTest {
     @BeforeEach
     void resetCounter() {
         // Defensive: if a previous test leaked the counter, reset it so
-        // cold-path tests (TTD_ACTIVE_SESSIONS == 0) work reliably.
-        Ttd.TTD_ACTIVE_SESSIONS.set(0);
+        // cold-path tests (TTD_GEN == 0) work reliably.
+        Ttd.testSetTtdGen(0L);
     }
 
     @AfterEach
-    void checkCounterZero() {
-        assertEquals(0, Ttd.TTD_ACTIVE_SESSIONS.get(),
-                "TTD_ACTIVE_SESSIONS must be 0 after each test");
+    void checkCounterEven() {
+        // After each test, TTD_GEN must be even (no session currently active).
+        // The @BeforeEach resets it to 0, but sessions run during the test
+        // leave TTD_GEN at a non-zero even value (2, 4, ...).  The invariant
+        // is "even = no session active", not "0 = pristine".
+        assertEquals(0L, Ttd.TTD_GEN % 2,
+                "TTD_GEN must be even after each test (no active session); "
+                        + "actual=" + Ttd.TTD_GEN);
     }
 
     // =========================================================================
@@ -132,8 +137,8 @@ class ResumeFrameTest {
     // =========================================================================
 
     /**
-     * When {@code TTD_ACTIVE_SESSIONS == 0}, {@link Ttd#saveFrame} must
-     * allocate ZERO bytes on the calling thread.
+     * When {@code TTD_GEN == 0} (pristine — no session has ever fired),
+     * {@link Ttd#saveFrame} must allocate ZERO bytes on the calling thread.
      *
      * <p>Measured using {@link com.sun.management.ThreadMXBean#getThreadAllocatedBytes}
      * (accessed via reflection for Java 17 source-compat).  Skips if the JVM
@@ -165,12 +170,12 @@ class ResumeFrameTest {
 
         long delta = after - before;
         assertEquals(0L, delta,
-                "saveFrame with TTD_ACTIVE_SESSIONS==0 must allocate 0 bytes; "
+                "saveFrame with TTD_GEN==0 must allocate 0 bytes; "
                         + "allocated " + delta + " bytes across 10 000 calls");
     }
 
     /**
-     * When {@code TTD_ACTIVE_SESSIONS == 0}, {@link Ttd#popResumeFrame} must
+     * When {@code TTD_GEN == 0} (pristine), {@link Ttd#popResumeFrame} must
      * allocate ZERO bytes.
      *
      * <p>We avoid JUnit assertions inside the measurement window — the
@@ -201,7 +206,7 @@ class ResumeFrameTest {
         // Correctness check outside the measurement window.
         assertNull(last, "popResumeFrame must return null outside session");
         assertEquals(0L, delta,
-                "popResumeFrame with TTD_ACTIVE_SESSIONS==0 must allocate 0 bytes; "
+                "popResumeFrame with TTD_GEN==0 must allocate 0 bytes; "
                         + "allocated " + delta + " bytes");
     }
 
@@ -495,31 +500,36 @@ class ResumeFrameTest {
 
     @Test
     void session_counter_lifecycle() {
-        assertEquals(0, Ttd.TTD_ACTIVE_SESSIONS.get(), "starts at 0");
+        assertEquals(0L, Ttd.TTD_GEN, "TTD_GEN starts at 0");
         Holder root = new Holder();
-        int[] duringSession = new int[1];
+        long[] duringSession = new long[1];
 
         Ttd.sessionWithRepl(root, quitRepl(), () -> {
-            duringSession[0] = Ttd.TTD_ACTIVE_SESSIONS.get();
+            duringSession[0] = Ttd.TTD_GEN;
         });
 
-        assertEquals(1, duringSession[0], "must be 1 during session");
-        assertEquals(0, Ttd.TTD_ACTIVE_SESSIONS.get(), "must be 0 after session");
+        // During session: TTD_GEN is odd (0→1 on entry).
+        assertEquals(1L, duringSession[0], "TTD_GEN must be 1 (odd) during first session");
+        // After session: TTD_GEN is even (1→2 on exit).
+        assertEquals(2L, Ttd.TTD_GEN, "TTD_GEN must be 2 (even) after first session");
+        // Reset for AfterEach check.
+        Ttd.testSetTtdGen(0L);
     }
 
     @Test
     void session_counter_decrements_on_exception() {
         Holder root = new Holder();
         // A plain RuntimeException from the body escapes sessionWithRepl
-        // (only Restart and Quit are caught internally).  The finally block
-        // must still run and decrement the counter.
+        // (only CpsBackstep and Quit are caught internally).  The finally block
+        // must still run and increment TTD_GEN back to even.
         assertThrows(RuntimeException.class, () ->
             Ttd.sessionWithRepl(root, quitRepl(), () -> {
                 throw new RuntimeException("test exception");
             }));
 
-        assertEquals(0, Ttd.TTD_ACTIVE_SESSIONS.get(),
-                "counter must be 0 even after exceptional session exit");
+        assertEquals(0L, Ttd.TTD_GEN % 2,
+                "TTD_GEN must be even even after exceptional session exit");
+        Ttd.testSetTtdGen(0L);
     }
 
     /**
@@ -538,7 +548,7 @@ class ResumeFrameTest {
             Ttd.saveFrame(idFirst, 1, new long[0], new Object[0]);
         });
 
-        assertEquals(0, Ttd.TTD_ACTIVE_SESSIONS.get());
+        assertEquals(0L, Ttd.TTD_GEN % 2, "TTD_GEN must be even between sessions");
 
         // Second session: deque must be clean (no leftover from first session).
         Ttd.sessionWithRepl(root, quitRepl(), () -> {

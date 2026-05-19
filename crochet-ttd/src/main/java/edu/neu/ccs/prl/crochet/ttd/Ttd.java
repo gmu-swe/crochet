@@ -1,5 +1,7 @@
 package edu.neu.ccs.prl.crochet.ttd;
 
+import java.lang.invoke.MethodHandles;
+import java.lang.invoke.VarHandle;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -54,40 +56,77 @@ public final class Ttd {
     private Ttd() {}
 
     // =========================================================================
-    // B.2: ResumeFrame runtime — thread-local deque, session counter, interning
+    // C.1: TTD_GEN — parity-encoded generation counter (replaces TTD_ACTIVE_SESSIONS)
     // =========================================================================
 
     /**
-     * Count of currently active TTD sessions across all threads.
+     * Global TTD generation counter.  Parity encodes session state:
      *
-     * <p><b>Stand-in for C.1 {@code TTD_GEN}.</b>  This plain counter will be
-     * replaced by C.1 with a generation integer whose parity encodes
-     * checkpoint vs. rollback phase, mirroring the {@code VERSION_COUNTER}
-     * convention in {@code CheckpointRollbackAgent}.  Until C.1 lands, this
-     * counter is used only as a boolean test:
-     * {@code TTD_ACTIVE_SESSIONS == 0} means "no session active — take the
-     * zero-alloc early-return path in {@link #saveFrame} /
-     * {@link #popResumeFrame}".
+     * <ul>
+     *   <li>{@code TTD_GEN == 0} — no session has <em>ever</em> fired (pristine).
+     *       This is the dominant steady state for {@link TimeTravelBody}-annotated
+     *       code that is never exercised under a TTD session.</li>
+     *   <li>{@code TTD_GEN} odd — a session is currently active on some thread.</li>
+     *   <li>{@code TTD_GEN} even &gt; 0 — all sessions have completed; at least one
+     *       session has run in this JVM process lifetime.</li>
+     * </ul>
      *
-     * <p>Backed by an {@link AtomicInteger} to prevent lost updates when multiple
-     * threads start sessions concurrently. The public field exposes the backing
-     * {@link AtomicInteger} directly; callers should use {@code .get()} for reads
-     * and should not mutate it except through {@code sessionWithRepl}.
-     * Tests may call {@code .set(0)} to reset the counter after a test.
+     * <p>Transitions:
+     * <pre>
+     *   session entry: even N  →  odd  N+1  (getAndAdd(1))
+     *   session exit:  odd  N+1 → even N+2  (getAndAdd(1))
+     * </pre>
+     *
+     * <p>Nesting is rejected by the {@code CTX} thread-local check before the
+     * increment, so a single thread never applies two entry increments before
+     * the matching exit.  Concurrent sessions from different threads both
+     * increment from even to odd simultaneously; the {@code getAndAdd} VarHandle
+     * operation is atomic.
+     *
+     * <p><b>Overflow:</b> {@code long} counter.  At 2 increments per session, the
+     * counter saturates at {@code Long.MAX_VALUE / 2 ≈ 4.6 × 10^18} sessions.
+     * At 1,000,000 sessions/second that is ~146,000 years.  No overflow guard needed.
+     *
+     * <p><b>Access:</b> the cold-path guard in {@link #saveFrame} and
+     * {@link #popResumeFrame} reads via {@link #TTD_GEN_HANDLE}{@code .getOpaque()},
+     * which allows the JIT to hoist the read out of tight loops while still
+     * guaranteeing materialization.  Session entry/exit use {@code getAndAdd} for
+     * sequential consistency.
      *
      * <p>TODO: annotate with {@code @Internal} once unit A.4 merges.
      */
-    public static final AtomicInteger TTD_ACTIVE_SESSIONS = new AtomicInteger(0);
+    public static volatile long TTD_GEN = 0L;
+
+    /** VarHandle for {@link #TTD_GEN} — used for getOpaque reads and atomic getAndAdd. */
+    static final VarHandle TTD_GEN_HANDLE;
+
+    static {
+        try {
+            TTD_GEN_HANDLE = MethodHandles.lookup()
+                    .findStaticVarHandle(Ttd.class, "TTD_GEN", long.class);
+        } catch (ReflectiveOperationException e) {
+            throw new ExceptionInInitializerError(e);
+        }
+    }
+
+    /**
+     * Test-only: forcibly set {@link #TTD_GEN} to a specific value.
+     * Allows tests to synthesize "session active" state without running a real session.
+     * Must not be called outside test code.
+     */
+    static void testSetTtdGen(long value) {
+        TTD_GEN_HANDLE.setVolatile(value);
+    }
 
     /**
      * Per-thread deque of {@link ResumeFrame} records pushed by
      * {@link #saveFrame}.
      *
      * <p>Using {@code withInitial(ArrayDeque::new)} so the supplier fires only
-     * inside an active session (the {@code TTD_ACTIVE_SESSIONS == 0}
-     * early-return guard fires before this is touched on cold paths).  The JIT
-     * therefore sees a non-null {@code get()} result on every warm call site,
-     * which eliminates the null-check branch from the compiled path.
+     * inside an active session (the {@code TTD_GEN == 0} early-return guard fires
+     * before this is touched on cold paths).  The JIT therefore sees a non-null
+     * {@code get()} result on every warm call site, which eliminates the
+     * null-check branch from the compiled path.
      */
     private static final ThreadLocal<ArrayDeque<ResumeFrame>> FRAME_DEQUE =
             ThreadLocal.withInitial(ArrayDeque::new);
@@ -239,8 +278,8 @@ public final class Ttd {
      * calls on the current thread do not affect the returned list, and callers
      * may mutate the list freely without affecting the runtime.
      *
-     * <p>If no TTD session is currently active ({@link #TTD_ACTIVE_SESSIONS}
-     * {@code == 0}), returns an empty list without touching the thread-local.
+     * <p>If no TTD session is currently active ({@link #TTD_GEN}{@code == 0}),
+     * returns an empty list without touching the thread-local.
      *
      * <p>For each {@link ResumeFrame} in the deque, the debug table is
      * consulted for the {@code (methodId, bci)} pair.  If an entry exists,
@@ -260,7 +299,7 @@ public final class Ttd {
      * @return mutable snapshot list, innermost frame first; never null
      */
     public static List<StackEntry> captureStack() {
-        if (TTD_ACTIVE_SESSIONS.get() == 0) return new ArrayList<>(0);
+        if ((long) TTD_GEN_HANDLE.getOpaque() == 0L) return new ArrayList<>(0);
         ArrayDeque<ResumeFrame> deque = FRAME_DEQUE.get();
         if (deque.isEmpty()) return new ArrayList<>(0);
 
@@ -356,15 +395,11 @@ public final class Ttd {
     /**
      * Push a save-point record onto the current thread's resume deque.
      *
-     * <p>When {@link #TTD_ACTIVE_SESSIONS} is zero (the common case — no
-     * session is running), this method returns immediately <em>without
-     * allocating anything</em> (zero-alloc steady state).  The guard on
-     * {@code TTD_ACTIVE_SESSIONS} comes before any {@code ThreadLocal.get()}
-     * or object construction, so the cold path is a single volatile read +
-     * conditional branch.
-     *
-     * <p>C.1 will replace the {@code == 0} check with a generation-counter
-     * test that also distinguishes stale frames from prior checkpoint epochs.
+     * <p>When {@link #TTD_GEN} is zero (the common case — no session has ever
+     * fired), this method returns immediately <em>without allocating anything</em>
+     * (zero-alloc steady state).  The guard on {@code TTD_GEN} comes before any
+     * {@code ThreadLocal.get()} or object construction, so the cold path is a
+     * single {@code getOpaque} read + conditional branch.
      *
      * <p>Called from bytecode emitted by B.3.  The {@code prims} and
      * {@code refs} arrays are owned by the newly created {@link ResumeFrame};
@@ -378,8 +413,10 @@ public final class Ttd {
      */
     public static void saveFrame(int methodId, int bci, long[] prims, Object[] refs) {
         // Zero-alloc early return: guard BEFORE any ThreadLocal.get() or alloc.
-        // C.1 will replace this check with a TTD_GEN generation test.
-        if (TTD_ACTIVE_SESSIONS.get() == 0) return;
+        // TTD_GEN == 0 means "no session has ever fired" (pristine JVM startup).
+        // Read via getOpaque so the JIT may hoist out of tight loops while still
+        // materialising when needed — same pattern as VersionCounter.getOpaque().
+        if ((long) TTD_GEN_HANDLE.getOpaque() == 0L) return;
         FRAME_DEQUE.get().push(new ResumeFrame(methodId, bci, prims, refs));
     }
 
@@ -407,7 +444,7 @@ public final class Ttd {
      * TODO: annotate with {@code @Internal} once unit A.4 merges.
      */
     public static ResumeFrame popResumeFrame(int methodId) {
-        if (TTD_ACTIVE_SESSIONS.get() == 0) return null;
+        if ((long) TTD_GEN_HANDLE.getOpaque() == 0L) return null;
         ArrayDeque<ResumeFrame> deque = FRAME_DEQUE.get();
         ResumeFrame top = deque.peek();
         if (top == null || top.methodId != methodId) return null;
@@ -452,35 +489,12 @@ public final class Ttd {
 
     /**
      * Push a frame directly onto the thread-local deque (HEAD), bypassing the
-     * {@code TTD_ACTIVE_SESSIONS} guard.  For use by tests that need to stage
-     * a resume frame before invoking an instrumented method.
+     * {@link #TTD_GEN} guard.  For use by tests that need to stage a resume
+     * frame before invoking an instrumented method.
      */
     static void testPushFrame(ResumeFrame frame) {
         FRAME_DEQUE.get().push(frame);
     }
-
-    // =========================================================================
-    // B.4: Back-step mechanism selection
-    // =========================================================================
-
-    /**
-     * When {@code true} (the default), back-stepping uses the CPS-driven
-     * mechanism: rollback, pre-stage a {@link ResumeFrame} chain on the deque,
-     * re-invoke the body.  The body's dispatch prelude then table-jumps to the
-     * target save-point BCI and resumes from there.
-     *
-     * <p>When {@code false} (set via {@code -Dcrochet.ttd.backstep=restart}),
-     * the legacy {@link Restart}-throw path is used: back-stepping throws
-     * {@link Restart} to unwind the body, the session loop catches it, performs
-     * rollback, and re-invokes the body which replays silently until the target
-     * breakpoint.  This path is preserved for Phase B duration so existing tests
-     * continue to pass under the legacy protocol; it is removed in C.1.
-     *
-     * <p>Evaluated once at class-load time.  The system property must be set
-     * before any {@code Ttd.session} call (ideally on the JVM command line).
-     */
-    static final boolean USE_CPS_BACKSTEP =
-            !"restart".equals(System.getProperty("crochet.ttd.backstep"));
 
     // =========================================================================
     // Session lifecycle
@@ -507,14 +521,18 @@ public final class Ttd {
      * may also be used by IDE integrations to substitute a non-stdin
      * frontend.
      *
-     * <p><b>Back-step mechanism:</b> when {@link #USE_CPS_BACKSTEP} is true
-     * (default), back-stepping is driven by the CPS prelude in each
-     * {@link TimeTravelBody}-annotated method: the session snapshots the
-     * current resume-frame deque, performs rollback, clears the deque, pushes
-     * the snapshot as a resume chain (INNERMOST-FIRST so OUTERMOST lands at
-     * HEAD), and re-invokes the body.  When {@code false} (legacy mode via
-     * {@code -Dcrochet.ttd.backstep=restart}), back-stepping throws
-     * {@link Restart} to unwind the body stack, then replays from the start.
+     * <p><b>Back-step mechanism (C.1, CPS-only):</b> back-stepping is driven
+     * by the CPS prelude in each {@link TimeTravelBody}-annotated method: the
+     * session snapshots the current resume-frame deque, performs rollback,
+     * clears the deque, pushes the snapshot as a resume chain (INNERMOST-FIRST
+     * so OUTERMOST lands at HEAD), and re-invokes the body.  The body's dispatch
+     * prelude then table-jumps to the target save-point BCI and resumes from
+     * there.
+     *
+     * <p><b>TTD_GEN lifecycle:</b> {@link #TTD_GEN} is incremented by 1 on
+     * entry (even → odd = "session active") and again by 1 on exit (odd → even
+     * = "session done").  {@link #saveFrame} and {@link #popResumeFrame} return
+     * early when {@code TTD_GEN == 0} (pristine; no session has ever fired).
      */
     public static void sessionWithRepl(Object root, Repl repl, Runnable body) {
         if (root == null) {
@@ -532,12 +550,12 @@ public final class Ttd {
         TtdContext ctx = new TtdContext(root, repl);
         ctx.checkpointVersion = CheckpointRollbackAgent.checkpoint(root);
         CTX.set(ctx);
-        // Increment active-sessions counter so saveFrame / popResumeFrame
-        // take their live paths.  Decremented in the finally block below
-        // (normal and exceptional exit).  C.1 will replace this plain counter
-        // with a TTD_GEN generation counter.  AtomicInteger ensures the
-        // increment/decrement are not lost under concurrent sessions.
-        TTD_ACTIVE_SESSIONS.getAndIncrement();
+        // C.1: even→odd transition: "session now active".
+        // saveFrame / popResumeFrame take their live paths while TTD_GEN is odd.
+        // On exit (finally), we apply odd→even: "session done".
+        // getAndAdd(1L) is atomic; concurrent sessions from different threads
+        // each get their own odd generation value.
+        TTD_GEN_HANDLE.getAndAdd(1L);
         try {
             while (true) {
                 ctx.currentIdx = 0;
@@ -549,10 +567,7 @@ public final class Ttd {
                             + " breakpoints hit)");
                     Repl.Action a = ctx.repl.prompt(ctx, /*atEnd=*/true);
                     if (a.kind == Repl.Action.Kind.RESTART) {
-                        // Back-step from end-of-body: legacy path always used here
-                        // (the CPS path requires a live deque at the moment of back-step;
-                        // at end-of-body the deque state from the last forward run is no
-                        // longer useful since body ran to completion).
+                        // Back-step from end-of-body: use CPS path.
                         rollbackAndRecheckpoint(ctx);
                         ctx.targetStop = a.targetIdx;
                         FRAME_DEQUE.get().clear();
@@ -563,10 +578,6 @@ public final class Ttd {
                     // CPS path: rollback + deque staging already done inside hitInternal.
                     // ctx.targetStop has been set by hitInternal before throw.
                     // Just re-loop to invoke body.run() again with staged frames.
-                } catch (Restart r) {
-                    rollbackAndRecheckpoint(ctx);
-                    // ctx.targetStop has been set by the REPL prior to throw.
-                    FRAME_DEQUE.get().clear();
                 } catch (Quit q) {
                     return;
                 }
@@ -574,11 +585,12 @@ public final class Ttd {
         } finally {
             CTX.remove();
             // Drain resume deque and clear thread-local to prevent memory leaks.
-            // Must run before decrementing the counter so that if a saveFrame
-            // call races on another thread, clearSessionState is complete before
-            // TTD_ACTIVE_SESSIONS drops to 0.
+            // Must run before incrementing TTD_GEN so that if a saveFrame call
+            // races on another thread, clearSessionState is complete before
+            // TTD_GEN transitions back to even.
             clearSessionState();
-            TTD_ACTIVE_SESSIONS.getAndDecrement();
+            // C.1: odd→even transition: "session done".
+            TTD_GEN_HANDLE.getAndAdd(1L);
         }
     }
 
@@ -625,12 +637,8 @@ public final class Ttd {
                 return;
             case RESTART:
                 ctx.targetStop = a.targetIdx;
-                if (USE_CPS_BACKSTEP) {
-                    backstepWithCps(ctx);
-                    // backstepWithCps never returns normally — always throws CpsBackstep.
-                } else {
-                    throw new Restart();
-                }
+                backstepWithCps(ctx);
+                // backstepWithCps never returns normally — always throws CpsBackstep.
                 return; // unreachable
             case QUIT:
                 throw new Quit();
@@ -719,20 +727,14 @@ public final class Ttd {
      * Thrown by {@link #backstepWithCps} to signal the session loop to
      * re-invoke the body with a pre-staged resume-frame chain.
      *
-     * <p>Unlike {@link Restart}, this exception is thrown AFTER rollback and
-     * deque staging have already been performed.  The session loop catches it
-     * and re-loops without performing additional rollback.
+     * <p>Thrown AFTER rollback and deque staging have already been performed.
+     * The session loop catches it and re-loops without performing additional
+     * rollback.
      *
      * <p>Not part of the public API; package-private for test access.
      */
     static final class CpsBackstep extends RuntimeException {
         CpsBackstep() { super(null, null, true, false); }
-        @Override public synchronized Throwable fillInStackTrace() { return this; }
-    }
-
-    /** Thrown by breakpoint() to unwind the body for back-stepping (legacy path). */
-    static final class Restart extends RuntimeException {
-        Restart() { super(); }
         @Override public synchronized Throwable fillInStackTrace() { return this; }
     }
 
