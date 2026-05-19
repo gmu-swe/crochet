@@ -1,7 +1,7 @@
 # Soundness Sketch: `checkpointWorldSafe()` — STW Heap Iteration
 
 **Unit:** E.1  
-**Status:** Draft — pending Reviewer subagent sign-off  
+**Status:** Revised — addressing Reviewer critique (6 amendments applied)  
 **Date:** 2026-05-19
 
 ---
@@ -144,6 +144,26 @@ the CAS in `$$crochetCheckpoint(V)` fails benignly (no-op). I's snap was already
 established at the explicit checkpoint. This is correct: the earlier explicit
 checkpoint snap takes precedence and is not double-written.
 
+### 3.4 Double-visit of user klass and Fast-proxy klass
+
+`HeapWalker.collectCRIJClasses()` collects all `CRIJInstrumented` classes,
+including both the original user class `Foo` and its Fast-proxy counterpart
+`Foo$$crochetFast`. At the time the heap walk runs:
+
+- Instances currently in **user-klass mode** (klass header points to `Foo`) are
+  found by `IterateOverInstancesOfClass(Foo, ...)`.
+- Instances currently in **Fast-proxy mode** (klass header has been CAS-swapped
+  to `Foo$$crochetFast`) are found by `IterateOverInstancesOfClass(Foo$$crochetFast, ...)`.
+
+Both calls invoke `$$crochetCheckpoint(V)` on the matched instances. An instance
+can match at most one of the two calls (its runtime klass is either the user klass
+or the proxy klass, never both simultaneously). However, if an instance were to be
+visited by both calls (e.g., due to a race between the klass swap and the iteration —
+which is prevented by the STW, but acknowledged here for completeness), the second
+call is idempotent: the CAS from current-version-or-sentinel to `-V` fails, and
+`$$crochetCheckpoint` is a no-op for that instance. No double-write of the snap
+can occur. The double-class iteration is therefore safe.
+
 ---
 
 ## 4. Interaction with `checkpointAll`
@@ -182,9 +202,12 @@ twice: once in the class-level pass and once by the heap walk. The second call
 is an I3-idempotent no-op (same V, CAS fails cleanly). This is correct.
 
 **One version per `checkpointWorldSafe` call:** exactly as with `checkpointAll`,
-`nextCheckpointVersion()` is called once at the top of `checkpointWorldSafe`.
-The same V is propagated to every `$$crochetCheckpoint(V)` call in the heap
-walk. All subsequently mutated instances are snapped relative to this V.
+`nextCheckpointVersion()` is called exactly once. Concretely, `v` is allocated
+inside `CheckpointRollbackAgent.checkpointAll()` (line ~79 of
+`CrochetWorldSafe.java`) as the first action of `checkpointWorldSafe()`. That
+same `v` is then passed to `HeapWalker.checkpointWorldSafe(v)` and propagated
+to every `$$crochetCheckpoint(V)` call in the heap walk. All subsequently
+mutated instances are snapped relative to this V.
 `rollbackAll(V)` restores all of them.
 
 ---
@@ -225,20 +248,27 @@ loading a class after `checkpointWorldSafe` returns and verifying:
 
 ## 6. Mid-Iteration GC
 
-JVMTI `IterateThroughHeap` / heap iteration callbacks receive stable object
-references via JNI local references within a JNI local frame. From the JVMTI
-spec (§2.6.5): "Heap iteration callbacks are not called from within a GC cycle
-that may move objects." HotSpot honors this by deferring or postponing heap
-iteration relative to GC phases that relocate objects (G1 evacuation, ZGC
-relocation, Shenandoah copy phases).
+JVMTI heap iteration callbacks receive object handles managed by the JVMTI
+implementation, not raw oop pointers. Object references are stable across the
+callback because:
 
-In practice:
-- During `SuspendThreadList` all application threads are at safepoints.
-- HotSpot will not start a new concurrent GC cycle that evacuates objects
-  while application threads are at safepoints (the GC coordinator would
-  deadlock waiting for threads that are suspended by JVMTI).
-- The JVMTI heap iterator uses stable oop handles; the GC does not move
-  objects during a JVMTI heap-iteration callback.
+- During `SuspendThreadList`, all application threads are at safepoints.
+  HotSpot cannot initiate a relocating GC while application threads are
+  already stopped by JVMTI: the GC coordinator's own stop-the-world phase
+  must gather all threads at a safepoint, but those threads are already held
+  by JVMTI — the coordinator would deadlock waiting for threads that can no
+  longer respond to safepoint polls. Therefore no relocating GC cycle
+  (G1 evacuation, ZGC relocation, Shenandoah copy phase) can start while our
+  STW window is open.
+- Our implementation uses `IterateOverInstancesOfClass` (one call per known
+  CRIJInstrumented class) with `JVMTI_HEAP_OBJECT_EITHER` as the object
+  filter, then `GetObjectsWithTags` to retrieve stable `jobject` references
+  for Phase B. The Phase A callback only writes to JVMTI tag slots — no heap
+  allocation and no JNI object accesses occur inside the callback. During
+  Phase B, the iteration thread allocates JNI local references for the
+  returned `jobject[]`; those are tracked by the JNI local frame and are
+  immune to any GC that could fire on this thread (none can, because
+  application threads cannot trigger GC while they are suspended).
 
 **What can happen:** the JVM may run a stop-the-world GC pass before or
 after (not during) the JVMTI iteration. Objects collected by GC between the
@@ -247,13 +277,12 @@ them (their version is unreachable). This is correct.
 
 **Potential issue flagged:** If using ZGC or Shenandoah in a mode where
 concurrent relocation overlaps with JVMTI agent operation, the JVMTI
-`IterateThroughHeap` may interact with the concurrent GC in ways not fully
-specified by the JVMTI spec. Our implementation uses the
-`JVMTI_HEAP_FILTER_CLASS_TAGGED` mechanism with `AddCapabilities` for
-`can_tag_objects` to allow klass-based filtering; relying on the JVMTI
-abstraction layer (not raw oop pointers) keeps us within the spec. If a
-production deployment reports issues with ZGC/Shenandoah, the mitigation is
-to force a full STW GC before the heap walk (via `JVMTI_EVENT_GARBAGE_COLLECTION_*`).
+heap iteration may interact with the concurrent GC in ways that are GC-
+implementation-specific. Our implementation uses `IterateOverInstancesOfClass`
+with `AddCapabilities` for `can_tag_objects` to stay within the JVMTI
+abstraction layer (not raw oop pointers). If a production deployment reports
+issues with ZGC/Shenandoah, the mitigation is to force a full STW GC before
+the heap walk (via `JVMTI_EVENT_GARBAGE_COLLECTION_*`).
 
 ---
 
@@ -371,6 +400,31 @@ between the static pass and the STW start. For production use, this window is
 sub-millisecond. A future enhancement (E.2 or beyond) could move the static
 pass inside the STW window to eliminate the gap entirely.
 
+### T7: Partial `SuspendThreadList` failure
+
+`SuspendThreadList` fills a per-thread error array (`suspend_results[i]`) in
+addition to its overall return code. A thread whose per-thread entry is
+non-`JVMTI_ERROR_NONE` (and not `JVMTI_ERROR_THREAD_SUSPENDED`, which is benign
+and means "already suspended by another agent") was NOT suspended. If the walk
+proceeds with such a thread still running, it can mutate Java object fields
+concurrently with Phase A or Phase B, silently voiding the §1 guarantee.
+
+**Hardening (implemented):** the native `iterateAndCheckpoint` inspects every
+per-thread `suspend_results[i]` entry. If any entry is a non-benign error, the
+implementation:
+1. Emits a diagnostic to stderr naming the failing thread index and error code.
+2. Resumes only the threads it successfully suspended (entries that returned
+   `JVMTI_ERROR_NONE`; entries that returned `JVMTI_ERROR_THREAD_SUSPENDED` are
+   left as-is, since we did not suspend them).
+3. Throws `java.lang.IllegalStateException` with the message
+   `"checkpointWorldSafe: SuspendThreadList partial failure; STW guarantee
+   cannot be honored"` — so the Java caller cannot silently continue with a
+   degraded snapshot.
+
+The "best-effort continue" alternative (log a warning, walk anyway) was explicitly
+rejected because it would silently void the §1 guarantee in error paths where
+the caller has no way to detect the problem.
+
 ---
 
 ## 8. Fallback: Native Agent Not Loaded
@@ -399,46 +453,62 @@ needed.
 ## 9. Implementation Notes
 
 The native function `Java_net_jonbell_crochet_runtime_HeapWalker_iterateAndCheckpoint`
-implements the following algorithm:
+implements a two-phase algorithm. JNI `CallVoidMethod` is **not permitted from
+within a `jvmtiHeapObjectCallback`** — the JVMTI spec restricts the operations
+allowed inside heap-iteration callbacks to tagging and counting only. The
+two-phase design avoids this restriction: Phase A runs inside the callback
+(tagging only), while Phase B runs on the iteration thread outside any callback
+but still inside the STW window.
 
 ```
 1. Acquire g_walk_mutex (guards concurrent STW calls).
 2. Get current thread (the caller; never suspend it).
 3. GetAllThreads → build targets list (everyone except caller).
-4. SuspendThreadList(targets) → STW.
-5. For each CRIJInstrumented klass K (pre-enumerated at class-load time or
-   discovered via IterateThroughHeap with JVMTI_HEAP_FILTER_CLASS_TAGGED):
-     IterateThroughHeapInstance(K, callback):
-       callback(inst):
-         env->CallVoidMethod(inst, checkpointMethodID, V)
-         // This calls $$crochetCheckpoint(V) on the instance.
+4. SuspendThreadList(targets).
+   Check per-thread suspend_results[i]: if any entry is non-OK and
+   non-JVMTI_ERROR_THREAD_SUSPENDED, resume the threads we did suspend,
+   throw IllegalStateException, and return (§7 T7 hardening).
+
+5. === STW window begins ===
+
+   Phase A — tag (inside IterateOverInstancesOfClass callbacks):
+     For each CRIJInstrumented klass K in the passed classes[]:
+       IterateOverInstancesOfClass(K, JVMTI_HEAP_OBJECT_EITHER, tag_callback):
+         tag_callback(class_tag, size, tag_ptr, user_data):
+           *tag_ptr = g_heap_walk_tag;  // tag only — no JNI calls here
+
+   Phase B — checkpoint (outside any callback, still in STW window,
+              on the iteration thread):
+     GetObjectsWithTags({g_heap_walk_tag}) → count, objects[], tags[]
+     for i in 0..count-1:
+       CallVoidMethod(objects[i], $$crochetCheckpoint, V)
+       SetTag(objects[i], 0)  // clear tag for future walks
+
 6. ResumeThreadList(targets).
+   === STW window ends ===
+
 7. Release g_walk_mutex.
 ```
 
-The `$$crochetCheckpoint` call is via JNI `CallVoidMethod`, which is valid
-inside a JVMTI heap callback when the JVM is suspended (the callback runs on
-the iteration thread, which is not suspended). The `IterateThroughHeapInstance`
-API (JVMTI 1.2, `IterateOverInstancesOfClass`) restricts iteration to a single
-class; calling it once per CRIJInstrumented class is correct and allows
-fine-grained error isolation.
+**Safety of Phase B's `CallVoidMethod`:** the call runs on the iteration thread,
+outside any heap callback, while the heap is frozen by the STW window. JNI calls
+are not permitted from within `jvmtiHeapObjectCallback`; the two-phase design
+avoids this restriction by deferring all JNI calls to Phase B.
 
-**Klass enumeration strategy:** because `IterateThroughHeapInstance` requires
-a `jclass` argument, we need the set of CRIJInstrumented classes at the time
-of the walk. We use JNI `FindClass` + `GetSubclassesOf` (unavailable in JVMTI)
-or delegate to the Java side: the Java `HeapWalker.iterateAndCheckpoint(int V)`
-method collects the set of loaded CRIJInstrumented classes (via
-`INITIALIZED_CLASSES` + `INSTRUMENTATION_HANDLE.getAllLoadedClasses()`) and
-passes them to the native function as a `jclass[]`. This avoids the need for a
-"find all subclasses of CRIJInstrumented" JVMTI call, which has no standard
-API.
+**Klass enumeration strategy:** `IterateOverInstancesOfClass` requires a
+`jclass` argument. The Java side (`HeapWalker.collectCRIJClasses()`) collects
+the set of loaded CRIJInstrumented classes (via `INITIALIZED_CLASSES` +
+`INSTRUMENTATION_HANDLE.getAllLoadedClasses()`) and passes them to the native
+function as a `jclass[]`. This avoids the need for a "find all subclasses of
+CRIJInstrumented" JVMTI call, which has no standard API. Both user klasses and
+their Fast-proxy counterparts are included; see §3.4 for the idempotency
+argument that makes double-visiting safe.
 
-**Alternative implementation:** `IterateThroughHeap` (unrestricted) with a tag-
-based filter. We tag every CRIJInstrumented class with a sentinel tag via
-`SetTag`, then use `JVMTI_HEAP_FILTER_CLASS_TAGGED` to visit only instances
-of tagged classes. This avoids the per-class loop but requires tagging all
-CRIJInstrumented classes before the walk. We choose the **per-class approach**
-(one `IterateThroughHeapInstance` call per class) because:
+**Why not `IterateThroughHeap` with `JVMTI_HEAP_FILTER_CLASS_TAGGED`?**
+`JVMTI_HEAP_FILTER_CLASS_TAGGED` belongs to the `IterateThroughHeap` API (JVMTI
+heap-iteration filters). Our implementation uses `IterateOverInstancesOfClass`
+(one call per class), not `IterateThroughHeap`. We chose the per-class approach
+because:
 1. The class set is known from Java-side bookkeeping (INITIALIZED_CLASSES).
-2. It avoids the `can_tag_objects` capability overhead.
-3. It matches the existing `checkpointAll` code structure.
+2. It avoids the need to pre-tag every CRIJInstrumented class before the walk.
+3. It provides fine-grained per-class error isolation.
