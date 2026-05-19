@@ -378,9 +378,51 @@ Java_net_jonbell_crochet_runtime_HeapWalker_iterateAndCheckpoint(
                 static_cast<jint>(targets.size()),
                 targets.data(),
                 suspend_results.data());
-        if (err != JVMTI_ERROR_NONE) {
-            fprintf(stderr, "[crochet-jvmti] HeapWalker: SuspendThreadList error: %d"
-                    " (STW guarantee may be weakened)\n", err);
+        // Inspect per-thread results.  JVMTI_ERROR_THREAD_SUSPENDED is benign
+        // (thread was already suspended by another agent or a prior call).
+        // Any other non-NONE result means the thread is running and the STW
+        // guarantee cannot be honoured for it — abort to preserve §1.
+        bool partial_failure = false;
+        for (size_t i = 0; i < targets.size(); ++i) {
+            jvmtiError r = suspend_results[i];
+            if (r != JVMTI_ERROR_NONE && r != JVMTI_ERROR_THREAD_SUSPENDED) {
+                char* name = nullptr;
+                g_jvmti->GetErrorName(r, &name);
+                fprintf(stderr, "[crochet-jvmti] HeapWalker: SuspendThreadList"
+                        " partial failure: thread[%zu] error %d (%s);"
+                        " aborting STW walk to preserve §1 guarantee.\n",
+                        i, r, name ? name : "?");
+                if (name) g_jvmti->Deallocate(reinterpret_cast<unsigned char*>(name));
+                partial_failure = true;
+            }
+        }
+        if (partial_failure) {
+            // Resume the threads we DID successfully suspend before bailing out.
+            // A thread with JVMTI_ERROR_THREAD_SUSPENDED was already suspended
+            // before we arrived — we must NOT resume it, as we didn't suspend it.
+            // A thread with JVMTI_ERROR_NONE was suspended by us — resume it.
+            std::vector<jthread> to_resume;
+            to_resume.reserve(targets.size());
+            for (size_t i = 0; i < targets.size(); ++i) {
+                if (suspend_results[i] == JVMTI_ERROR_NONE) {
+                    to_resume.push_back(targets[i]);
+                }
+            }
+            if (!to_resume.empty()) {
+                std::vector<jvmtiError> resume_results(to_resume.size(), JVMTI_ERROR_NONE);
+                g_jvmti->ResumeThreadList(
+                        static_cast<jint>(to_resume.size()),
+                        to_resume.data(),
+                        resume_results.data());
+            }
+            g_jvmti->Deallocate(reinterpret_cast<unsigned char*>(threads));
+            // Surface as an exception so CrochetWorldSafe can throw
+            // IllegalStateException to the caller.
+            env->ThrowNew(
+                env->FindClass("java/lang/IllegalStateException"),
+                "checkpointWorldSafe: SuspendThreadList partial failure;"
+                " STW guarantee cannot be honored");
+            return JNI_FALSE;
         }
     }
 
