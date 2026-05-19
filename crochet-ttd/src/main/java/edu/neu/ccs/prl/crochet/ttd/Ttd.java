@@ -428,6 +428,36 @@ public final class Ttd {
     }
 
     // =========================================================================
+    // @VisibleForTesting helpers — package-private, tests only
+    // =========================================================================
+
+    /**
+     * Clear the current thread's resume deque without removing the thread-local.
+     * For use by tests that manage the deque lifecycle manually.
+     */
+    static void testClearDeque() {
+        FRAME_DEQUE.get().clear();
+    }
+
+    /**
+     * Return a snapshot list of all frames currently in the thread-local deque,
+     * HEAD first, for test assertions.  The returned list is a copy; it is
+     * decoupled from the live deque.
+     */
+    static List<ResumeFrame> testPeekDeque() {
+        return new ArrayList<>(FRAME_DEQUE.get());
+    }
+
+    /**
+     * Push a frame directly onto the thread-local deque (HEAD), bypassing the
+     * {@code TTD_ACTIVE_SESSIONS} guard.  For use by tests that need to stage
+     * a resume frame before invoking an instrumented method.
+     */
+    static void testPushFrame(ResumeFrame frame) {
+        FRAME_DEQUE.get().push(frame);
+    }
+
+    // =========================================================================
     // Session lifecycle
     // =========================================================================
 
