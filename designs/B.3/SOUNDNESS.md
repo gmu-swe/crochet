@@ -1,6 +1,7 @@
 # B.3 LineMarkerTransformer CPS Extension — Soundness Sketch
 
-*Author: B.3 builder agent — May 2026*
+*Author: B.3 builder agent v2 — May 2026*
+*Revised to cover callsite save points and correct cross-method back-step ordering.*
 
 ---
 
@@ -26,21 +27,23 @@ source-level position as the resume target, then continuing forward.
   - Calls to external (non-instrumented) methods (treated as opaque effects).
 
 - *Source-level position* means:
-  - A *line-marker bci*: the instruction index of the first instruction
-    covered by a `LineNumberTable` entry (i.e., every `visitLineNumber` site
-    in the original bytecode).
-  - A *callsite bci*: the instruction index of any `INVOKE*` instruction
-    inside the method body that is NOT one of the synthetic TTD calls emitted
-    by the transformer itself (`Ttd.saveFrame`, `Ttd.popResumeFrame`,
-    `Ttd.registerMethodLine`).
+  - A *line-marker bci*: the instruction index of the `LineNumberNode`
+    pseudo-instruction (every `visitLineNumber` site in the original bytecode).
+  - A *callsite bci*: the instruction index of any non-TTD `INVOKE*` instruction
+    (`INVOKEVIRTUAL`, `INVOKESPECIAL`, `INVOKESTATIC`, `INVOKEINTERFACE`,
+    `INVOKEDYNAMIC`) whose arguments are entirely reconstructible from live
+    locals or inline constants at that BCI. Non-reconstructible callsites do
+    NOT become save points and are treated as ordinary instructions.
 
-**Key simplification:** In Phase B, the resume mechanism is *re-execution
-from the top of `m`*, not mid-frame restoration.  The dispatch prelude jumps
-to the save-point label, but the code from entry to that label re-runs
-(trivially zero-instruction gap because the prelude is a pure table-jump with
-no heap side-effects).  Observable effects of the original `m` before the
-resumed position are therefore replayed identically on re-execution (assuming
-the body is deterministic, which is a stated `Ttd.session` precondition).
+**Key simplification:** The resume mechanism is a verifier-compatible *shim*
+approach: at resume, the dispatch prelude restores live locals from the saved
+frame, then GOTOs a shim label placed in the original instruction stream
+immediately before the argument-loading sequence. The shim label has an empty
+operand stack (verifier-compatible). From the shim label, the JVM re-loads the
+call arguments from local variables / constants and falls through to the INVOKE.
+Observable effects of the original `m` before the resumed position are replayed
+identically on re-execution (assuming the body is deterministic, the stated
+`Ttd.session` precondition).
 
 ---
 
@@ -127,26 +130,29 @@ the stores go directly to the slot the original code would use.
 
 ## 4. Save-Frame Correctness
 
-At each save point (line-marker bci or callsite bci), the emitted snippet:
+At each save point (line-marker or callsite), the emitted snippet is:
 
 ```
 PUSH methodId (LDC int)
 PUSH bci      (LDC int)
 PUSH prims[]  (NEWARRAY T_LONG of size = live_prims_count)
-  — for each live prim local at this bci (in B.1 sorted order):
-      load slot (ILOADx / FLOADx / LLOADx / DLOADx)
-      (widen to long if needed: i2l, f2l, d2l is bit-unsafe — use raw bits:
-       for float: Float.floatToRawIntBits(f) then i2l;
-       for int/short/char/byte/boolean: zero-extend via ILOAD + I2L;
-       for long: LLOAD directly;
-       for double: Double.doubleToRawLongBits(d))
+  — for each live prim local (in B.1 sorted order):
+      load slot; encode to long (raw bits for float/double)
       LASTORE
 PUSH refs[]   (ANEWARRAY Object of size = live_refs_count)
-  — for each live ref local at this bci (in B.1 sorted order):
-      ALOAD slot
-      AASTORE
+  — for each live ref local (in B.1 sorted order):
+      ALOAD slot; AASTORE
 INVOKESTATIC Ttd.saveFrame(int, int, long[], Object[])
 ```
+
+**Placement invariant — the operand stack is empty when the save-frame is
+emitted.** For line-marker save points, this is guaranteed by the Java
+compiler: the stack is empty at statement boundaries (which is where line
+numbers are emitted). For callsite save points, the save-frame is emitted at
+`argStartBci`, which is the instruction immediately before the argument-loading
+sequence. At this point the stack is also empty, because `argStartBci` is the
+BCI of the first arg-loading instruction — which by definition has nothing
+below it on the stack (the argument sequence starts from an empty stack).
 
 **Claim (a) — packing preserves all live values.**
 
@@ -154,9 +160,8 @@ At the save-point bci, B.1's `LivenessAnalyzer` has reported the set of
 live locals.  A local is live iff it holds a typed, non-TOP value at that bci
 in the ASM `BasicInterpreter` forward data-flow.  The snippet loads each such
 local before any instruction of the original method body at that bci executes.
-The stack is in a consistent state at a save-point bci (it is the beginning of
-a statement, immediately after a line-number pseudo-instruction or at a
-callsite), so the load instructions are type-safe and verifiable.
+The stack is empty at a save-point bci, so the LOAD instructions are type-safe
+and verifiable.
 
 **Claim (b) — unpacking at resume restores values to the same slots.**
 
@@ -294,7 +299,7 @@ to instrument.  Skipping is trivially correct.
 
 ---
 
-## 8. Lambda / Synthetic Body Skip
+## 8. Lambda / Synthetic Body Skip + Callsite Coverage
 
 A `@TimeTravelBody` method body may contain a lambda expression, e.g.:
 
@@ -312,117 +317,141 @@ SKIPPED by the transformer.
 
 **Why this is correct for user intent.** The user annotated `doWork`, not the
 lambda.  Time-travel pause points are intended at the source-line granularity
-of `doWork`.  The line `items.forEach(...)` produces a line-marker save point
-in `doWork`; the lambda body is an implementation detail.  Save points inside
-the lambda body would be semantically confusing (the user is "inside" an
-iteration, which is hard to represent as a resumable frame without also saving
-the iteration state — a much harder problem, out of scope for Phase B).
+of `doWork`.  Save points inside the lambda body would be semantically confusing
+(the user is "inside" an iteration, which is hard to represent as a resumable
+frame without also saving the iteration state — a much harder problem).
 
-The user's observable intent (pause at the `forEach` line in `doWork`) is
-fully captured by the callsite save point at the `forEach` invocation.
+**Callsite save point at the `forEach` invocation.** The B.3 transformer
+now emits a callsite save point at the `items.forEach(...)` call in `doWork`.
+This means:
+- On forward execution, a `ResumeFrame(doWork_id, forEach_bci, ...)` is pushed
+  before the `INVOKEINTERFACE forEach` executes.
+- On resume at the `forEach` callsite, the dispatch prelude restores `doWork`'s
+  locals, GOTOs the shim label, and the `INVOKEINTERFACE forEach` re-executes.
+  This re-invokes the lambda body (via the same captured lambda object), which
+  is the intended behavior: the `forEach` call is replayed.
+
+The `forEach` lambda is backed by an `INVOKEDYNAMIC` instruction whose bootstrap
+(`LambdaMetafactory`) is JVM-cached after the first call (JVMS §5.4.3.6).
+Re-execution of `INVOKEDYNAMIC` does NOT re-invoke the bootstrap; it uses the
+cached `CallSite`'s `MethodHandle` directly. Observable behavior is identical
+to the first execution (see §5).
 
 ---
 
 ## 9. Cross-Method Back-Step
 
 **Setting.** The user's `@TimeTravelBody` method `outer` calls a
-`@TimeTravelBody` helper method `inner`, and back-steps to a line L_inner
-inside `inner`.
+`@TimeTravelBody` helper method `inner`, and back-steps to position
+`(outer_callsite, inner_bci)` — i.e., to the state of `outer` just before
+calling `inner`, and to a specific line `L_inner` inside `inner`.
 
-**Mechanism.**
+**Forward-execution frame capture.** Both methods emit save points. `saveFrame`
+uses `ArrayDeque.push` (`addFirst`), so the most recently pushed frame is at
+the HEAD. During forward execution:
 
-When `outer` executes forward and calls `inner`, both methods emit save points.
-At line L_inner, `saveFrame` pushes a `ResumeFrame(methodId_inner, bci_inner,
-...)` onto the deque.  At the calling line in `outer` (the callsite of `inner`),
-`saveFrame` pushes a `ResumeFrame(methodId_outer, bci_outer, ...)`.  The
-deque thus holds, top-to-bottom:
-  `[inner_frame_at_L_inner, outer_frame_at_callsite]`
+1. `outer` reaches the callsite of `inner` (BCI `callsite_bci`). The
+   callsite save-frame is emitted BEFORE the argument loads:
+   `saveFrame(outer_id, callsite_bci, ...)` → `outer_frame` at HEAD.
+2. `inner` is called. At `L_inner` (BCI `bci_inner`), a line-marker save-frame
+   fires: `saveFrame(inner_id, bci_inner, ...)` → `inner_frame` at HEAD.
 
-On back-step, `Ttd.session` re-runs `outer` from the top.
+After forward execution up to `L_inner`:
+```
+Deque HEAD → [inner_frame, outer_frame] ← TAIL
+```
 
-**Resume sequence:**
+**Back-step setup (session layer responsibility).** When the user requests a
+back-step to `(outer_callsite, inner_bci)`:
 
-1. `outer`'s dispatch prelude calls `Ttd.popResumeFrame(methodId_outer)`.
-   The top frame has `methodId_inner` ≠ `methodId_outer`, so `popResumeFrame`
-   returns `null`.  The prelude falls through to normal forward execution of
-   `outer`.
+1. Session calls `clearSessionState()` — deque is now EMPTY.
+2. Session pushes the frames in REVERSE forward-execution order:
+   - Push `outer_frame` first → `[outer_frame]` (outer is at HEAD).
+   - Push `inner_frame` last → `[inner_frame, outer_frame]` (inner is at HEAD).
+3. Session re-runs the body from the top.
 
-   Wait — this is wrong as stated. The deque order matters. Let me be precise.
+**Resume execution sequence:**
 
-**Correct deque ordering.** `saveFrame` uses `push` (i.e., `addFirst`), so
-the MOST RECENTLY pushed frame is at the HEAD of the deque.  During forward
-execution:
+1. `outer`'s dispatch prelude calls `popResumeFrame(outer_id)`.
+   HEAD = `inner_frame`; `inner_frame.methodId = inner_id ≠ outer_id` → returns
+   `null`. Prelude falls through to normal forward execution of `outer`.
 
-- `outer` is running; at the callsite bci, `saveFrame(outer_id, callsite_bci,
-  ...)` is called → outer's frame is pushed to HEAD.
-- `inner` is called; at L_inner bci, `saveFrame(inner_id, bci_inner, ...)` is
-  called → inner's frame is pushed to HEAD.
+2. `outer` re-executes forward. Before reaching the callsite of `inner`,
+   `saveFrame` is called again (fresh callsite save-frame is pushed to the deque).
+   Deque is now: `[new_outer_frame, inner_frame, outer_frame]`.
 
-Deque head-to-tail: `[inner_frame, outer_frame]`.
+   Note: the stale `outer_frame` and `new_outer_frame` are below `inner_frame`.
+   This is harmless — they will not be popped by `inner`'s prelude (wrong id).
 
-**Resume sequence (correct):**
+3. `outer` calls `inner`.
 
-1. `outer`'s dispatch prelude calls `popResumeFrame(methodId_outer)`.
-   HEAD = `inner_frame` with `methodId_inner ≠ methodId_outer` → returns
-   `null`. Prelude falls through. Outer re-executes forward from its first
-   instruction.
+4. `inner`'s dispatch prelude calls `popResumeFrame(inner_id)`.
+   HEAD = `new_outer_frame` with `outer_id ≠ inner_id` → returns `null`.
+   Prelude falls through... but wait — the deque order is: we pushed
+   `inner_frame` AFTER `outer_frame`. But `saveFrame` in step 2 pushed
+   `new_outer_frame` on top. So the deque is:
+   `[new_outer_frame, inner_frame, outer_frame]`.
 
-2. Outer's forward execution reaches the callsite of `inner`. Before calling
-   `inner`, a FRESH `saveFrame(outer_id, callsite_bci, ...)` is pushed.
-   But wait — the old `outer_frame` is still on the deque below.
+   Actually, `popResumeFrame(inner_id)` peeks at HEAD = `new_outer_frame` with
+   `outer_id` → no match → returns `null`. `inner` runs forward... but
+   `inner_frame` is still on the deque below!
 
-**Issue.** This shows that on replay, the deque accumulates extra frames.
-The B.2 design must handle this.  Examining `Ttd.saveFrame`: it pushes
-unconditionally (when `TTD_ACTIVE_SESSIONS > 0`).  On replay, re-execution
-generates fresh save frames that pile on top of the existing ones.
+**Corrected model:** The session must push frames in the order that lets each
+method's prelude find ITS OWN frame at the HEAD when it is entered. The correct
+approach is:
 
-**Resolution: session manages the deque.** The `Ttd.session` loop CLEARS the
-deque on each restart via `clearSessionState()` before re-running the body.
-This means: on each back-step restart, the deque starts EMPTY.  The user's
-code then pushes frames during forward execution until hitting `Ttd.lineHit`
-which triggers the REPL.  To resume at a saved position, the session must
-RE-PUSH the desired resume frames onto the (cleared) deque before re-running
-the body.
+- Session pushes frames in reverse call-chain order (outermost method's frame
+  goes on TOP, innermost on the bottom — so when `outer` enters first, it finds
+  its frame on top; when `inner` enters, `inner_frame` is now at the top).
 
-**Revised mechanism for resume-mode.** When the user back-steps to position
-(outer_callsite, inner_bci):
-1. Session clears the deque.
-2. Session pushes `inner_frame` and `outer_frame` (bottom to top): first push
-   `inner_frame` (HEAD), then this produces `[inner_frame]`.  Wait, no:
-   push order must be: push outer's frame first (becomes HEAD), then push
-   inner's frame (becomes new HEAD).
+Revised push order:
+1. Push `inner_frame` first → `[inner_frame]`.
+2. Push `outer_frame` last → `[outer_frame, inner_frame]`.
 
-   Result: HEAD = `inner_frame`, tail = `outer_frame`.
+Now:
+1. `outer`'s prelude calls `popResumeFrame(outer_id)`. HEAD = `outer_frame` with
+   `outer_id` → **match**. Frame is popped. Prelude restores `outer`'s locals
+   from `outer_frame.prims`/`outer_frame.refs`. Table-jumps to `callsite_bci`'s
+   shim label, which re-loads the args for `inner` and falls through to the
+   INVOKE. Deque is now `[inner_frame]`.
 
-3. Body is re-run.  `outer`'s prelude calls `popResumeFrame(outer_id)`.
-   HEAD = `inner_frame` → null returned → prelude falls through → outer
-   re-executes forward.
+2. `outer` calls `inner` (via the callsite shim).
 
-4. Outer reaches callsite of `inner`.  It calls `inner`.
+3. `inner`'s prelude calls `popResumeFrame(inner_id)`. HEAD = `inner_frame` with
+   `inner_id` → **match**. Frame is popped. Prelude restores `inner`'s locals.
+   Table-jumps to `bci_inner` (a line-marker save-point). `inner` resumes at
+   `L_inner`. Deque is now `[]`.
 
-5. `inner`'s prelude calls `popResumeFrame(inner_id)`.  HEAD = `inner_frame`
-   with matching `methodId` → frame is popped and returned.  Prelude
-   table-jumps to `bci_inner`, restores locals.  `inner` resumes at L_inner.
+**Summary of correct LIFO ordering:** The session pushes frames with the
+INNERMOST method's frame FIRST (pushed to HEAD), and the OUTERMOST last (ends
+up on top as HEAD). This is the reverse of forward-execution push order, and it
+matches the call-chain's re-entry order: the outermost method enters first and
+finds its frame at the top, consumes it, calls inner; the inner method enters
+and finds its frame at the top.
 
-This is correct. The deque acts as a stack-of-intents: outer's frame sits
-below inner's, to be consumed when the *outer* method re-enters its prelude.
-But in step 3 above, outer's prelude sees `inner_frame` at HEAD and gets
-`null`.  Then in step 5, `inner`'s prelude sees `inner_frame` and pops it.
-The `outer_frame` remains on the deque, unconsumed — this is correct,
-because outer has already re-entered and is now calling inner forward (the
-callsite is part of normal forward execution, not a resume target here).
+**Deque contamination on fresh save-frames during replay.** When `outer` runs
+forward from the restored callsite shim (step 2 in the deque ordering above),
+does it emit a fresh save-frame? NO — because the dispatch prelude consumed the
+frame and set `resumeSlot` to non-null. The save-frame snippets in the body
+still execute on forward paths, but since `outer`'s prelude already consumed the
+frame, `outer` has resumed at the callsite shim and immediately calls `inner`
+(the arg loads and INVOKE execute). No additional line-marker save-frames are
+emitted between the prelude and the callsite (the prelude GOTOs the shim label
+which is placed right before the arg loads, bypassing any earlier line-marker
+snippets). The fresh save-frames emitted on forward paths in `inner` are
+correct: they record `inner`'s progress AFTER the resumed position.
 
-**Assumption.** The session layer (or a future D.3 nondet-record/replay
-mechanism) is responsible for re-materializing the resume chain on the deque
-before each re-run.  Phase B leaves this wiring to the REPL / session; the
-transformer's prelude simply reads and acts on whatever frames are present.
-In Phase B tests, we manually push frames to test the transformer's half.
+**Assumption.** The session layer (B.4 or later) is responsible for
+re-materializing the resume chain on the deque before each re-run, using the
+INNERMOST-first push order described above. Phase B's transformer prelude simply
+reads and acts on whatever frames are present; the correctness of the ordering
+is a session-layer concern.
 
-**Idempotency of calls.** The call `outer → inner` between the prelude and
-the L_inner resume point is re-executed in forward mode.  Idempotency requires
-the body is deterministic (the `Ttd.session` stated precondition).  Under D.3's
-nondeterminism record/replay, any non-deterministic call result is replayed
-from the log, making re-execution effectively deterministic.
+**Idempotency of calls.** The call `outer → inner` is re-executed from the
+callsite shim. Idempotency requires the body is deterministic (the `Ttd.session`
+stated precondition). Under D.3's nondeterminism record/replay, any
+non-deterministic call result is replayed from the log, making re-execution
+effectively deterministic.
 
 ---
 
@@ -444,9 +473,10 @@ from the log, making re-execution effectively deterministic.
    method uses a custom `invokedynamic` with a stateful bootstrap (not
    `LambdaMetafactory`), the `MethodHandle` returned by the bootstrap may embed
    mutable state.  Re-execution of the `invokedynamic` instruction uses the
-   cached `MethodHandle`, so re-execution may see the mutated state.  The
-   declared `Ttd.session` precondition (body must be deterministic) covers this
-   case, but the verifier cannot check it.
+   cached `MethodHandle` (JVM caches it after the first BSM invocation), so
+   re-execution may see the mutated state.  The declared `Ttd.session`
+   precondition (body must be deterministic) covers this case, but the verifier
+   cannot check it.
 
 3. **Stack-overflow during deep resume chain.** The dispatch prelude allocates
    stack frames for `popResumeFrame` and the table-switch logic.  A very deep
@@ -456,7 +486,17 @@ from the log, making re-execution effectively deterministic.
    Phase B limits the practical depth to a few dozen frames; E.2 will address
    tail-call optimization if needed.
 
-4. **Interaction with `@CrochetSkip`.** If a `@TimeTravelBody` method is also
+4. **Args inline-computed at callsite → refused at instrumentation time (silent
+   skip).** Callsites whose arguments are computed by inline expressions (e.g.,
+   `f(g() + 1)` where `g()`'s return is used directly, or `f(a + b)` with
+   arithmetic) are silently excluded from the callsite save-point set.  These
+   calls can still be reached on forward paths; they just cannot be resume
+   targets.  The user cannot back-step to the exact moment just before such a
+   call.  *Mitigation:* in practice, `javac -g` stores local variable values
+   before most calls for debuggability, so the majority of real-world callsites
+   are reconstructible.
+
+5. **Interaction with `@CrochetSkip`.** If a `@TimeTravelBody` method is also
    effectively skipped by Crochet's transformer (because its class is in the
    skip-list), the field accesses inside it are not wrapped.  The TTD
    transformer still instruments the method (its class passes the TTD
@@ -466,12 +506,19 @@ from the log, making re-execution effectively deterministic.
    rollback.  This is a documented limitation of Phase B; full heap coverage
    requires integrating with Crochet's field-access wrappers.
 
-5. **Float/double bit representation.** Primitive encoding uses
+6. **Float/double bit representation.** Primitive encoding uses
    `Float.floatToRawIntBits` and `Double.doubleToRawLongBits`.  These preserve
    NaN payload bits and signed-zero bits.  No precision loss.  The inverse
    `Float.intBitsToFloat` / `Double.longBitsToDouble` is an exact inverse.
    This is well-defined by the IEEE 754 specification and Java's documented
    behavior.
+
+7. **Session-layer deque ordering.** The correctness of cross-method back-step
+   depends on the session layer (B.4) pushing resume frames in INNERMOST-FIRST
+   order (see §9). If B.4 pushes in the wrong order, the prelude may consume
+   the wrong frame or skip the intended resume target. This coupling between
+   B.3 (transformer) and B.4 (session) must be documented and tested in the
+   B.4 integration tests.
 
 6. **`this` in resume prelude.** For non-static methods, `this` (slot 0) may
    be live at the save-point bci.  It will be packed into `refs[0]` and

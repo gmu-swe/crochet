@@ -27,7 +27,7 @@ import edu.neu.ccs.prl.crochet.ttd.LineMarkerTransformer.SavePoint;
  *   <li>Skip rules: {@code <clinit>}, synthetic, abstract, native methods
  *       produce no {@link MethodAnalysis}.</li>
  *   <li>Save-point enumeration: line-marker BCIs become save points; callsite
- *       BCIs are NOT included (Phase B restriction).</li>
+ *       BCIs with reconstructible arguments are also included.</li>
  *   <li>Primitive encoding / liveness: save points carry the correct
  *       categorization of live locals into prims and refs.</li>
  *   <li>Dispatch prelude integration: the synthetic save-frame mechanism

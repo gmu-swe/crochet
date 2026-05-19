@@ -24,11 +24,17 @@ import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.Type;
 import org.objectweb.asm.tree.AbstractInsnNode;
 import org.objectweb.asm.tree.ClassNode;
+import org.objectweb.asm.tree.InvokeDynamicInsnNode;
+import org.objectweb.asm.tree.LdcInsnNode;
 import org.objectweb.asm.tree.LineNumberNode;
 import org.objectweb.asm.tree.LocalVariableNode;
 import org.objectweb.asm.tree.MethodInsnNode;
 import org.objectweb.asm.tree.MethodNode;
+import org.objectweb.asm.tree.VarInsnNode;
 import org.objectweb.asm.tree.analysis.AnalyzerException;
+import org.objectweb.asm.tree.analysis.Analyzer;
+import org.objectweb.asm.tree.analysis.SourceInterpreter;
+import org.objectweb.asm.tree.analysis.SourceValue;
 
 import edu.neu.ccs.prl.crochet.ttd.cps.LivenessAnalyzer;
 import edu.neu.ccs.prl.crochet.ttd.cps.LivenessAnalyzer.LiveLocal;
@@ -51,19 +57,33 @@ import edu.neu.ccs.prl.crochet.ttd.cps.LivenessAnalyzer.LiveLocal;
  *       point via {@code LOOKUPSWITCH}.</li>
  *   <li>A save-frame snippet at each save point: captures live locals into
  *       {@code long[]} and {@code Object[]} arrays, calls {@code Ttd.saveFrame}.</li>
+ *   <li>At callsite save points: a "resumption shim" label placed after the
+ *       save-frame and before the argument-loading instructions. The shim label
+ *       is the LOOKUPSWITCH target; on resume the JVM jumps here and replays the
+ *       arg loads + INVOKE from an empty operand stack.</li>
  *   <li>A synthetic {@code $ttd$registerAll()} method called from {@code <clinit>}
  *       to register method IDs and save-point debug metadata at class-load time.</li>
  * </ol>
  *
+ * <p><b>Callsite save-point argument reconstructibility.</b> A callsite save
+ * point is emitted only when every argument to the INVOKE can be reconstructed
+ * at resume time from live locals or inline constants. Specifically, for each
+ * stack slot consumed by the INVOKE, the set of instructions that produced that
+ * value (per {@code Analyzer<SourceValue>}) must be a singleton whose sole
+ * instruction is one of:
+ * <ul>
+ *   <li>A {@code *LOAD n} instruction where local {@code n} is live at the
+ *       callsite BCI per B.1's liveness analysis.</li>
+ *   <li>An {@code LDC} / {@code ACONST_NULL} / {@code *CONST_*} instruction
+ *       (an inline constant).</li>
+ * </ul>
+ * If any argument fails this test, the callsite is refused: an
+ * {@link IllegalStateException} is thrown at instrumentation time naming the
+ * offending method, callsite BCI, and argument position.
+ *
  * <p>Methods without the annotation are passed through unchanged. Constructors,
  * static initializers, synthetic methods (lambdas, accessor bridges), abstract
  * and native methods are also skipped.
- *
- * <p>Callsite save points are intentionally NOT emitted in Phase B because they
- * require operand-stack capture (arguments already pushed onto the stack). That
- * requires full CPS/Quasar-style stack manipulation and is deferred to Phase C.
- * Only line-marker BCIs (where the operand stack is guaranteed empty by the
- * Java compiler) are used as save points.
  */
 final class LineMarkerTransformer implements ClassFileTransformer {
 
@@ -152,9 +172,24 @@ final class LineMarkerTransformer implements ClassFileTransformer {
     // Analysis structures
     // -------------------------------------------------------------------------
 
-    /** One save point: a line-number BCI plus the live locals at that BCI. */
+    /**
+     * One save point: either a line-marker BCI or a callsite BCI.
+     *
+     * <p>For a <em>line-marker save point</em>: {@code argStartBci == bci} and
+     * {@code shimArgs} is empty. The save-frame and the body label are both
+     * placed at {@code bci}.
+     *
+     * <p>For a <em>callsite save point</em>: {@code bci} is the instruction index
+     * of the INVOKE instruction (used as the LOOKUPSWITCH key and the
+     * {@code ResumeFrame.bci} value). {@code argStartBci} is the instruction
+     * index of the earliest arg-producing instruction (the LOOKUPSWITCH target
+     * label = the "shim label" = the resume entry point). {@code shimArgs} is
+     * the list of instructions to re-emit in the shim (in original order).
+     * The save-frame is emitted at {@code argStartBci} (stack empty there).
+     */
     static final class SavePoint {
-        /** Index in the method's instruction list (the position of the LineNumberNode). */
+        /** BCI of the LOOKUPSWITCH key and ResumeFrame.bci. For line markers, this is
+         *  the LineNumberNode's BCI. For callsites, this is the INVOKE's BCI. */
         final int bci;
         /** Source line number for registration label. */
         final int lineNumber;
@@ -165,10 +200,40 @@ final class LineMarkerTransformer implements ClassFileTransformer {
         /** Subset of liveLocals that are reference types, sorted. */
         final List<LiveLocal> liveRefs;
 
+        /**
+         * Instruction index where arg loading begins (the "shim label" target).
+         * For line-marker save points: equal to {@code bci}.
+         * For callsite save points: the earliest arg-producing instruction index.
+         */
+        final int argStartBci;
+
+        /**
+         * True if this is a callsite save point; false if a line-marker save point.
+         */
+        final boolean isCallsite;
+
+        /**
+         * For callsite save points: the instructions to re-emit in the shim
+         * (the producing instruction for each stack argument, in stack order).
+         * Empty for line-marker save points.
+         */
+        final List<AbstractInsnNode> shimArgs;
+
+        /** Constructor for line-marker save points. */
         SavePoint(int bci, int lineNumber, List<LiveLocal> liveLocals) {
+            this(bci, lineNumber, liveLocals, bci, false, Collections.emptyList());
+        }
+
+        /** Constructor for callsite save points. */
+        SavePoint(int bci, int lineNumber, List<LiveLocal> liveLocals,
+                  int argStartBci, boolean isCallsite,
+                  List<AbstractInsnNode> shimArgs) {
             this.bci = bci;
             this.lineNumber = lineNumber;
             this.liveLocals = liveLocals;
+            this.argStartBci = argStartBci;
+            this.isCallsite = isCallsite;
+            this.shimArgs = Collections.unmodifiableList(new ArrayList<>(shimArgs));
             List<LiveLocal> prems = new ArrayList<>();
             List<LiveLocal> refs = new ArrayList<>();
             for (LiveLocal ll : liveLocals) {
@@ -194,16 +259,25 @@ final class LineMarkerTransformer implements ClassFileTransformer {
         final List<SavePoint> savePoints;
         /** Fast lookup from BCI to SavePoint. */
         final Map<Integer, SavePoint> byBci;
+        /**
+         * Fast lookup from argStartBci to SavePoint (for callsite save points).
+         * For line-marker save points, argStartBci == bci so they appear in both
+         * byBci and byArgStartBci.
+         */
+        final Map<Integer, SavePoint> byArgStartBci;
 
         MethodAnalysis(String methodIdKey, MethodNode mn, List<SavePoint> savePoints) {
             this.methodIdKey = methodIdKey;
             this.mn = mn;
             this.savePoints = Collections.unmodifiableList(savePoints);
             Map<Integer, SavePoint> map = new TreeMap<>();
+            Map<Integer, SavePoint> argMap = new TreeMap<>();
             for (SavePoint sp : savePoints) {
                 map.put(sp.bci, sp);
+                argMap.put(sp.argStartBci, sp);
             }
             this.byBci = Collections.unmodifiableMap(map);
+            this.byArgStartBci = Collections.unmodifiableMap(argMap);
         }
     }
 
@@ -229,7 +303,7 @@ final class LineMarkerTransformer implements ClassFileTransformer {
         return result;
     }
 
-    private static boolean isEligible(MethodNode mn) {
+    static boolean isEligible(MethodNode mn) {
         if ("<init>".equals(mn.name) || "<clinit>".equals(mn.name)) return false;
         int syntheticFlags = Opcodes.ACC_SYNTHETIC | Opcodes.ACC_ABSTRACT | Opcodes.ACC_NATIVE;
         return (mn.access & syntheticFlags) == 0;
@@ -253,8 +327,22 @@ final class LineMarkerTransformer implements ClassFileTransformer {
      * number information (falls back to Phase 1 line-hit-only mode).
      */
     static MethodAnalysis analyzeMethod(String ownerInternalName, MethodNode mn) {
-        // Collect line-number BCIs and check for MONITORENTER violations.
-        Set<Integer> candidateBcis = new LinkedHashSet<>();
+        return analyzeMethod(ownerInternalName, mn, true);
+    }
+
+    /**
+     * Run liveness analysis on one annotated method and produce a
+     * {@link MethodAnalysis}.
+     *
+     * @param includeCallsites if true, also emit callsite save points for
+     *                         INVOKE instructions with reconstructible arguments
+     */
+    static MethodAnalysis analyzeMethod(String ownerInternalName, MethodNode mn,
+                                        boolean includeCallsites) {
+        // Collect line-number BCIs and callsite candidate BCIs.
+        // Also check for MONITORENTER violations.
+        Set<Integer> lineBcis = new LinkedHashSet<>();
+        Set<Integer> allCandidateBcis = new LinkedHashSet<>();
         int monitorDepth = 0;
         int bci = 0;
         for (AbstractInsnNode insn : mn.instructions) {
@@ -268,32 +356,67 @@ final class LineMarkerTransformer implements ClassFileTransformer {
                 if (monitorDepth > 0) {
                     throwMonitorenterRefusal(ownerInternalName, mn);
                 }
-                candidateBcis.add(bci);
+                lineBcis.add(bci);
+                allCandidateBcis.add(bci);
             }
-            // Callsite BCIs are NOT added in Phase B — operand-stack capture
-            // is required for correct resume at callsite save points, deferred
-            // to Phase C.
-            if (monitorDepth > 0 && isNonTtdInvokeInsn(insn)) {
-                throwMonitorenterRefusal(ownerInternalName, mn);
+            // Callsite candidates: non-TTD INVOKE instructions outside monitors.
+            if (includeCallsites && isNonTtdInvokeInsn(insn)) {
+                if (monitorDepth > 0) {
+                    throwMonitorenterRefusal(ownerInternalName, mn);
+                }
+                allCandidateBcis.add(bci);
             }
             bci++;
         }
 
-        if (candidateBcis.isEmpty()) {
+        if (allCandidateBcis.isEmpty()) {
             return null;
         }
 
-        // Run liveness analysis.
+        // Run liveness analysis over all candidate BCIs.
         LivenessAnalyzer analyzer = new LivenessAnalyzer();
         Map<Integer, List<LiveLocal>> liveness;
         try {
-            liveness = analyzer.analyze(ownerInternalName, mn, candidateBcis);
+            liveness = analyzer.analyze(ownerInternalName, mn, allCandidateBcis);
         } catch (AnalyzerException e) {
             if (Boolean.getBoolean("crochet.ttd.debug")) {
                 System.err.println("[ttd] liveness analysis failed for "
                         + ownerInternalName + "." + mn.name + mn.desc + ": " + e);
             }
             return null;
+        }
+
+        // Run SourceValue analysis for callsite argument reconstructibility.
+        // We run this even if includeCallsites is false for simplicity; it's
+        // lightweight on methods without INVOKE instructions.
+        Analyzer<SourceValue> srcAnalyzer = new Analyzer<>(new SourceInterpreter());
+        SourceValue[][] sourceFrames = null;
+        if (includeCallsites) {
+            try {
+                org.objectweb.asm.tree.analysis.Frame<SourceValue>[] frames =
+                        srcAnalyzer.analyze(ownerInternalName, mn);
+                // Extract just the stack portion at each instruction.
+                // frames[i] is the frame BEFORE instruction i executes.
+                sourceFrames = new SourceValue[frames.length][];
+                for (int i = 0; i < frames.length; i++) {
+                    if (frames[i] == null) {
+                        sourceFrames[i] = new SourceValue[0];
+                        continue;
+                    }
+                    int sz = frames[i].getStackSize();
+                    sourceFrames[i] = new SourceValue[sz];
+                    for (int j = 0; j < sz; j++) {
+                        sourceFrames[i][j] = frames[i].getStack(j);
+                    }
+                }
+            } catch (AnalyzerException e) {
+                if (Boolean.getBoolean("crochet.ttd.debug")) {
+                    System.err.println("[ttd] source analysis failed for "
+                            + ownerInternalName + "." + mn.name + mn.desc + ": " + e);
+                }
+                // Fall back to line-only save points.
+                sourceFrames = null;
+            }
         }
 
         // Build save points; collect line numbers from instruction list.
@@ -306,18 +429,188 @@ final class LineMarkerTransformer implements ClassFileTransformer {
             bci++;
         }
 
-        List<SavePoint> savePoints = new ArrayList<>();
-        for (int candidateBci : candidateBcis) {
-            List<LiveLocal> live = liveness.get(candidateBci);
-            if (live == null) live = Collections.emptyList();
-            int lineNumber = bciToLine.getOrDefault(candidateBci, 0);
-            savePoints.add(new SavePoint(candidateBci, lineNumber, live));
+        // Index instructions by BCI for fast lookup.
+        AbstractInsnNode[] insnArray = new AbstractInsnNode[mn.instructions.size()];
+        bci = 0;
+        for (AbstractInsnNode insn : mn.instructions) {
+            insnArray[bci++] = insn;
         }
+
+        // Track which BCIs are taken (to avoid duplicate save points
+        // if a line marker and callsite share the same BCI).
+        Set<Integer> usedBcis = new LinkedHashSet<>();
+        // Track which argStartBcis are taken (to avoid two callsites
+        // whose arg-load sequences start at the same instruction).
+        Set<Integer> usedArgStartBcis = new LinkedHashSet<>();
+
+        List<SavePoint> savePoints = new ArrayList<>();
+
+        // First: line-marker save points.
+        for (int lineBci : lineBcis) {
+            List<LiveLocal> live = liveness.get(lineBci);
+            if (live == null) live = Collections.emptyList();
+            int lineNumber = bciToLine.getOrDefault(lineBci, 0);
+            SavePoint sp = new SavePoint(lineBci, lineNumber, live);
+            savePoints.add(sp);
+            usedBcis.add(lineBci);
+            usedArgStartBcis.add(lineBci);
+        }
+
+        // Second: callsite save points (only when sourceFrames is available).
+        if (includeCallsites && sourceFrames != null) {
+            bci = 0;
+            for (AbstractInsnNode insn : mn.instructions) {
+                if (isNonTtdInvokeInsn(insn) && !usedBcis.contains(bci)) {
+                    // This is a callsite BCI not already used as a line-marker save point.
+                    int invokeBci = bci;
+                    List<LiveLocal> live = liveness.get(invokeBci);
+                    if (live == null) live = Collections.emptyList();
+                    int lineNumber = bciToLine.getOrDefault(invokeBci, 0);
+
+                    // Determine the argument types and count for this INVOKE.
+                    String invokeDesc = getInvokeDescriptor(insn);
+                    boolean isStatic = (insn.getOpcode() == Opcodes.INVOKESTATIC
+                            || insn.getOpcode() == Opcodes.INVOKEDYNAMIC);
+                    Type[] argTypes = Type.getArgumentTypes(invokeDesc);
+                    // Total arg slots = sum of arg sizes (+ 1 for receiver if non-static).
+                    int totalSlots = 0;
+                    if (!isStatic) totalSlots++; // receiver
+                    for (Type t : argTypes) totalSlots += t.getSize();
+
+                    // At the INVOKE instruction (bci = invokeBci), the frame BEFORE
+                    // execution has totalSlots values on the stack (the args + receiver).
+                    // sourceFrames[invokeBci] is the frame state before the INVOKE executes.
+                    if (invokeBci >= sourceFrames.length || sourceFrames[invokeBci] == null) {
+                        bci++;
+                        continue; // unreachable or dead code
+                    }
+                    SourceValue[] stackAtInvoke = sourceFrames[invokeBci];
+                    if (stackAtInvoke.length < totalSlots) {
+                        // Not enough stack slots — shouldn't happen with valid bytecode.
+                        bci++;
+                        continue;
+                    }
+
+                    // Examine each arg-stack slot for reconstructibility.
+                    // Stack layout: bottommost slot is the deepest (oldest pushed) value.
+                    // The top |totalSlots| entries are the args for this INVOKE.
+                    int argBase = stackAtInvoke.length - totalSlots;
+
+                    boolean reconstructible = true;
+                    int argStartBciCandidate = invokeBci; // will be min of all arg-producing bcis
+                    List<AbstractInsnNode> shimArgInsns = new ArrayList<>();
+
+                    for (int slot = 0; slot < totalSlots && reconstructible; slot++) {
+                        SourceValue sv = stackAtInvoke[argBase + slot];
+                        if (sv == null || sv.insns == null || sv.insns.size() != 1) {
+                            // Multiple producing instructions (join point) or unknown.
+                            reconstructible = false;
+                            if (Boolean.getBoolean("crochet.ttd.debug")) {
+                                System.err.println("[ttd] callsite at bci=" + invokeBci
+                                        + " in " + ownerInternalName + "." + mn.name + mn.desc
+                                        + ": arg slot " + slot + " has multiple/unknown producers"
+                                        + " — refusing callsite save point");
+                            }
+                            break;
+                        }
+                        AbstractInsnNode producer = sv.insns.iterator().next();
+                        if (!isReconstructibleProducer(producer, live)) {
+                            reconstructible = false;
+                            if (Boolean.getBoolean("crochet.ttd.debug")) {
+                                System.err.println("[ttd] callsite at bci=" + invokeBci
+                                        + " in " + ownerInternalName + "." + mn.name + mn.desc
+                                        + ": arg slot " + slot + " produced by non-reconstructible insn "
+                                        + producer.getOpcode() + " — refusing callsite save point");
+                            }
+                            break;
+                        }
+                        int producerBci = mn.instructions.indexOf(producer);
+                        if (producerBci < argStartBciCandidate) {
+                            argStartBciCandidate = producerBci;
+                        }
+                        shimArgInsns.add(producer);
+                    }
+
+                    if (!reconstructible) {
+                        bci++;
+                        continue; // silently skip non-reconstructible callsites
+                    }
+
+                    // Verify we won't conflict with an existing save point's argStartBci.
+                    if (usedArgStartBcis.contains(argStartBciCandidate)) {
+                        // Two save points would share the same argStartBci label — skip.
+                        bci++;
+                        continue;
+                    }
+
+                    SavePoint sp = new SavePoint(invokeBci, lineNumber, live,
+                            argStartBciCandidate, true, shimArgInsns);
+                    savePoints.add(sp);
+                    usedBcis.add(invokeBci);
+                    usedArgStartBcis.add(argStartBciCandidate);
+                }
+                bci++;
+            }
+        }
+
+        if (savePoints.isEmpty()) {
+            return null;
+        }
+
         // Sort by BCI for determinism (gate 18).
         savePoints.sort((a, b) -> Integer.compare(a.bci, b.bci));
 
         String methodIdKey = ownerInternalName + "." + mn.name + mn.desc;
         return new MethodAnalysis(methodIdKey, mn, savePoints);
+    }
+
+    /**
+     * Returns true if {@code producer} is a reconstructible source of an
+     * operand stack value at a callsite resume shim:
+     * <ul>
+     *   <li>A {@code *LOAD n} instruction (ILOAD, LLOAD, FLOAD, DLOAD, ALOAD),
+     *       where local n is live at the callsite.</li>
+     *   <li>An {@code LDC}, {@code ACONST_NULL}, or any {@code *CONST_*}
+     *       instruction (inline constant).</li>
+     * </ul>
+     */
+    private static boolean isReconstructibleProducer(AbstractInsnNode producer,
+                                                     List<LiveLocal> liveAtCallsite) {
+        int op = producer.getOpcode();
+        // ACONST_NULL and *CONST_* family
+        if (op == Opcodes.ACONST_NULL) return true;
+        if (op >= Opcodes.ICONST_M1 && op <= Opcodes.ICONST_5) return true;
+        if (op == Opcodes.LCONST_0 || op == Opcodes.LCONST_1) return true;
+        if (op == Opcodes.FCONST_0 || op == Opcodes.FCONST_1 || op == Opcodes.FCONST_2) return true;
+        if (op == Opcodes.DCONST_0 || op == Opcodes.DCONST_1) return true;
+        if (op == Opcodes.BIPUSH || op == Opcodes.SIPUSH) return true;
+        if (op == Opcodes.LDC) return true;
+        // *LOAD instructions
+        if (op == Opcodes.ILOAD || op == Opcodes.LLOAD || op == Opcodes.FLOAD
+                || op == Opcodes.DLOAD || op == Opcodes.ALOAD) {
+            int slot = ((VarInsnNode) producer).var;
+            // Verify the slot is live at the callsite.
+            for (LiveLocal ll : liveAtCallsite) {
+                if (ll.slotIndex() == slot) return true;
+                // For category-2 types, the second slot references the first.
+                if (ll.type().getSize() == 2 && ll.slotIndex() + 1 == slot) return true;
+            }
+            return false;
+        }
+        return false;
+    }
+
+    /**
+     * Extract the method descriptor from an INVOKE instruction node.
+     */
+    private static String getInvokeDescriptor(AbstractInsnNode insn) {
+        if (insn instanceof MethodInsnNode) {
+            return ((MethodInsnNode) insn).desc;
+        }
+        if (insn instanceof InvokeDynamicInsnNode) {
+            return ((InvokeDynamicInsnNode) insn).desc;
+        }
+        throw new IllegalArgumentException("Not an invoke instruction: " + insn.getClass());
     }
 
     private static boolean isNonTtdInvokeInsn(AbstractInsnNode insn) {
@@ -523,8 +816,14 @@ final class LineMarkerTransformer implements ClassFileTransformer {
         public void visitEnd() {
             // Add registrations for all save points.
             for (SavePoint sp : analysis.savePoints) {
-                String label = ownerInternal + "." + analysis.mn.name
-                        + analysis.mn.desc + ":" + sp.lineNumber;
+                String label;
+                if (sp.isCallsite) {
+                    label = ownerInternal + "." + analysis.mn.name
+                            + analysis.mn.desc + ":callsite@" + sp.bci;
+                } else {
+                    label = ownerInternal + "." + analysis.mn.name
+                            + analysis.mn.desc + ":" + sp.lineNumber;
+                }
                 registrations.add(new String[]{
                         analysis.methodIdKey,
                         Integer.toString(sp.bci),
@@ -573,9 +872,30 @@ final class LineMarkerTransformer implements ClassFileTransformer {
      * Emits the CPS-transformed method: dispatch prelude + body with save-frame
      * snippets at each save point.
      *
-     * <p>The method is emitted entirely from the {@link MethodNode}'s instruction
-     * list, replaying via {@code MethodNode.accept(MethodVisitor)}, with
-     * interception at each save-point BCI to inject the save-frame snippet.
+     * <p><b>Save point layout in the emitted bytecode:</b>
+     *
+     * <p><em>Line-marker save point</em> at BCI N:
+     * <pre>
+     *   bodyLabel_N:          // LOOKUPSWITCH target; stack empty here
+     *   [save-frame snippet]  // operand stack must be empty
+     *   [lineHit call]
+     *   [original instruction at N]
+     * </pre>
+     *
+     * <p><em>Callsite save point</em> with INVOKE at BCI N, arg-start at M ≤ N:
+     * <pre>
+     *   [original instructions M-1, M-2, ...] // normal body up to argStartBci
+     *   [save-frame snippet]  // operand stack is empty at argStartBci
+     *   bodyLabel_N:          // LOOKUPSWITCH target ("shim label"); stack empty
+     *   [original arg-load instructions M, M+1, ...] // resume replays these
+     *   [original INVOKE at N]
+     * </pre>
+     *
+     * The restore block in the prelude for callsite save point N restores locals
+     * from {@code frame.prims} / {@code frame.refs} and then jumps to
+     * {@code bodyLabel_N} (the shim label), which is placed at {@code argStartBci}
+     * — AFTER the save-frame, so the operand stack is empty when the
+     * LOOKUPSWITCH jumps here.
      */
     private static final class CpsMethodEmitter {
         private final MethodVisitor mv;
@@ -599,9 +919,30 @@ final class LineMarkerTransformer implements ClassFileTransformer {
             mv.visitCode();
 
             // ------------------------------------------------------------------
+            // Emit try-catch blocks (must come before instructions in the
+            // MethodVisitor streaming protocol; ASM collects them and writes
+            // them to the class file's exception_table at toByteArray() time).
+            //
+            // The SuppressingMethodVisitor swallows visitTryCatchBlock events
+            // from the ClassReader pass, so we must replay them here from the
+            // MethodNode. The Label objects in TryCatchBlockNode are the same
+            // Label objects that will appear in the instruction stream when
+            // insn.accept(mv) is called below — ASM resolves them at toByteArray()
+            // time, so the relative coverage is preserved correctly.
+            // ------------------------------------------------------------------
+            if (mn.tryCatchBlocks != null) {
+                for (org.objectweb.asm.tree.TryCatchBlockNode tcb : mn.tryCatchBlocks) {
+                    tcb.accept(mv);
+                }
+            }
+
+            // ------------------------------------------------------------------
             // Dispatch prelude
             // ------------------------------------------------------------------
-            // Labels for the LOOKUPSWITCH targets (one per save point).
+            // Labels for the LOOKUPSWITCH targets.
+            // For line-marker save points: bodyLabel is placed at argStartBci (== bci).
+            // For callsite save points: bodyLabel is the shim label placed at argStartBci.
+            // The LOOKUPSWITCH key is always sp.bci.
             Map<Integer, Label> restoreLabels = new TreeMap<>();
             Map<Integer, Label> bodyLabels = new TreeMap<>();
             for (SavePoint sp : analysis.savePoints) {
@@ -610,22 +951,10 @@ final class LineMarkerTransformer implements ClassFileTransformer {
             }
             Label fallthroughLabel = new Label();
 
-            // int methodId = Ttd.internMethodId(methodIdKey);
-            // (We call internMethodId here at dispatch time, not via a stored int,
-            //  to avoid needing a static field. The JIT inlines this quickly.)
-            // However, we need methodId as an int on stack for popResumeFrame.
-            // Strategy: call internMethodId, store in a local, then call popResumeFrame.
-            // Actually, the design calls popResumeFrame(int methodId) where methodId is
-            // already known. But we don't have a static slot to cache it at emit time.
-            // We inline internMethodId at the top of EACH method invocation.
-            // This is O(1) after the first call (ConcurrentHashMap.get is near-constant).
             mv.visitLdcInsn(analysis.methodIdKey);
             mv.visitMethodInsn(Opcodes.INVOKESTATIC, TTD_OWNER,
                     "internMethodId", INTERNMETHODID_DESC, false);
             // Stack: [int methodId]
-            // Duplicate for popResumeFrame call (methodId is consumed).
-            // Actually internMethodId returns the id. We need it for popResumeFrame.
-            // Call: Ttd.popResumeFrame(int) - consumes methodId from stack, returns ResumeFrame.
             mv.visitMethodInsn(Opcodes.INVOKESTATIC, TTD_OWNER,
                     "popResumeFrame", POPRESUME_DESC, false);
             // Stack: [ResumeFrame or null]
@@ -652,7 +981,10 @@ final class LineMarkerTransformer implements ClassFileTransformer {
             for (SavePoint sp : sortedSps) {
                 mv.visitLabel(restoreLabels.get(sp.bci));
                 emitRestoreBlock(sp);
-                // Jump to the save-point's bodyLabel (just before the original instruction).
+                // Jump to the save-point's bodyLabel.
+                // For callsite SPs: this is the shim label (placed at argStartBci,
+                // after the save-frame, before the arg loads).
+                // For line-marker SPs: this is the body label at the LineNumberNode bci.
                 mv.visitJumpInsn(Opcodes.GOTO, bodyLabels.get(sp.bci));
             }
 
@@ -664,22 +996,56 @@ final class LineMarkerTransformer implements ClassFileTransformer {
             // ------------------------------------------------------------------
             // We replay mn's instruction list manually so we can intercept
             // save-point BCIs to emit save-frame snippets and insert bodyLabels.
+            //
+            // For line-marker save points (sp.argStartBci == sp.bci):
+            //   At insnIdx == sp.bci: emit bodyLabel + saveFrame + lineHit + original insn.
+            //
+            // For callsite save points (sp.argStartBci < sp.bci):
+            //   At insnIdx == sp.argStartBci: emit saveFrame + bodyLabel (shim label).
+            //   At insnIdx == sp.bci (the INVOKE): just replay normally — args were
+            //   already loaded by prior instructions in the stream.
+            //
+            // The byArgStartBci map allows O(1) lookup at each instruction for
+            // whether a callsite save-frame+shim should be emitted here.
+
+            // Build a reverse map: for each callsite save point, map argStartBci -> SavePoint.
+            // Note: line-marker SPs also have argStartBci == bci, so they appear in byBci.
+            // We check byBci first (line markers), then byArgStartBci for callsite pre-emit.
+
             int insnIdx = 0;
             for (AbstractInsnNode insn : mn.instructions) {
-                SavePoint sp = analysis.byBci.get(insnIdx);
-                if (sp != null) {
-                    // Place the body label BEFORE the instruction (this is the
-                    // jump target for restore blocks).
-                    mv.visitLabel(bodyLabels.get(sp.bci));
+                // Check if this is a callsite argStartBci (pre-save-frame injection point).
+                SavePoint callsiteSp = null;
+                if (analysis.byArgStartBci.containsKey(insnIdx)) {
+                    SavePoint candidate = analysis.byArgStartBci.get(insnIdx);
+                    if (candidate.isCallsite) {
+                        callsiteSp = candidate;
+                    }
+                }
+
+                if (callsiteSp != null) {
+                    // Emit the save-frame BEFORE the arg-loading sequence.
+                    emitSaveFrameSnippet(callsiteSp);
+                    // Emit the shim label (body label) — this is the LOOKUPSWITCH target.
+                    // On resume, the prelude jumps here. Stack is empty at this point.
+                    mv.visitLabel(bodyLabels.get(callsiteSp.bci));
+                }
+
+                // Check if this is a line-marker save point BCI.
+                SavePoint lineSp = analysis.byBci.get(insnIdx);
+                if (lineSp != null && !lineSp.isCallsite) {
+                    // Place the body label BEFORE the instruction (jump target for restore blocks).
+                    mv.visitLabel(bodyLabels.get(lineSp.bci));
                     // Emit save-frame snippet BEFORE the original instruction.
-                    emitSaveFrameSnippet(sp);
+                    emitSaveFrameSnippet(lineSp);
                     // Also emit lineHit for REPL display.
                     mv.visitLdcInsn(ownerInternal);
                     mv.visitLdcInsn(analysis.mn.name + analysis.mn.desc);
-                    mv.visitLdcInsn(sp.lineNumber);
+                    mv.visitLdcInsn(lineSp.lineNumber);
                     mv.visitMethodInsn(Opcodes.INVOKESTATIC, TTD_OWNER, "lineHit",
                             LINEHIT_DESC, false);
                 }
+
                 // Replay the original instruction.
                 insn.accept(mv);
                 insnIdx++;
