@@ -253,6 +253,43 @@ final class FastProxySupport {
         }
     }
 
+    /* ---------- F.1 dirty-bit: noteDirty ---------- */
+
+    /**
+     * F.1: set {@code $$crochetDirty = 1} on {@code inst}, using the
+     * VarHandle resolved for the user class. Tolerates null {@code inst}
+     * (no-op) and classes whose dirty VarHandle was not resolved (pre-F.1
+     * instrumentation or failed field lookup — treated as always-dirty which
+     * is the safe fallback).
+     *
+     * <p>Write uses plain (non-release) {@link VarHandle#set} semantics.
+     * The stripe-lock in {@link #fastAccess} provides the ordering guarantee
+     * for the checkpoint path; the PUTFIELD pre-hook fires {@code $$crochetAccess}
+     * after this set, which either enters the stripe-lock (klass=proxy) or is a
+     * no-op (klass=user). Either way, a subsequent stripe-lock holder's volatile
+     * read of dirty observes dirty==1.
+     */
+    static void noteDirty(Object inst) {
+        if (inst == null) {
+            return;
+        }
+        Class<?> c = inst.getClass();
+        // Walk past any Fast proxy layer to the real user class.
+        while (c != null && CRIJFast.class.isAssignableFrom(c)) {
+            c = c.getSuperclass();
+        }
+        if (c == null) {
+            return;
+        }
+        ClassMeta.VersionHandles handles = ClassMeta.of(c).versionHandles();
+        if (handles.dirty == null) {
+            // Pre-F.1 class or failed VarHandle resolution: no dirty field.
+            // Safe to skip — fastAccess treats missing dirty handle as always-dirty.
+            return;
+        }
+        handles.dirty.set(inst, 1);
+    }
+
     /* ---------- fastAccess race-winner ---------- */
 
     /**
@@ -380,20 +417,56 @@ final class FastProxySupport {
             boolean rollbackBranch = (realV & 1) == 0;
             try {
                 if (!rollbackBranch) {
-                    // Checkpoint: paper §3.1 flat-nested semantics — the latest
-                    // checkpoint overwrites any previous snap. A racing entrant
-                    // that sees the same version and was blocked behind us will
-                    // re-check klass under the lock and find klass=user; it
-                    // returns cheaply so it doesn't double-install.
-                    Object shadow = allocateShadow(userClass);
-                    obj.$$crochetCopyFieldsTo(shadow);
-                    obj.$$crochetSetSnap(shadow);
+                    // F.1 dirty-bit optimization: skip shadow allocation if dirty==0
+                    // AND a prior snap already exists (snap != null). When snap is null
+                    // (first checkpoint ever for this instance) we always allocate to
+                    // avoid the first-checkpoint race described in SOUNDNESS.md §7b.
+                    //
+                    // Invariant (SOUNDNESS.md §5): dirty==0 here means no PUTFIELD has
+                    // fired on this instance since the prior checkpoint cleared dirty
+                    // (which happened under this same stripe lock). The stripe-lock
+                    // release-acquire provides the happens-before from prior-clear to
+                    // this-read, so dirty==0 is a reliable signal.
+                    ClassMeta.VersionHandles handles = ClassMeta.of(userClass).versionHandles();
+                    VarHandle dirtyVh = handles.dirty;
+                    int dirty = (dirtyVh != null) ? (int) dirtyVh.getVolatile(obj) : 1;
+                    Object existingSnap = obj.$$crochetGetSnap();
+                    if (dirty != 0 || existingSnap == null) {
+                        // Checkpoint: paper §3.1 flat-nested semantics — the latest
+                        // checkpoint overwrites any previous snap. A racing entrant
+                        // that sees the same version and was blocked behind us will
+                        // re-check klass under the lock and find klass=user; it
+                        // returns cheaply so it doesn't double-install.
+                        Object shadow = allocateShadow(userClass);
+                        obj.$$crochetCopyFieldsTo(shadow);
+                        obj.$$crochetSetSnap(shadow);
+                        // Clear dirty under the stripe lock — this write is visible
+                        // to the next checkpoint's dirty-read via the release-acquire
+                        // of the stripe lock (ReentrantLock unlock/lock).
+                        if (dirtyVh != null) {
+                            dirtyVh.setVolatile(obj, 0);
+                        }
+                    }
+                    // else: snap != null && dirty == 0 → prior snap is still valid.
+                    // The prior snap holds field values identical to current values
+                    // (no PUTFIELD fired since the prior checkpoint cleared dirty).
+                    // No shadow allocation needed; the rollback path will use the
+                    // existing snap.
                     PropagateWorklist.enqueueOrRun(obj, realV, true);
                 } else {
                     Object snap = obj.$$crochetGetSnap();
                     if (snap != null) {
                         obj.$$crochetCopyFieldsFrom(snap);
                         obj.$$crochetSetSnap(null);
+                    }
+                    // F.1: clear dirty on rollback. After rollback the instance is
+                    // in its pre-checkpoint state, equivalent to "never mutated since
+                    // the last snap." Setting dirty=0 ensures the next checkpoint can
+                    // skip the shadow if no PUTFIELD fires before it.
+                    ClassMeta.VersionHandles handles = ClassMeta.of(userClass).versionHandles();
+                    VarHandle dirtyVh = handles.dirty;
+                    if (dirtyVh != null) {
+                        dirtyVh.setVolatile(obj, 0);
                     }
                     PropagateWorklist.enqueueOrRun(obj, realV, false);
                 }

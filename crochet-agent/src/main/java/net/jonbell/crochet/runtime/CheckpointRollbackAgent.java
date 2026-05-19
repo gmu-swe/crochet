@@ -530,6 +530,40 @@ public final class CheckpointRollbackAgent {
         FastProxySupport.fastAccess(obj);
     }
 
+    /**
+     * F.1 dirty-bit: called from the PUTFIELD pre-hook in
+     * {@link net.jonbell.crochet.transform.FieldAccessWrapper} for every
+     * PUTFIELD site on an instrumented receiver. Sets {@code $$crochetDirty = 1}
+     * on {@code inst} so that the next checkpoint's {@link #fastAccess} call
+     * knows to materialize a shadow rather than reuse the prior snap.
+     *
+     * <p>The receiver is typed as {@link Object} (not {@link CRIJInstrumented})
+     * because the PUTFIELD pre-hook may fire on receivers whose static type is a
+     * non-instrumented interface or JDK class — the cast gate in the pre-hook
+     * already ensures the receiver is {@link CRIJInstrumented} before calling
+     * this, so the cast here is safe.
+     *
+     * <p>The set is a plain (non-volatile) Unsafe write. Ordering is guaranteed
+     * by the subsequent {@code $$crochetAccess()} call:
+     * <ul>
+     *   <li>If the klass is a Fast proxy, {@link #fastAccess} acquires the stripe
+     *       lock; the lock's release-acquire pair provides happens-before between
+     *       this write and any stripe-lock holder's read.
+     *   <li>If the klass is user (no active checkpoint), dirty is set but
+     *       {@code fastAccess} is not called. The next checkpoint's klass swap +
+     *       stripe-lock will observe the dirty bit correctly.
+     * </ul>
+     *
+     * <p>Early-return on null to tolerate instrumented classes whose
+     * {@code $$crochetDirty} offset resolution failed (pre-F.1 cached class
+     * bytes, or an unloaded class race during warm-up). The cost of the null
+     * check is a single branch on the hot path — benign given that this call
+     * fires on every PUTFIELD in user code.
+     */
+    public static void noteDirty(Object inst) {
+        FastProxySupport.noteDirty(inst);
+    }
+
     /* ---------- Gap 3: reflective static-field checkpoint ---------- */
 
     public static int checkpointStatics(Class<?> c) {
