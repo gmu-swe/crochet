@@ -1,5 +1,7 @@
 package net.jonbell.crochet.runtime;
 
+import java.util.concurrent.atomic.AtomicBoolean;
+
 /**
  * User-facing facade for the stop-the-world world-safe checkpoint API.
  *
@@ -9,6 +11,19 @@ package net.jonbell.crochet.runtime;
  * STW (stop-the-world) heap iteration that checkpoints every live
  * {@link CRIJInstrumented} instance in the heap. The combined operation
  * establishes a consistent before-image for the full live world.
+ *
+ * <h2>Ordering</h2>
+ *
+ * <p>The static-field pass runs BEFORE the STW window to minimise pause length.
+ * This is sound because static fields are held by {@code sfHelper} instances
+ * (one per user class, a {@link CRIJInstrumented} hidden-class instance), and
+ * those instances are themselves picked up by the STW heap walk. The second
+ * {@code $$crochetCheckpoint(V)} call on a already-snapped sfHelper is an
+ * idempotent no-op (I3 — CAS fails, no double-write). Any PUTSTATIC that fires
+ * between the static pass and the STW triggers {@code fastAccess} on the sfHelper,
+ * which allocates the snap before overwriting — so the snap still holds the
+ * pre-pass value. See {@code designs/E.2/DESIGN.md §2} for the full argument
+ * and cross-references to {@code designs/E.1/SOUNDNESS.md §4} and §7 T6.
  *
  * <h2>Soundness guarantee</h2>
  *
@@ -22,11 +37,14 @@ package net.jonbell.crochet.runtime;
  *
  * <p>When the native agent is not loaded ({@link HeapWalker#isEngaged()} is
  * {@code false}), {@link #checkpointWorldSafe()} falls back to
- * {@link CheckpointRollbackAgent#checkpointAll()} and emits a warning to
- * {@code stderr}. The fallback is sound for the majority of practical
+ * {@link CheckpointRollbackAgent#checkpointAll()} and emits a one-time warning to
+ * {@code stderr} (subsequent calls after the first are silently forwarded without
+ * repeating the warning). The fallback is sound for the majority of practical
  * workloads (heap-rooted checkpoints work correctly); the STW is a soundness
  * <em>strengthening</em> that eliminates torn-snap races from concurrent
- * mutations.
+ * mutations. See {@code designs/E.2/DESIGN.md §4} and
+ * {@code designs/E.1/SOUNDNESS.md §8} for the rationale behind the fallback
+ * decision.
  *
  * <h2>Merge note</h2>
  *
@@ -38,10 +56,19 @@ package net.jonbell.crochet.runtime;
  * @see HeapWalker
  * @see CheckpointRollbackAgent#checkpointAll()
  * @see CheckpointRollbackAgent#rollbackAll(int)
+ * @see <a href="../../../../../../../../designs/E.2/DESIGN.md">E.2 Design</a>
+ * @see <a href="../../../../../../../../designs/E.1/SOUNDNESS.md">E.1 Soundness Sketch</a>
  */
 public final class CrochetWorldSafe {
 
     private CrochetWorldSafe() {}
+
+    /**
+     * Guards the one-time missing-native warning. Set to {@code true} on
+     * the first call that observes {@link HeapWalker#isEngaged()} == false
+     * so that subsequent fallback calls do not re-emit the message.
+     */
+    private static final AtomicBoolean FALLBACK_WARNED = new AtomicBoolean(false);
 
     /**
      * Establishes a whole-program checkpoint at a fresh version V and returns V.
@@ -91,11 +118,16 @@ public final class CrochetWorldSafe {
             }
         } else {
             // Native agent not loaded — fall back to checkpointAll's existing
-            // behavior (phase 1 already ran). Emit a non-suppressible warning
-            // so users know the STW guarantee does not apply.
-            System.err.println("[crochet-heap] WARNING: native agent not loaded;"
-                    + " falling back to checkpointAll. STW guarantees do not apply."
-                    + " Load libcrochet-jvmti.so via -agentpath for the full soundness guarantee.");
+            // behavior (phase 1 already ran). Emit a one-time warning (first call
+            // only) so that workloads calling checkpointWorldSafe() in a loop do
+            // not flood stderr. The warning fires at most once per JVM lifetime.
+            // See designs/E.2/DESIGN.md §4 and designs/E.1/SOUNDNESS.md §8.
+            if (FALLBACK_WARNED.compareAndSet(false, true)) {
+                System.err.println("[crochet-heap] WARNING: native agent not loaded;"
+                        + " falling back to checkpointAll. STW guarantees do not apply."
+                        + " Load libcrochet-jvmti.so via -agentpath for the full soundness guarantee."
+                        + " (This warning will not repeat.)");
+            }
         }
 
         // Phase 3: stack-root checkpoint (belt-and-suspenders; no-op if StackRoots
