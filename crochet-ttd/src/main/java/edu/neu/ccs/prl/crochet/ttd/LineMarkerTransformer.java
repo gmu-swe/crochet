@@ -496,6 +496,20 @@ final class LineMarkerTransformer implements ClassFileTransformer {
                     // The top |totalSlots| entries are the args for this INVOKE.
                     int argBase = stackAtInvoke.length - totalSlots;
 
+                    // If argBase > 0, there are stack values BELOW the argument frame at
+                    // the INVOKE bci. The save-frame snippet is inserted at argStartBci
+                    // (the first arg-loading instruction), but if the stack is non-empty
+                    // there, the emitted bytecode fails the verifier (save-frame requires
+                    // an empty operand stack). Silently refuse this callsite.
+                    //
+                    // Example: `ICONST_1; ALOAD_0; INVOKEVIRTUAL hashCode; IADD`
+                    // At the INVOKEVIRTUAL, argBase = 1 (ICONST_1 sits below ALOAD_0).
+                    // The argStartBci is ALOAD_0's bci, but the stack already has [1].
+                    if (argBase > 0) {
+                        bci++;
+                        continue; // silently refuse — consistent with other refusal policies
+                    }
+
                     boolean reconstructible = true;
                     int argStartBciCandidate = invokeBci; // will be min of all arg-producing bcis
                     List<AbstractInsnNode> shimArgInsns = new ArrayList<>();

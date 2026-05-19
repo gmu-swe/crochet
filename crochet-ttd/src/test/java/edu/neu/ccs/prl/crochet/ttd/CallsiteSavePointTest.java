@@ -508,6 +508,53 @@ class CallsiteSavePointTest {
     }
 
     // =========================================================================
+    // B.3-callsite-11b: argBase > 0 callsite is refused (Amendment 1 fix)
+    // =========================================================================
+
+    /**
+     * Pattern: {@code ICONST_1; ALOAD_0; INVOKEVIRTUAL Object.hashCode()I; IADD}.
+     *
+     * <p>At the INVOKEVIRTUAL, {@code argBase = 1} because ICONST_1 sits below
+     * ALOAD_0 on the operand stack. The save-frame snippet would need to be inserted
+     * at the ALOAD_0 bci, but the stack is non-empty there ([1]), which fails the
+     * verifier. The callsite must be silently refused (NOT a save point).
+     *
+     * <p>This is the exact case described in the Amendment 1 bug report.
+     */
+    @Test
+    void callsite_with_arg_base_gt_zero_is_refused() {
+        // public static int body(Object obj) { return 1 + obj.hashCode(); }
+        // Compiles roughly to: ICONST_1; ALOAD_0; INVOKEVIRTUAL hashCode; IADD; IRETURN
+        MethodNode mn = annotatedMethod(
+                Opcodes.ACC_PUBLIC | Opcodes.ACC_STATIC,
+                "body", "(Ljava/lang/Object;)I");
+
+        addLineNumber(mn, 1);
+        // ICONST_1  -- pushes a value that sits BELOW the receiver on the stack
+        mn.instructions.add(new InsnNode(Opcodes.ICONST_1));
+        // ALOAD 0   -- receiver for the INVOKEVIRTUAL; argBase = 1 at invoke time
+        mn.instructions.add(new VarInsnNode(Opcodes.ALOAD, 0));
+        // INVOKEVIRTUAL Object.hashCode()I
+        mn.instructions.add(new MethodInsnNode(Opcodes.INVOKEVIRTUAL,
+                "java/lang/Object", "hashCode", "()I", false));
+        // IADD
+        mn.instructions.add(new InsnNode(Opcodes.IADD));
+        mn.instructions.add(new InsnNode(Opcodes.IRETURN));
+        mn.maxLocals = 1;
+        mn.maxStack = 2;
+
+        MethodAnalysis analysis = LineMarkerTransformer.analyzeMethod("com/example/Foo", mn, true);
+        assertNotNull(analysis, "should produce analysis (has line marker)");
+
+        // The INVOKEVIRTUAL callsite has argBase=1 → must NOT be a save point.
+        for (SavePoint sp : analysis.savePoints) {
+            assertFalse(sp.isCallsite,
+                    "callsite with argBase > 0 must be refused as a save point;"
+                            + " found unexpected callsite SP at bci=" + sp.bci);
+        }
+    }
+
+    // =========================================================================
     // B.3-callsite-12: Multiple live locals packed correctly for callsite SP
     // =========================================================================
 
