@@ -172,6 +172,15 @@ public class CrochetTransformer {
         if (!isJdkClass && REFLECTION_REWRITER_ENABLED) {
             chain = new ReflectionRewriter(Opcodes.ASM9, chain);
         }
+        // CheckpointWrapper sits above ReflectionRewriter / JsrInliner so it
+        // sees the original (pre-JSR-inlined) descriptor but still operates on
+        // fully inlined bytecode for older class files.  It does not need
+        // scratch locals, so placement above SharedLocalsProvider is fine.
+        // Only applied to user classes — JDK methods do not carry
+        // @CrochetCheckpoint, and adding the visitor there would be dead weight.
+        if (!isJdkClass) {
+            chain = new CheckpointWrapper(Opcodes.ASM9, chain);
+        }
         if (needsJsrInlining) {
             chain = new JsrInliner(Opcodes.ASM9, chain);
         }
@@ -408,7 +417,12 @@ public class CrochetTransformer {
             return true;
         }
         // Shaded ASM under the agent's own relocated package.
-        if (internalName.startsWith("net/jonbell/crochet/agent/shaded/")) {
+        // The maven-shade-plugin relocates org.objectweb.asm →
+        // edu.neu.ccs.prl.crochet.agent.shaded.asm, so the internal-name
+        // prefix is edu/neu/ccs/prl/crochet/agent/shaded/.
+        // (An older comment said "net/jonbell/crochet/agent/shaded/" but that
+        // path does not exist in the shaded jar.)
+        if (internalName.startsWith("edu/neu/ccs/prl/crochet/agent/shaded/")) {
             return true;
         }
         // crochet-instrument's own classes (jlink plugins, runtime support
