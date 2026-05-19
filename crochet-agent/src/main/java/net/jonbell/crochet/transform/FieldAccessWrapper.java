@@ -200,6 +200,10 @@ public final class FieldAccessWrapper extends ClassVisitor {
         return r;
     }
 
+    /** Descriptor of the {@code @CrochetSkip} annotation. */
+    private static final String CROCHET_SKIP_DESC =
+            "Lnet/jonbell/crochet/annotation/CrochetSkip;";
+
     private static Boolean readSuspectFlags(ClassLoader l, String resource) {
         try (java.io.InputStream in = (l != null
                 ? l.getResourceAsStream(resource)
@@ -217,6 +221,13 @@ public final class FieldAccessWrapper extends ClassVisitor {
             if ("java/lang/Enum".equals(superName)) {
                 return Boolean.TRUE;
             }
+            // @CrochetSkip: classes annotated with this opt out of Crochet
+            // instrumentation, so they won't have a $$crochetAccess() method.
+            // Emit the guarded form (INSTANCEOF CRIJInstrumented + IFEQ skip)
+            // instead of a direct INVOKEVIRTUAL that would fail to link.
+            if (hasAnnotation(reader, CROCHET_SKIP_DESC)) {
+                return Boolean.TRUE;
+            }
             return Boolean.FALSE;
         } catch (java.io.IOException ignored) {
             return null;
@@ -226,6 +237,28 @@ public final class FieldAccessWrapper extends ClassVisitor {
             // INVOKEVIRTUAL fast path.
             return null;
         }
+    }
+
+    /**
+     * Return {@code true} iff the class file read by {@code reader} carries
+     * the named annotation descriptor in its {@code RuntimeVisibleAnnotations}
+     * attribute.
+     */
+    private static boolean hasAnnotation(org.objectweb.asm.ClassReader reader, String desc) {
+        final boolean[] found = {false};
+        reader.accept(new org.objectweb.asm.ClassVisitor(Opcodes.ASM9) {
+            @Override
+            public org.objectweb.asm.AnnotationVisitor visitAnnotation(
+                    String descriptor, boolean visible) {
+                if (desc.equals(descriptor)) {
+                    found[0] = true;
+                }
+                return null;
+            }
+        }, org.objectweb.asm.ClassReader.SKIP_CODE
+                | org.objectweb.asm.ClassReader.SKIP_DEBUG
+                | org.objectweb.asm.ClassReader.SKIP_FRAMES);
+        return found[0];
     }
 
     private static final class WrapAccessesMV extends CtorAwareMv {

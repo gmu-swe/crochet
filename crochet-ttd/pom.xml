@@ -111,6 +111,8 @@
                         <configuration>
                             <excludes>
                                 <exclude>**/cps/CorpusLivenessTest.java</exclude>
+                                <!-- PipelineFuzzTest: long-running; activated via -Pfuzz profile. -->
+                                <exclude>**/PipelineFuzzTest.java</exclude>
                                 <!-- InternedLineConstantsTest belongs to unit C.2
                                      (interned line constants). It is present in the
                                      source tree as an untracked work-in-progress file
@@ -145,4 +147,51 @@
             </plugin>
         </plugins>
     </build>
+
+    <profiles>
+        <!--
+          Fuzz profile: runs PipelineFuzzTest for ≥1 hour against the JDK
+          base image corpus. Activate with: mvn -pl crochet-ttd test -Pfuzz
+          The default fuzz duration is 60 minutes (3600000 ms). Override with
+          -Dcrochet.ttd.fuzzDuration=N (milliseconds).
+
+          The test uses a standalone execution without the javaagents to avoid
+          the class-ordering issue described in CorpusLivenessTest's exclusion
+          comment: PipelineFuzzTest invokes the transformer directly without
+          going through the agent, so no circular instrumentation occurs.
+
+          B.6 exit gate: run for ≥10 minutes (600000 ms) minimum; document
+          actual duration in designs/phase-b/EXIT.md.
+        -->
+        <profile>
+            <id>fuzz</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <artifactId>maven-surefire-plugin</artifactId>
+                        <executions>
+                            <execution>
+                                <id>fuzz-test</id>
+                                <goals><goal>test</goal></goals>
+                                <configuration>
+                                    <includes>
+                                        <include>**/PipelineFuzzTest.java</include>
+                                    </includes>
+                                    <!-- No javaagents: transformer invoked directly. -->
+                                    <argLine>-Xverify:all</argLine>
+                                    <systemPropertyVariables>
+                                        <crochet.ttd.fuzzDuration>${crochet.ttd.fuzzDuration}</crochet.ttd.fuzzDuration>
+                                    </systemPropertyVariables>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+                </plugins>
+            </build>
+            <properties>
+                <!-- Default 60-minute fuzz run. Override on command line. -->
+                <crochet.ttd.fuzzDuration>3600000</crochet.ttd.fuzzDuration>
+            </properties>
+        </profile>
+    </profiles>
 </project>
