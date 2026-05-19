@@ -213,26 +213,57 @@ unless the path from the nearest checkpoint deterministically
 re-executes the same calls. So we still need replay-determinism, just
 with finer-grained anchors.
 
-**(C) Stack capture via JDI / JVMTI.**
-Use the JDI debug interface to snapshot stack frames at checkpoint
-time, restore via FrameInjection (which doesn't exist — JVMTI doesn't
-let you push frames). Not feasible without JVM-level support that
-isn't there.
+**(C) Bytecode CPS to statically-known resume points.**
+At instrumentation time, the set of resume targets inside a
+`@TimeTravelBody` method is finite and bytecode-visible (every line
+marker + every callsite). That's enough to rewrite each annotated
+method into a resumable form — the Quasar / Kilim pattern — without
+JVMTI frame-push.
+
+Per method: emit frame-saves at every save point (line marker /
+callsite), emit a dispatch prelude at method entry that table-jumps
+to the resume label, and at each resume label materialize locals
+from the saved frame. Resume mode is carried via a thread-local
+deque, not a signature change. Caller frames participate in the same
+deque, so multi-level frame restoration is a chain of "land at the
+inner-call site, invoke the inner with its frame still on top."
+
+What this buys vs (A)+(B):
+- No re-execution → no replay-determinism requirement for the
+  back-step path itself. Limitation 4 stops blocking back-step;
+  it only matters for forward replay past the resume point.
+- True back-step into a returned helper, not just within the body.
+- Stack-as-data (the REPL's "show me the stack at this checkpoint"
+  UX) falls out for free — the ResumeFrame chain is the data.
+
+Cost: ~3-4 KLOC of bytecode transformation + ~1 KLOC tests.
+Quasar is the upper-bound prior art at ~15 KLOC; we throw out the
+scheduler, suspendable-anywhere semantics, serialization, and
+cross-thread continuations. Punts (lambdas, `MONITORENTER` in
+resumable regions, `<init>`/`<clinit>`, interface dispatch to
+non-annotated impls) are documented, not solved.
+
+See [WISHLIST.md §3.1](../../WISHLIST.md) for the full design sketch
+and [PLAN.md](../../PLAN.md) Phase B for the implementation plan.
 
 ### Recommended
 
-(A) for now. (B) becomes attractive if we have the multi-thread
-Fray-recording machinery in place — natural place to insert per-step
-checkpoints — but adds significant infrastructure for marginal gain
-in single-method use cases.
+(C) is now the path. (A) was the right answer when stack-frame
+restoration looked JVM-bound; with the bytecode-CPS framing it's
+clearly achievable and the value (cross-method back-step decoupled
+from replay determinism) is large enough to be worth the build.
+
+(B) (multi-checkpoint timeline) remains complementary, not
+competing: dense checkpoints are useful for forward scrubbing, CPS
+resume is useful for back-step. Sequence (C) first.
 
 ### Open question
 
-Is there a JVM extension request worth filing for "push synthetic
-stack frame from JVMTI"? Possibly. Project Loom's continuation
-machinery has some related primitives (`Continuation.run` resumes a
-stack); piggy-backing on those would be a research direction, not a
-near-term fix.
+Foldability of the dispatch prelude when no TTD session is active —
+combine with the `TTD_ACTIVE` generation-counter pattern (see
+[WISHLIST.md §3.3](../../WISHLIST.md)) so save-call sites JIT-fold
+to no-ops outside sessions. Same template Crochet already uses for
+`VERSION_COUNTER`.
 
 ---
 
@@ -327,15 +358,30 @@ real demo win.
 **Phase 5 — generic record/replay nondet shims** (only if not on
 Fray path):
 Bytecode-rewrite time / hashCode / Random calls through TTD shims.
-Skip if Phase 3 is built (Fray covers this).
+Skip if Phase 3 is built (Fray covers this). With CPS-resume
+(Limitation 3 option C) shipping ahead of this, even the no-Fray
+back-step path stops needing nondet shims — resume restores frames
+rather than re-executing. Phase 5 is then only useful for forward
+replay past a resume point, which is a much narrower use case.
+
+---
+
+The cross-cutting Crochet-level work that touches multiple TTD
+limitations — bytecode CPS (Limitation 3 option C), `checkpointAll`
+opt-out semantics, external-state hooks, the TTD generation counter
+— is sequenced at the project level in [PLAN.md](../../PLAN.md).
+This doc remains the design rationale for the TTD-specific phase
+plan; PLAN.md is the operational order.
 
 ---
 
 ## What stays out of scope
 
-- **Stack-frame restoration**: blocked on JVMTI not exposing frame
-  push. Project Loom's `Continuation` is the closest primitive but
-  requires the target code to be written as continuations.
+- **Resume into uninstrumented frames**: bytecode CPS (Limitation 3
+  option C) covers `@TimeTravelBody`-marked methods only. Calls into
+  JDK or other uninstrumented code are atomic — back-step lands at
+  the call boundary, not inside the callee. Same scope rule as
+  today's `lineHit`.
 - **Native-code state**: file descriptors, sockets, JNI heap. No
   reasonable replay model.
 - **Cross-process distributed TTD**: out of scope; we're a
