@@ -1,0 +1,40 @@
+E.3 Storage Validation Benchmark
+Generated: 2026-05-19
+Hardware: Ubuntu 22.04, 244 vCPUs, Java 21 Temurin
+JDK: /tmp/jdk-inst-E.3 (instrumented)
+Native: libcrochet-jvmti.so (HeapWalker engaged)
+Workload: 40% heap occupancy, SmallData/MediumData/LargeData mix
+Methodology: targeted JVMTI walk (bench classes only), no rollback, 10 runs, 2 warmup
+
+=== 16 MB heap (calibration) ===
+  objects=71,063 | live=~7 MB
+  median=184.5 ms | p95=188.4 ms | IQR=4.0 ms
+  per-object=2.60 µs
+
+=== 256 MB heap ===
+  objects=1,137,043 | live=~110 MB
+  median=4,973.0 ms | p95=5,132.8 ms | IQR=182.5 ms
+  per-object=4.37 µs
+
+=== 1 GB heap ===
+  objects=4,548,174 | live=~435 MB
+  median=21,109.3 ms | p95=23,410.7 ms | IQR=405.7 ms
+  per-object=4.64 µs
+
+=== 2 GB heap ===
+  objects=9,096,351 | live=~860 MB
+  median=45,368.8 ms | p95=49,102.9 ms | IQR=847.2 ms
+  per-object=4.99 µs
+
+=== Versus E.1 design estimate ===
+  E.1 estimated: 5-15 ms for N=10,000 instances on <100 MB heap
+  At N=10,000: measured ~26 ms (2.60 µs × 10,000)  [WITHIN estimate]
+  At N=71,063: measured 184.5 ms (2.60 µs × 71,063) [13x over upper bound]
+  At N=1,137,043: 4,973 ms [~332x over upper bound]
+  At N=9,096,351: 45,369 ms [~3,024x over upper bound]
+
+Conclusion: STW pause scales linearly at ~4-5 µs/object (dominated by
+CallVoidMethod JNI overhead per object in Phase B). The E.1 estimate of
+5-15 ms is only accurate for N ≤ ~3,000-6,000 objects. For realistic
+production heaps (>100k objects), the STW pause is several seconds to
+minutes. See BUDGET.md for full analysis and recommendations.

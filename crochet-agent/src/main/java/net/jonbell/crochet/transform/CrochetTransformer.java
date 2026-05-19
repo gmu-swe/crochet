@@ -362,6 +362,29 @@ public class CrochetTransformer {
                 || internalName.equals("java/lang/Character")) {
             return true;
         }
+        // java.lang.ThreadLocal and its nested classes: instrumenting them
+        // causes infinite recursion at scale.  When many objects are being
+        // checkpointed (checkpointWorldSafe with N > ~10k instances), the
+        // JVMTI Phase-B CallVoidMethod path triggers GC reference processing
+        // on the Reference Handler thread.  That thread calls
+        // ThreadLocal.getMap() → $$crochetAccess on the ThreadLocal instance
+        // → FastProxySupport.fastAccess → PropagateWorklist.enqueueOrRun
+        // (which does DRAINING.get() → ThreadLocal.get() → ...) →
+        // StackOverflowError.
+        //
+        // ThreadLocalMap is skipped for the same reason: it accesses ThreadLocal
+        // fields and calls ThreadLocal.$$crochetAccess(), which doesn't exist once
+        // ThreadLocal itself is skipped → NoSuchMethodError.
+        //
+        // Skipping these classes means thread-local state is not tracked across
+        // checkpoint/rollback; this is acceptable because PropagateWorklist
+        // uses ThreadLocals only for runtime bookkeeping (recursion detection,
+        // drain queue), not for user-visible state.
+        if (internalName.equals("java/lang/ThreadLocal")
+                || internalName.equals("java/lang/InheritableThreadLocal")
+                || internalName.startsWith("java/lang/ThreadLocal$")) {
+            return true;
+        }
         // Our own runtime/transform/agent/patch/annotation code must never
         // recurse — the instrumentation chain uses these classes directly.
         if (internalName.startsWith(RUNTIME_PACKAGE_PREFIX)
