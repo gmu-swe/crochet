@@ -58,12 +58,12 @@ class ResumeFrameTest {
     void resetCounter() {
         // Defensive: if a previous test leaked the counter, reset it so
         // cold-path tests (TTD_ACTIVE_SESSIONS == 0) work reliably.
-        Ttd.TTD_ACTIVE_SESSIONS = 0;
+        Ttd.TTD_ACTIVE_SESSIONS.set(0);
     }
 
     @AfterEach
     void checkCounterZero() {
-        assertEquals(0, Ttd.TTD_ACTIVE_SESSIONS,
+        assertEquals(0, Ttd.TTD_ACTIVE_SESSIONS.get(),
                 "TTD_ACTIVE_SESSIONS must be 0 after each test");
     }
 
@@ -495,16 +495,16 @@ class ResumeFrameTest {
 
     @Test
     void session_counter_lifecycle() {
-        assertEquals(0, Ttd.TTD_ACTIVE_SESSIONS, "starts at 0");
+        assertEquals(0, Ttd.TTD_ACTIVE_SESSIONS.get(), "starts at 0");
         Holder root = new Holder();
         int[] duringSession = new int[1];
 
         Ttd.sessionWithRepl(root, quitRepl(), () -> {
-            duringSession[0] = Ttd.TTD_ACTIVE_SESSIONS;
+            duringSession[0] = Ttd.TTD_ACTIVE_SESSIONS.get();
         });
 
         assertEquals(1, duringSession[0], "must be 1 during session");
-        assertEquals(0, Ttd.TTD_ACTIVE_SESSIONS, "must be 0 after session");
+        assertEquals(0, Ttd.TTD_ACTIVE_SESSIONS.get(), "must be 0 after session");
     }
 
     @Test
@@ -518,7 +518,7 @@ class ResumeFrameTest {
                 throw new RuntimeException("test exception");
             }));
 
-        assertEquals(0, Ttd.TTD_ACTIVE_SESSIONS,
+        assertEquals(0, Ttd.TTD_ACTIVE_SESSIONS.get(),
                 "counter must be 0 even after exceptional session exit");
     }
 
@@ -538,7 +538,7 @@ class ResumeFrameTest {
             Ttd.saveFrame(idFirst, 1, new long[0], new Object[0]);
         });
 
-        assertEquals(0, Ttd.TTD_ACTIVE_SESSIONS);
+        assertEquals(0, Ttd.TTD_ACTIVE_SESSIONS.get());
 
         // Second session: deque must be clean (no leftover from first session).
         Ttd.sessionWithRepl(root, quitRepl(), () -> {

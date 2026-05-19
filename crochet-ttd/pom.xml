@@ -89,9 +89,46 @@
             </plugin>
             <plugin>
                 <artifactId>maven-surefire-plugin</artifactId>
-                <configuration>
-                    <argLine>-javaagent:${project.basedir}/target/crochet-ttd-${project.version}.jar -javaagent:${project.basedir}/../crochet-agent/target/crochet-agent-${project.version}.jar --add-reads java.base=jdk.unsupported</argLine>
-                </configuration>
+                <executions>
+                    <!--
+                      Default execution: all tests EXCEPT CorpusLivenessTest, under both
+                      javaagents and -Xverify:all. CorpusLivenessTest is excluded here
+                      because it creates ASM ClassNode objects that Crochet's field-access
+                      wrapper wraps with $$crochetAccess() calls; when other test classes
+                      loaded ASM's ClassNode before the Crochet agent fully processed it
+                      (class-load ordering is non-deterministic under -Xverify:all), the
+                      wrapper call fails with NoSuchMethodError. The test itself exercises
+                      only LivenessAnalyzer (pure analysis, no TTD runtime), so running it
+                      without the javaagents in the corpus execution below is correct.
+                    -->
+                    <execution>
+                        <id>default-test</id>
+                        <goals><goal>test</goal></goals>
+                        <configuration>
+                            <excludes>
+                                <exclude>**/cps/CorpusLivenessTest.java</exclude>
+                            </excludes>
+                            <argLine>-Xverify:all -javaagent:${project.basedir}/target/crochet-ttd-${project.version}.jar -javaagent:${project.basedir}/../crochet-agent/target/crochet-agent-${project.version}.jar --add-reads java.base=jdk.unsupported</argLine>
+                        </configuration>
+                    </execution>
+                    <!--
+                      Corpus execution: CorpusLivenessTest only, in its own forked JVM
+                      without the javaagents. The test reads JDK class files and runs
+                      LivenessAnalyzer — no TTD or Crochet runtime is needed. Running it
+                      in isolation avoids the ASM ClassNode instrumentation ordering issue
+                      described above.
+                    -->
+                    <execution>
+                        <id>corpus-test</id>
+                        <goals><goal>test</goal></goals>
+                        <configuration>
+                            <includes>
+                                <include>**/cps/CorpusLivenessTest.java</include>
+                            </includes>
+                            <argLine>-Xverify:all</argLine>
+                        </configuration>
+                    </execution>
+                </executions>
             </plugin>
         </plugins>
     </build>

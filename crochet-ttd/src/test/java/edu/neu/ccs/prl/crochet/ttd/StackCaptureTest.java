@@ -46,12 +46,12 @@ class StackCaptureTest {
 
     @BeforeEach
     void resetCounter() {
-        Ttd.TTD_ACTIVE_SESSIONS = 0;
+        Ttd.TTD_ACTIVE_SESSIONS.set(0);
     }
 
     @AfterEach
     void checkCounterZero() {
-        assertEquals(0, Ttd.TTD_ACTIVE_SESSIONS,
+        assertEquals(0, Ttd.TTD_ACTIVE_SESSIONS.get(),
                 "TTD_ACTIVE_SESSIONS must be 0 after each test");
     }
 

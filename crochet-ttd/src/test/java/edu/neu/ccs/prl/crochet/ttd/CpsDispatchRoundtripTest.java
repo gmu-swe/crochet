@@ -67,13 +67,13 @@ class CpsDispatchRoundtripTest {
         COUNTER = 0;
         Ttd.testClearDeque();
         // Activate session so saveFrame / popResumeFrame take the live path.
-        Ttd.TTD_ACTIVE_SESSIONS = 1;
+        Ttd.TTD_ACTIVE_SESSIONS.set(1);
     }
 
     @AfterEach
     void teardown() {
         Ttd.testClearDeque();
-        Ttd.TTD_ACTIVE_SESSIONS = 0;
+        Ttd.TTD_ACTIVE_SESSIONS.set(0);
     }
 
     // =========================================================================
