@@ -111,23 +111,8 @@
                         <configuration>
                             <excludes>
                                 <exclude>**/cps/CorpusLivenessTest.java</exclude>
-<<<<<<< HEAD
                                 <!-- PipelineFuzzTest: long-running; activated via -Pfuzz profile. -->
                                 <exclude>**/PipelineFuzzTest.java</exclude>
-                                <!-- InternedLineConstantsTest belongs to unit C.2
-                                     (interned line constants). It is present in the
-                                     source tree as an untracked work-in-progress file
-                                     from the C.2 agent; it exercises C.2-specific
-                                     bytecode invariants that do not apply to B.4's
-                                     transformer changes. Exclude it here so the B.4
-                                     default-test execution does not run it (the C.2
-                                     pom will include it in its own execution). -->
-                                <exclude>**/InternedLineConstantsTest.java</exclude>
-=======
-                                <!-- InternedLineConstantsTest (C.2) is now included
-                                     in this C.3 branch which merges both C.1 and C.2.
-                                     The test is run under the default-test execution. -->
->>>>>>> origin/unit/C.3-overhead-gate
                             </excludes>
                             <argLine>-Xverify:all -javaagent:${project.basedir}/target/crochet-ttd-${project.version}.jar -javaagent:${project.basedir}/../crochet-agent/target/crochet-agent-${project.version}.jar --add-reads java.base=jdk.unsupported</argLine>
                         </configuration>
@@ -156,7 +141,6 @@
 
     <profiles>
         <!--
-<<<<<<< HEAD
           Fuzz profile: runs PipelineFuzzTest for ≥1 hour against the JDK
           base image corpus. Activate with: mvn -pl crochet-ttd test -Pfuzz
           The default fuzz duration is 60 minutes (3600000 ms). Override with
@@ -189,7 +173,18 @@
                                     <systemPropertyVariables>
                                         <crochet.ttd.fuzzDuration>${crochet.ttd.fuzzDuration}</crochet.ttd.fuzzDuration>
                                     </systemPropertyVariables>
-=======
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+                </plugins>
+            </build>
+            <properties>
+                <!-- Default 60-minute fuzz run. Override on command line. -->
+                <crochet.ttd.fuzzDuration>3600000</crochet.ttd.fuzzDuration>
+            </properties>
+        </profile>
+        <!--
           jmh profile: compile src/jmh/java benchmarks into the main jar
           so they can be run with -cp crochet-ttd-*.jar.
 
@@ -221,20 +216,12 @@
                                         <compileSourceRoot>${project.basedir}/src/main/java</compileSourceRoot>
                                         <compileSourceRoot>${project.basedir}/src/jmh/java</compileSourceRoot>
                                     </compileSourceRoots>
->>>>>>> origin/unit/C.3-overhead-gate
                                 </configuration>
                             </execution>
                         </executions>
                     </plugin>
                 </plugins>
             </build>
-<<<<<<< HEAD
-            <properties>
-                <!-- Default 60-minute fuzz run. Override on command line. -->
-                <crochet.ttd.fuzzDuration>3600000</crochet.ttd.fuzzDuration>
-            </properties>
-=======
->>>>>>> origin/unit/C.3-overhead-gate
         </profile>
     </profiles>
 </project>
