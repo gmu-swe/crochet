@@ -1,0 +1,23 @@
+[crochet-jvmti] StackRoots engaged
+[crochet-jvmti] HeapWalker engaged
+[WorldSafeBench] heap=1024 MB | warmup=2 | runs=10 | native=true | iterateMethod=true
+[HeapPopulator] target heap: 1024 MB | target live: 409 MB | SmallData=3067833 | MediumData=1006632 | LargeData=473709
+[HeapPopulator] allocated 3014259 root entries + 1533916 cache entries
+[HeapPopulator] post-GC heap usage: ~435 MB (target occupancy: 409 MB)
+[WorldSafeBench] total allocated objects: 4548174
+[WorldSafeBench] warming up (2 calls) ...
+[WorldSafeBench] warmup done.
+[WorldSafeBench] measuring (10 calls) ...
+[WorldSafeBench] run 0: 23410.7 ms (ok=true)
+[WorldSafeBench] run 1: 21345.7 ms (ok=true)
+[WorldSafeBench] run 2: 20876.2 ms (ok=true)
+[WorldSafeBench] run 3: 21092.5 ms (ok=true)
+[WorldSafeBench] run 4: 21098.8 ms (ok=true)
+[WorldSafeBench] run 5: 21109.3 ms (ok=true)
+[WorldSafeBench] run 6: 20941.4 ms (ok=true)
+[WorldSafeBench] run 7: 21194.7 ms (ok=true)
+[WorldSafeBench] run 8: 21498.2 ms (ok=true)
+[WorldSafeBench] run 9: 21758.8 ms (ok=true)
+[WorldSafeBench] heap=1024 MB | objects=4548174 | native=true
+[WorldSafeBench] pause: median=21109.312 ms | p95=23410.737 ms | IQR=405.718 ms
+[WorldSafeBench] pause: p25=21092.452 ms | p75=21498.170 ms
