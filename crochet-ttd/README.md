@@ -124,6 +124,34 @@ At each `Ttd.breakpoint()` the REPL takes over:
 | `quit` | `q` | exit session |
 | `help` | `h` | this list |
 
+## Back-step mechanism
+
+As of Phase B (units B.3–B.4), back-stepping is driven by a
+CPS (continuation-passing style) bytecode transformation emitted by the
+`LineMarkerTransformer`. Each `@TimeTravelBody` method receives a
+**dispatch prelude** at method entry and a **save-frame snippet** at
+every save-point (one per source line / callsite). On back-step, the
+session snapshots the current resume-frame deque, performs rollback,
+pre-stages the frames on the deque, and re-invokes the body. The body's
+dispatch prelude table-jumps directly to the target save-point BCI,
+restoring live locals from the frame, and execution resumes at the
+correct source line without re-running earlier lines.
+
+### Deprecated: `Restart`-throw back-step path
+
+The legacy `Restart`-throw back-step path (active when
+`-Dcrochet.ttd.backstep=restart` is set) is **deprecated** as of Phase B
+and will be removed in unit C.1. Under the legacy path, back-stepping
+throws `Restart` to unwind the body, then replays the body from the
+beginning, silently skipping breakpoints until the target index. The CPS
+path (the new default) is more efficient: it restores locals from the
+save-frame and resumes at the exact target BCI without re-running any
+code.
+
+The `restart` system-property override exists only to let pre-B.3 tests
+continue to pass during Phase B. **Do not use** `-Dcrochet.ttd.backstep=restart`
+in new code; it will not exist in C.1.
+
 ## Mechanism
 
 `Ttd.session(root, body)`:
