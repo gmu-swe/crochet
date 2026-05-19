@@ -121,6 +121,16 @@ final class LineMarkerTransformer implements ClassFileTransformer {
      */
     private static final String TTD_GEN_DESC = "J";
 
+    /**
+     * Prefix for synthetic per-method-id static int fields emitted by C.2.
+     * Each annotated method gets one field: {@code $$ttd$mid$0},
+     * {@code $$ttd$mid$1}, etc. Slot indices are assigned in the order
+     * analyses are visited (ClassNode.methods order — stable per class file).
+     */
+    static final String TTD_MID_FIELD_PREFIX = "$$ttd$mid$";
+    /** JVM descriptor for the per-method-id static int fields. */
+    static final String TTD_MID_FIELD_DESC = "I";
+
     /** Name of the synthetic class-init helper emitted at {@code visitEnd()}. */
     static final String REGISTER_ALL_METHOD = "$ttd$registerAll";
     static final String REGISTER_ALL_DESC = "()V";
@@ -1292,7 +1302,7 @@ final class LineMarkerTransformer implements ClassFileTransformer {
         /**
          * Emit the save-frame snippet for one save point:
          * <pre>
-         * LDC methodIdKey + internMethodId call
+         * GETSTATIC $$ttd$mid$N  (C.2: replaces LDC methodIdKey + internMethodId call)
          * LDC bci
          * NEWARRAY T_LONG (primCount)
          * for each live prim: DUP, LDC i, load+encode, LASTORE
@@ -1329,6 +1339,7 @@ final class LineMarkerTransformer implements ClassFileTransformer {
             mv.visitInsn(Opcodes.LCONST_0);
             mv.visitInsn(Opcodes.LCMP);
             mv.visitJumpInsn(Opcodes.IFEQ, skipSaveLabel);
+
 
             // C.2: GETSTATIC $$ttd$mid$N replaces LDC + INVOKESTATIC internMethodId.
             emitGetMethodId();
