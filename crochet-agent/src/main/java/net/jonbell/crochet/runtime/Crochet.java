@@ -8,6 +8,8 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 
+import net.jonbell.crochet.annotation.Stable;
+
 /**
  * User-facing facade over Crochet's checkpoint/diff API.
  *
@@ -68,6 +70,39 @@ import java.util.Objects;
 public final class Crochet {
 
     private Crochet() {}
+
+    /**
+     * Checkpoints the given root object and returns the version token.
+     *
+     * <p>This is the INVOKESTATIC target emitted by
+     * {@link net.jonbell.crochet.transform.CheckpointWrapper} for methods
+     * annotated with {@link net.jonbell.crochet.annotation.CrochetCheckpoint}.
+     * Application code may also call it directly.
+     *
+     * @param root the object to checkpoint; must not be {@code null}
+     * @return the checkpoint version token (pass to {@link #rollback} to restore)
+     */
+    @Stable
+    public static int checkpoint(Object root) {
+        return CheckpointRollbackAgent.checkpoint(root);
+    }
+
+    /**
+     * Rolls the root object back to the snapshot taken at version {@code v}.
+     *
+     * <p>This is the INVOKESTATIC target emitted by
+     * {@link net.jonbell.crochet.transform.CheckpointWrapper} for methods
+     * annotated with {@link net.jonbell.crochet.annotation.CrochetCheckpoint}.
+     * Application code may also call it directly.
+     *
+     * @param root the object to roll back; must not be {@code null}
+     * @param v    the version token returned by the corresponding
+     *             {@link #checkpoint(Object)} call
+     */
+    @Stable
+    public static void rollback(Object root, int v) {
+        CheckpointRollbackAgent.rollback(root, v);
+    }
 
     /**
      * Returns the list of instance fields that differ between the live object
