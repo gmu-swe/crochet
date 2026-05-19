@@ -7,6 +7,8 @@ import java.lang.reflect.Method;
 
 import sun.misc.Unsafe;
 
+import net.jonbell.crochet.annotation.Internal;
+
 /**
  * Per-user-class metadata that the legacy CROCHET attached by monkey-patching
  * {@code java.lang.Class} (see legacy/src/main/java/java/lang/Class.java). We
@@ -19,6 +21,7 @@ import sun.misc.Unsafe;
  * guarantees — any thread observing a non-null binding sees both fields fully
  * constructed even without a volatile read.
  */
+@Internal
 public final class ClassMeta {
 
     private static final ClassValue<ClassMeta> CACHE = new ClassValue<>() {

@@ -10,6 +10,8 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 
+import net.jonbell.crochet.annotation.Internal;
+
 /**
  * Per-class runtime-hot-path counters, gated by
  * {@code -Dcrochet.traceRuntime=true}. Counters are free when disabled: the
@@ -30,6 +32,7 @@ import java.util.concurrent.atomic.AtomicLong;
  * <p>Counters are {@link ClassValue}-backed — a single lock-free read in the
  * hot path, matching the strategy used by {@code sfHelperFor}.
  */
+@Internal
 public final class RuntimeTracer {
 
     /** True iff {@code -Dcrochet.traceRuntime=true} was set at agent load. */

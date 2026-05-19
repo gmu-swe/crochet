@@ -7,6 +7,7 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 import net.jonbell.crochet.annotation.CrochetEager;
+import net.jonbell.crochet.annotation.Stable;
 
 import sun.misc.Unsafe;
 
@@ -47,6 +48,7 @@ import sun.misc.Unsafe;
  * needed — a thrown path leaves the object in the user-class state with a
  * consistent (zeroed) view, preserving the paper's I3 continuity invariant.
  */
+@Stable
 public final class CheckpointRollbackAgent {
 
     private CheckpointRollbackAgent() {}
