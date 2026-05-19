@@ -15,6 +15,14 @@
 
     <description>End-to-end integration tests that run against a Crochet-instrumented JDK produced by the Maven plugin.</description>
 
+    <properties>
+        <!-- Integration tests exercise Java 21 APIs (virtual threads, sealed types).
+             The crochet-agent module compiles to Java 17 (source/target only, not
+             release), but the IT module must target Java 21 to reference
+             Thread.ofVirtual() and pattern-match on sealed CheckpointEvent subtypes. -->
+        <maven.compiler.release>21</maven.compiler.release>
+    </properties>
+
     <dependencies>
         <dependency>
             <groupId>edu.neu.ccs.prl.crochet</groupId>
@@ -32,6 +40,12 @@
         <plugins>
             <plugin>
                 <artifactId>maven-failsafe-plugin</artifactId>
+                <configuration>
+                    <argLine>
+                        --add-exports java.base/jdk.internal.vm=ALL-UNNAMED
+                        --add-opens java.base/jdk.internal.vm=ALL-UNNAMED
+                    </argLine>
+                </configuration>
                 <executions>
                     <execution>
                         <goals>
