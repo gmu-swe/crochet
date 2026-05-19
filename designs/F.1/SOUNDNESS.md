@@ -98,6 +98,9 @@ After the klass is swapped back to user, `fastAccess` returns. The read sees `in
 moment equals `inst.f` at the prior snap — i.e., the value written at `V_write ≤ V_prev ≤ V`.
 I2 holds: the observed value was written at a version not greater than `V_obs = V`.
 
+The cross-thread component of this argument (a PUTFIELD on thread A is observed by thread B's
+checkpoint dirty-read) relies on the stripe-lock release-acquire pairing; see §7b.
+
 ---
 
 ## 4. Why I3 (continuity at boundaries) is preserved
@@ -131,6 +134,9 @@ Case B — Prior checkpoint V_prev exists; checkpoint V_curr had dirty == 0:
 - Rolling back to V_curr must restore field values to the pre-V_curr state.
 - Since pre-V_curr values == pre-V_prev values, rolling back to V_curr using V_prev's snap is
   equivalent to rolling back using a V_curr snap — I3 is preserved.
+- Note: after `rollback`, `$$crochetSnap` is set to null. The skip condition `snap != null &&
+  dirty == 0` correctly falls through to the allocation path in this case (Case A applies), so
+  Case B's "prior checkpoint V_prev exists" implicitly assumes no rollback has intervened.
 
 **Multi-checkpoint chain of skipped shadows:**
 Suppose V_1, V_2, V_3 all had dirty == 0 at checkpoint time. Then the snap for V_1 (the oldest
@@ -156,18 +162,23 @@ then no PUTFIELD has fired on `inst` since the last dirty clear.
 The PUTFIELD pre-hook in `WrapAccessesMV.visitFieldInsnPostSuper` emits (for 1-slot PUTFIELD):
 
 ```
-GETSTATIC VERSION_GATE; IFEQ skip   // gate: skip if no checkpoint ever taken
-SWAP                                  // move receiver to top
-DUP                                   // duplicate receiver
-PUTFIELD $$crochetDirty, 1           // << new: set dirty BEFORE $$crochetAccess
-emitPreHook(mv, fOwner)              // call $$crochetAccess (may trigger fastAccess)
-SWAP                                  // restore receiver/value order
+GETSTATIC VERSION_GATE; IFEQ skip            // gate: skip if no checkpoint ever taken
+SWAP                                          // move receiver to top
+DUP                                           // duplicate receiver
+INVOKESTATIC CheckpointRollbackAgent.noteDirty(Ljava/lang/Object;)V
+                                              // << new: set dirty BEFORE $$crochetAccess
+                                              // noteDirty walks past proxy klass layers to
+                                              // find the user class for ClassMeta lookup,
+                                              // then does VarHandle.set on $$crochetDirty
+emitPreHook(mv, fOwner)                      // call $$crochetAccess (may trigger fastAccess)
+SWAP                                          // restore receiver/value order
 skip:
-PUTFIELD fOwner, name, descriptor    // original field write
+PUTFIELD fOwner, name, descriptor            // original field write
 ```
 
-The dirty-bit set (`PUTFIELD $$crochetDirty, 1`) is emitted **before** `emitPreHook` (which
-calls `$$crochetAccess`), which is itself **before** the original PUTFIELD. Therefore:
+The dirty-bit set (via `noteDirty`) is emitted **before** `emitPreHook` (which calls
+`$$crochetAccess`), which is itself **before** the original PUTFIELD. The pre-hook timing
+invariant — "set fires BEFORE `$$crochetAccess` fires BEFORE PUTFIELD" — still holds. Therefore:
 1. When the thread executes the dirty-bit set, it has not yet written the field.
 2. When `fastAccess` (called from `$$crochetAccess`) reads `dirty`, the field write has not yet
    occurred; the dirty-bit has already been set.
@@ -494,7 +505,7 @@ is null, always materialize the shadow. This one extra allocation per instance's
 negligible.
 
 **Summary of §7b resolution:**
-- Use volatile write for dirty-bit set (VarHandle release semantics on `$$crochetDirty`).
+- Use plain write for dirty-bit set; the subsequent `$$crochetAccess` call and the stripe-lock release-acquire on the checkpoint side provide the necessary happens-before from prior dirty-clear → current dirty-read.
 - Use volatile read for dirty-bit read in fastAccess (VarHandle acquire semantics).
 - Skip shadow ONLY IF `dirty == 0 AND snap != null` (both conditions required).
 - When snap is null (first checkpoint for this instance), ALWAYS allocate the shadow, even if
@@ -555,6 +566,23 @@ mutation+checkpoint workload run): see Final Report §Measured Savings.
 
 The A.1 memo's conclusion is clear: "A dirty-bit on these few types would nearly eliminate all
 snapshot allocation in the tested workloads."
+
+**Rollback-loop limitation:** F.1's savings are realized only on consecutive-checkpoint patterns
+(multiple checkpoints without intervening rollback). The `checkpoint → rollback → checkpoint`
+pattern that's typical of standard Crochet rollback-loop workflows gets 0% benefit because
+rollback clears `$$crochetSnap` and the safety rule (`snap == null → always allocate`) re-allocates
+on the next checkpoint. The TTD-style consecutive-checkpoint use case (e.g., line-by-line debugger
+stepping) is where F.1's value lands.
+
+**Eager-mode gap:** F.1's optimization applies exclusively to the lazy path (proxy-installed
+klass-swap). The eager-mode path in `FieldAdder.emitEagerVersionGuardedEntry` — used for `final`
+classes, which includes `HashMap$Node` (A.1's W3 top consumer at 98.3% of fastAccess calls) —
+allocates a shadow **unconditionally** at checkpoint time. F.1 provides **0% benefit** on
+workloads dominated by eager-mode classes. Concretely: W3 (microbench / HashMap-dominated) gets
+0% F.1 savings even though `HashMap$Node` is the overwhelmingly dominant allocator. The savings
+estimates above ("80-100% for Thread objects in W1/W2") apply only to lazy-path workloads where
+Thread objects and other non-final classes are the top consumers. Eager-path optimization is
+explicitly out of scope for F.1 and could be addressed as a follow-on unit.
 
 ---
 
