@@ -120,32 +120,27 @@ shimLabel_N:           ← stack empty here (LOOKUPSWITCH target)
 
 ## LIFO Ordering for Cross-Method Back-Step Resume Deque
 
-During forward execution, `saveFrame` is called with `push` (i.e., `addFirst`),
-so the most recently pushed frame is at the HEAD of the deque.
+The session pushes frames in REVERSE call-chain order — innermost frame first
+(becomes BOTTOM), outermost frame last (becomes HEAD). `Ttd.popResumeFrame(methodId)`
+peeks at HEAD only and returns null on mismatch (no deque walk).
 
-For a 2-method call chain `outer → inner`:
-- When `outer` reaches the callsite of `inner`, `saveFrame(outer_id, callsite_bci, ...)` is called → outer's frame is at HEAD.
-- `inner` is called; when `inner` hits a line marker, `saveFrame(inner_id, bci_inner, ...)` → inner's frame at HEAD.
-- Deque HEAD-to-TAIL: `[inner_frame, outer_frame]`.
+Forward execution captures frames in CALL order: outer's save-frame at the
+callsite fires BEFORE the INVOKE; inner's save-frame at its first line-marker
+fires AFTER entry. Captured forward order: `[outer_frame_at_callsite, inner_frame_at_lineN]`.
 
-On back-step setup (by the session layer, B.4):
-1. Session clears the deque (`clearSessionState()`).
-2. Session pushes `outer_frame` first → HEAD = `outer_frame`.
-3. Session pushes `inner_frame` last → HEAD = `inner_frame`, TAIL = `outer_frame`.
-4. Body re-runs.
-5. `outer`'s dispatch prelude calls `popResumeFrame(outer_id)`. HEAD = `inner_frame` with `methodId_inner ≠ outer_id` → returns `null`. Prelude falls through to normal forward execution of `outer`.
-6. `outer` re-executes forward and calls `inner`.
-7. `inner`'s dispatch prelude calls `popResumeFrame(inner_id)`. HEAD = `inner_frame` with `methodId_inner == inner_id` → pops and returns it. Prelude table-jumps to `bci_inner`, restores locals. `inner` resumes at the saved BCI.
+The session reverses this order before pushing back to the deque: push inner
+first, push outer last. Resulting deque (HEAD → tail): `[outer_frame, inner_frame]`.
 
-**Key invariant:** The session must push frames in REVERSE forward-execution
-order (innermost first, outermost last), so that `popResumeFrame` in each
-method's prelude sees ITS OWN frame at the top of the deque when control reaches
-it in the correct execution order.
+On re-entry to `outer`: prelude reads HEAD = outer_frame, methodId matches, pops,
+restores locals, GOTOs the callsite shim, re-loads args, INVOKEs inner. Inside
+inner: prelude reads HEAD = inner_frame, methodId matches, pops, GOTOs the
+line-marker bci, resumes. Resume succeeds.
 
-**`outer_frame` remains on the deque** after step 7 (unconsumed at this point).
-This is correct: `outer` is executing forward past the callsite of `inner`; the
-`outer_frame` at the callsite is stale (we already resumed into `inner`). The
-session layer is responsible for managing the deque precisely.
+The wrong order (push outer first → inner at HEAD) fails: outer's prelude reads
+HEAD = inner_frame, methodId doesn't match, falls through to forward execution;
+outer re-fires its save-frame at the callsite, pushing a fresh `new_outer_frame`
+to HEAD; inner's prelude then sees `new_outer_frame.methodId ≠ inner_id` → null
+→ forward execution. Cross-method resume fails.
 
 ---
 
