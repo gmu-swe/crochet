@@ -113,9 +113,19 @@ final class LineMarkerTransformer implements ClassFileTransformer {
     static final String REGISTERMETHODLINE_DESC = "(IILjava/lang/String;)V";
     static final String ANNOTATION_DESC = "Ledu/neu/ccs/prl/crochet/ttd/TimeTravelBody;";
 
+    /**
+     * Descriptor of {@code Ttd.TTD_ACTIVE_SESSIONS} static field.
+     * Used by the B.4 no-session guard: emits a GETSTATIC + get() + IFEQ skip
+     * around save-frame snippets so array allocation is skipped outside sessions.
+     */
+    private static final String TTD_ACTIVE_SESSIONS_DESC =
+            "Ljava/util/concurrent/atomic/AtomicInteger;";
+    private static final String ATOMIC_INT_OWNER =
+            "java/util/concurrent/atomic/AtomicInteger";
+
     /** Name of the synthetic class-init helper emitted at {@code visitEnd()}. */
-    private static final String REGISTER_ALL_METHOD = "$ttd$registerAll";
-    private static final String REGISTER_ALL_DESC = "()V";
+    static final String REGISTER_ALL_METHOD = "$ttd$registerAll";
+    static final String REGISTER_ALL_DESC = "()V";
 
     /**
      * Set of fully-qualified method FQNs ({@code "owner.name+desc"}) for which a
@@ -695,6 +705,16 @@ final class LineMarkerTransformer implements ClassFileTransformer {
     // Emission pass: ClassVisitor
     // -------------------------------------------------------------------------
 
+    /**
+     * Prefix for synthetic per-method-id static int fields emitted by C.2.
+     * Each annotated method gets one field: {@code $$ttd$mid$0},
+     * {@code $$ttd$mid$1}, etc. Slot indices are assigned in the order
+     * analyses are visited (ClassNode.methods order — stable per class file).
+     */
+    static final String TTD_MID_FIELD_PREFIX = "$$ttd$mid$";
+    /** JVM descriptor for the per-method-id static int fields. */
+    static final String TTD_MID_FIELD_DESC = "I";
+
     private static final class TtdClassVisitor extends ClassVisitor {
         private final String ownerInternal;
         /** Keyed by {@code "methodName+descriptor"}. */
@@ -706,6 +726,14 @@ final class LineMarkerTransformer implements ClassFileTransformer {
         private final List<String[]> registrations = new ArrayList<>();
         private boolean hasClinitAlready = false;
 
+        /**
+         * C.2: Map from methodIdKey → per-class slot index (0, 1, …).
+         * Slot index N corresponds to the synthetic field {@code $$ttd$mid$N}.
+         * Populated in {@code visitMethod} order so that assignment is stable
+         * across rebuilds (universal gate 18).
+         */
+        private final Map<String, Integer> methodIdSlots = new HashMap<>();
+
         TtdClassVisitor(ClassVisitor delegate, String ownerInternal,
                         List<MethodAnalysis> analyses) {
             super(Opcodes.ASM9, delegate);
@@ -714,6 +742,20 @@ final class LineMarkerTransformer implements ClassFileTransformer {
             for (MethodAnalysis a : analyses) {
                 analysisByKey.put(a.mn.name + a.mn.desc, a);
             }
+        }
+
+        /**
+         * Assign a per-class slot index for {@code methodIdKey} if not already
+         * present. Returns the (possibly newly-assigned) slot index.
+         */
+        private int slotFor(String methodIdKey) {
+            return methodIdSlots.computeIfAbsent(methodIdKey,
+                    k -> methodIdSlots.size());
+        }
+
+        /** Return the synthetic field name for slot {@code slotIdx}. */
+        static String midFieldName(int slotIdx) {
+            return TTD_MID_FIELD_PREFIX + slotIdx;
         }
 
         @Override
@@ -735,13 +777,24 @@ final class LineMarkerTransformer implements ClassFileTransformer {
                 // Not an annotated method with save points — check for Phase 1.
                 return new Phase1MethodVisitor(mv, ownerInternal, name + descriptor);
             }
+            // C.2: assign slot index for this method's id before emitting,
+            // then pre-compute the field name as a plain String so that
+            // SuppressingMethodVisitor and CpsMethodEmitter hold no reference
+            // to TtdClassVisitor — avoiding Crochet's $$crochetAccess()
+            // injection on TtdClassVisitor when those inner classes are
+            // retransformed by the Crochet agent.
+            int slot = slotFor(analysis.methodIdKey);
+            String fieldName = midFieldName(slot);
             // CPS emitter: suppress original bytecode, replay from MethodNode.
-            return new SuppressingMethodVisitor(mv, ownerInternal, analysis, registrations);
+            return new SuppressingMethodVisitor(mv, ownerInternal, analysis,
+                    registrations, fieldName);
         }
 
         @Override
         public void visitEnd() {
             if (!analysisByKey.isEmpty()) {
+                // C.2: emit one synthetic static int field per annotated method.
+                emitMethodIdFields();
                 // Emit the $ttd$registerAll() synthetic helper.
                 emitRegisterAll();
                 // If there was no <clinit>, emit one that calls $ttd$registerAll().
@@ -752,19 +805,50 @@ final class LineMarkerTransformer implements ClassFileTransformer {
             super.visitEnd();
         }
 
+        /**
+         * C.2: Emit one {@code private static synthetic int $$ttd$mid$N} field
+         * for each unique methodIdKey collected during visitMethod.
+         */
+        private void emitMethodIdFields() {
+            for (Map.Entry<String, Integer> entry : methodIdSlots.entrySet()) {
+                String fieldName = midFieldName(entry.getValue());
+                super.visitField(
+                        Opcodes.ACC_PRIVATE | Opcodes.ACC_STATIC | Opcodes.ACC_SYNTHETIC,
+                        fieldName, TTD_MID_FIELD_DESC, null, null).visitEnd();
+            }
+        }
+
         private void emitRegisterAll() {
             MethodVisitor mv = super.visitMethod(
                     Opcodes.ACC_PRIVATE | Opcodes.ACC_STATIC | Opcodes.ACC_SYNTHETIC,
                     REGISTER_ALL_METHOD, REGISTER_ALL_DESC, null, null);
             mv.visitCode();
+
+            // C.2: First, initialise the per-method id fields.
+            // For each unique methodIdKey, call internMethodId once and PUTSTATIC.
+            // Use a sorted iteration over slot indices for deterministic emission.
+            String[] keysBySlot = new String[methodIdSlots.size()];
+            for (Map.Entry<String, Integer> entry : methodIdSlots.entrySet()) {
+                keysBySlot[entry.getValue()] = entry.getKey();
+            }
+            for (int slot = 0; slot < keysBySlot.length; slot++) {
+                String methodIdKey = keysBySlot[slot];
+                mv.visitLdcInsn(methodIdKey);
+                mv.visitMethodInsn(Opcodes.INVOKESTATIC, TTD_OWNER,
+                        "internMethodId", INTERNMETHODID_DESC, false);
+                mv.visitFieldInsn(Opcodes.PUTSTATIC, ownerInternal,
+                        midFieldName(slot), TTD_MID_FIELD_DESC);
+            }
+
+            // Then register all save-point debug entries.
             for (String[] reg : registrations) {
                 String methodIdKey = reg[0];
                 int bci = Integer.parseInt(reg[1]);
                 String label = reg[2];
-                // int methodId = Ttd.internMethodId(methodIdKey);
-                mv.visitLdcInsn(methodIdKey);
-                mv.visitMethodInsn(Opcodes.INVOKESTATIC, TTD_OWNER,
-                        "internMethodId", INTERNMETHODID_DESC, false);
+                // int methodId = $$ttd$mid$N (already initialised above)
+                int slot = methodIdSlots.get(methodIdKey);
+                mv.visitFieldInsn(Opcodes.GETSTATIC, ownerInternal,
+                        midFieldName(slot), TTD_MID_FIELD_DESC);
                 // Ttd.registerMethodLine(methodId, bci, label);
                 mv.visitLdcInsn(bci);
                 mv.visitLdcInsn(label);
@@ -857,15 +941,25 @@ final class LineMarkerTransformer implements ClassFileTransformer {
         private final String ownerInternal;
         private final MethodAnalysis analysis;
         private final List<String[]> registrations;
+        /**
+         * C.2: pre-computed field name for this method's interned id.
+         * Stored as a plain String (not a reference to {@code TtdClassVisitor})
+         * to avoid Crochet's {@code $$crochetAccess()} injection on
+         * {@code TtdClassVisitor} when this visitor itself is retransformed
+         * by the Crochet agent.
+         */
+        private final String midFieldName;
 
         SuppressingMethodVisitor(MethodVisitor realWriter, String ownerInternal,
-                                  MethodAnalysis analysis, List<String[]> registrations) {
+                                  MethodAnalysis analysis, List<String[]> registrations,
+                                  String midFieldName) {
             // Pass null as delegate — we suppress all events.
             super(Opcodes.ASM9, null);
             this.realWriter = realWriter;
             this.ownerInternal = ownerInternal;
             this.analysis = analysis;
             this.registrations = registrations;
+            this.midFieldName = midFieldName;
         }
 
         @Override
@@ -888,7 +982,7 @@ final class LineMarkerTransformer implements ClassFileTransformer {
             }
             // Emit the CPS-transformed method body.
             CpsMethodEmitter emitter = new CpsMethodEmitter(
-                    realWriter, ownerInternal, analysis);
+                    realWriter, ownerInternal, analysis, midFieldName);
             emitter.emit();
         }
 
@@ -961,13 +1055,37 @@ final class LineMarkerTransformer implements ClassFileTransformer {
         private final int resumeSlot;
         /** Map from slot index → declared descriptor (from LVT + parameter types). */
         private final Map<Integer, String> declaredRefTypes;
+        /**
+         * C.2: name of the synthetic {@code $$ttd$mid$N} field for this method's
+         * interned id.  Pre-computed from the class visitor's slot map at
+         * construction time, so {@code CpsMethodEmitter} holds no reference to
+         * {@code TtdClassVisitor} — avoiding a cross-reference that triggers
+         * Crochet's {@code $$crochetAccess()} injection when the emitter itself
+         * gets retransformed by the Crochet agent.
+         */
+        private final String midFieldName;
 
-        CpsMethodEmitter(MethodVisitor mv, String ownerInternal, MethodAnalysis analysis) {
+        CpsMethodEmitter(MethodVisitor mv, String ownerInternal, MethodAnalysis analysis,
+                         String midFieldName) {
             this.mv = mv;
             this.ownerInternal = ownerInternal;
             this.analysis = analysis;
             this.resumeSlot = analysis.mn.maxLocals;
             this.declaredRefTypes = buildDeclaredRefTypes(analysis.mn);
+            this.midFieldName = midFieldName;
+        }
+
+        /**
+         * C.2: emit {@code GETSTATIC ownerInternal.$$ttd$mid$N I} where
+         * {@code $$ttd$mid$N} was pre-computed at construction time from the
+         * class visitor's slot map.  Replaces the old
+         * {@code LDC methodIdKey; INVOKESTATIC internMethodId} pattern, saving
+         * one String CP entry and eliminating the ConcurrentHashMap lookup from
+         * the runtime hot path.
+         */
+        private void emitGetMethodId() {
+            mv.visitFieldInsn(Opcodes.GETSTATIC, ownerInternal,
+                    midFieldName, TTD_MID_FIELD_DESC);
         }
 
         void emit() {
@@ -1007,9 +1125,9 @@ final class LineMarkerTransformer implements ClassFileTransformer {
             }
             Label fallthroughLabel = new Label();
 
-            mv.visitLdcInsn(analysis.methodIdKey);
-            mv.visitMethodInsn(Opcodes.INVOKESTATIC, TTD_OWNER,
-                    "internMethodId", INTERNMETHODID_DESC, false);
+            // C.2: GETSTATIC $$ttd$mid$N (field initialised in $ttd$registerAll)
+            // replaces the old LDC + INVOKESTATIC internMethodId pattern.
+            emitGetMethodId();
             // Stack: [int methodId]
             mv.visitMethodInsn(Opcodes.INVOKESTATIC, TTD_OWNER,
                     "popResumeFrame", POPRESUME_DESC, false);
@@ -1081,10 +1199,15 @@ final class LineMarkerTransformer implements ClassFileTransformer {
 
                 if (callsiteSp != null) {
                     // Emit the save-frame BEFORE the arg-loading sequence.
-                    emitSaveFrameSnippet(callsiteSp);
+                    // B.4: the shim label (bodyLabel) doubles as the skipSaveLabel —
+                    // when TTD_ACTIVE_SESSIONS == 0 the guard jumps directly to the
+                    // shim label, bypassing save-frame allocs while still executing
+                    // the arg-loads + INVOKE normally.
+                    Label shimLabel = bodyLabels.get(callsiteSp.bci);
+                    emitSaveFrameSnippet(callsiteSp, shimLabel);
                     // Emit the shim label (body label) — this is the LOOKUPSWITCH target.
                     // On resume, the prelude jumps here. Stack is empty at this point.
-                    mv.visitLabel(bodyLabels.get(callsiteSp.bci));
+                    mv.visitLabel(shimLabel);
                 }
 
                 // Check if this is a line-marker save point BCI.
@@ -1093,7 +1216,12 @@ final class LineMarkerTransformer implements ClassFileTransformer {
                     // Place the body label BEFORE the instruction (jump target for restore blocks).
                     mv.visitLabel(bodyLabels.get(lineSp.bci));
                     // Emit save-frame snippet BEFORE the original instruction.
-                    emitSaveFrameSnippet(lineSp);
+                    // B.4: use a fresh skip label placed between the save-frame and lineHit
+                    // so that when TTD_ACTIVE_SESSIONS == 0 the save-frame allocs are skipped
+                    // but lineHit still executes (lineHit has its own CTX null-check).
+                    Label afterSaveLabel = new Label();
+                    emitSaveFrameSnippet(lineSp, afterSaveLabel);
+                    mv.visitLabel(afterSaveLabel);
                     // Also emit lineHit for REPL display.
                     mv.visitLdcInsn(ownerInternal);
                     mv.visitLdcInsn(analysis.mn.name + analysis.mn.desc);
@@ -1123,12 +1251,36 @@ final class LineMarkerTransformer implements ClassFileTransformer {
          * for each live ref: DUP, LDC i, ALOAD slot, AASTORE
          * INVOKESTATIC Ttd.saveFrame(int, int, long[], Object[]) : void
          * </pre>
+         *
+         * <p><b>B.4 no-session guard:</b> the array allocations ({@code NEWARRAY},
+         * {@code ANEWARRAY}) and the {@code saveFrame} call are wrapped in a
+         * {@code TTD_ACTIVE_SESSIONS == 0} early-exit:
+         * <pre>
+         * GETSTATIC Ttd.TTD_ACTIVE_SESSIONS
+         * INVOKEVIRTUAL AtomicInteger.get() : int
+         * IFEQ skip_save_frame        ← jump if no session active
+         * [array allocs + saveFrame]
+         * skip_save_frame:
+         * </pre>
+         * This prevents array allocation on the no-session hot path.  The guard
+         * executes before {@code NEWARRAY}/{@code ANEWARRAY}, so the arrays are
+         * never created when {@code TTD_ACTIVE_SESSIONS == 0}.
+         *
+         * @param sp            the save point to emit
+         * @param skipSaveLabel the label to jump to when {@code TTD_ACTIVE_SESSIONS == 0};
+         *                      the caller places this label after the snippet to allow
+         *                      fall-through in the session-active case
          */
-        private void emitSaveFrameSnippet(SavePoint sp) {
-            // int methodId = Ttd.internMethodId(methodIdKey)
-            mv.visitLdcInsn(analysis.methodIdKey);
-            mv.visitMethodInsn(Opcodes.INVOKESTATIC, TTD_OWNER,
-                    "internMethodId", INTERNMETHODID_DESC, false);
+        private void emitSaveFrameSnippet(SavePoint sp, Label skipSaveLabel) {
+            // B.4 no-session guard: GETSTATIC + get() + IFEQ skip.
+            mv.visitFieldInsn(Opcodes.GETSTATIC, TTD_OWNER,
+                    "TTD_ACTIVE_SESSIONS", TTD_ACTIVE_SESSIONS_DESC);
+            mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, ATOMIC_INT_OWNER,
+                    "get", "()I", false);
+            mv.visitJumpInsn(Opcodes.IFEQ, skipSaveLabel);
+
+            // C.2: GETSTATIC $$ttd$mid$N replaces LDC + INVOKESTATIC internMethodId.
+            emitGetMethodId();
             // LDC bci
             mv.visitLdcInsn(sp.bci);
             // NEWARRAY T_LONG for primitives
