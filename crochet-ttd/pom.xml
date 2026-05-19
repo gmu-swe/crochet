@@ -31,6 +31,15 @@
             <groupId>org.ow2.asm</groupId>
             <artifactId>asm</artifactId>
         </dependency>
+        <!-- asm-tree + asm-analysis: used by LivenessAnalyzer (B.1) -->
+        <dependency>
+            <groupId>org.ow2.asm</groupId>
+            <artifactId>asm-tree</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.ow2.asm</groupId>
+            <artifactId>asm-analysis</artifactId>
+        </dependency>
         <dependency>
             <groupId>org.junit.jupiter</groupId>
             <artifactId>junit-jupiter</artifactId>
