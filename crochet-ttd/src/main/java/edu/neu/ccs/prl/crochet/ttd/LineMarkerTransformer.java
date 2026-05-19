@@ -777,11 +777,17 @@ final class LineMarkerTransformer implements ClassFileTransformer {
                 // Not an annotated method with save points — check for Phase 1.
                 return new Phase1MethodVisitor(mv, ownerInternal, name + descriptor);
             }
-            // C.2: assign slot index for this method's id before emitting.
-            slotFor(analysis.methodIdKey);
+            // C.2: assign slot index for this method's id before emitting,
+            // then pre-compute the field name as a plain String so that
+            // SuppressingMethodVisitor and CpsMethodEmitter hold no reference
+            // to TtdClassVisitor — avoiding Crochet's $$crochetAccess()
+            // injection on TtdClassVisitor when those inner classes are
+            // retransformed by the Crochet agent.
+            int slot = slotFor(analysis.methodIdKey);
+            String fieldName = midFieldName(slot);
             // CPS emitter: suppress original bytecode, replay from MethodNode.
             return new SuppressingMethodVisitor(mv, ownerInternal, analysis,
-                    registrations, this);
+                    registrations, fieldName);
         }
 
         @Override
@@ -935,19 +941,25 @@ final class LineMarkerTransformer implements ClassFileTransformer {
         private final String ownerInternal;
         private final MethodAnalysis analysis;
         private final List<String[]> registrations;
-        /** C.2: reference back to the class visitor for slot-index lookup. */
-        private final TtdClassVisitor classVisitor;
+        /**
+         * C.2: pre-computed field name for this method's interned id.
+         * Stored as a plain String (not a reference to {@code TtdClassVisitor})
+         * to avoid Crochet's {@code $$crochetAccess()} injection on
+         * {@code TtdClassVisitor} when this visitor itself is retransformed
+         * by the Crochet agent.
+         */
+        private final String midFieldName;
 
         SuppressingMethodVisitor(MethodVisitor realWriter, String ownerInternal,
                                   MethodAnalysis analysis, List<String[]> registrations,
-                                  TtdClassVisitor classVisitor) {
+                                  String midFieldName) {
             // Pass null as delegate — we suppress all events.
             super(Opcodes.ASM9, null);
             this.realWriter = realWriter;
             this.ownerInternal = ownerInternal;
             this.analysis = analysis;
             this.registrations = registrations;
-            this.classVisitor = classVisitor;
+            this.midFieldName = midFieldName;
         }
 
         @Override
@@ -970,7 +982,7 @@ final class LineMarkerTransformer implements ClassFileTransformer {
             }
             // Emit the CPS-transformed method body.
             CpsMethodEmitter emitter = new CpsMethodEmitter(
-                    realWriter, ownerInternal, analysis, classVisitor);
+                    realWriter, ownerInternal, analysis, midFieldName);
             emitter.emit();
         }
 
@@ -1044,33 +1056,36 @@ final class LineMarkerTransformer implements ClassFileTransformer {
         /** Map from slot index → declared descriptor (from LVT + parameter types). */
         private final Map<Integer, String> declaredRefTypes;
         /**
-         * C.2: reference to the class visitor for methodIdSlot lookup.
-         * Used to emit {@code GETSTATIC $$ttd$mid$N} in place of the old
-         * {@code LDC + INVOKESTATIC internMethodId} pattern.
+         * C.2: name of the synthetic {@code $$ttd$mid$N} field for this method's
+         * interned id.  Pre-computed from the class visitor's slot map at
+         * construction time, so {@code CpsMethodEmitter} holds no reference to
+         * {@code TtdClassVisitor} — avoiding a cross-reference that triggers
+         * Crochet's {@code $$crochetAccess()} injection when the emitter itself
+         * gets retransformed by the Crochet agent.
          */
-        private final TtdClassVisitor classVisitor;
+        private final String midFieldName;
 
         CpsMethodEmitter(MethodVisitor mv, String ownerInternal, MethodAnalysis analysis,
-                         TtdClassVisitor classVisitor) {
+                         String midFieldName) {
             this.mv = mv;
             this.ownerInternal = ownerInternal;
             this.analysis = analysis;
             this.resumeSlot = analysis.mn.maxLocals;
             this.declaredRefTypes = buildDeclaredRefTypes(analysis.mn);
-            this.classVisitor = classVisitor;
+            this.midFieldName = midFieldName;
         }
 
         /**
-         * C.2: emit {@code GETSTATIC ownerInternal.$$ttd$mid$N I} where N is
-         * the slot index for this method's methodIdKey.  Replaces the old
+         * C.2: emit {@code GETSTATIC ownerInternal.$$ttd$mid$N I} where
+         * {@code $$ttd$mid$N} was pre-computed at construction time from the
+         * class visitor's slot map.  Replaces the old
          * {@code LDC methodIdKey; INVOKESTATIC internMethodId} pattern, saving
          * one String CP entry and eliminating the ConcurrentHashMap lookup from
          * the runtime hot path.
          */
         private void emitGetMethodId() {
-            int slot = classVisitor.methodIdSlots.get(analysis.methodIdKey);
             mv.visitFieldInsn(Opcodes.GETSTATIC, ownerInternal,
-                    TtdClassVisitor.midFieldName(slot), TTD_MID_FIELD_DESC);
+                    midFieldName, TTD_MID_FIELD_DESC);
         }
 
         void emit() {
