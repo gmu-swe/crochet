@@ -119,6 +119,45 @@ public final class Ttd {
     }
 
     /**
+     * Fast no-session guard: returns {@code true} iff no TTD session has
+     * ever fired ({@code TTD_GEN == 0}, the pristine startup state).
+     *
+     * <p>This is the {@code emitSaveFrameSnippet} guard helper for
+     * {@link LineMarkerTransformer}.  Using a named method rather than
+     * emitting {@code GETSTATIC Ttd.TTD_GEN + LCONST_0 + LCMP} directly
+     * has a critical JIT benefit:
+     *
+     * <ul>
+     *   <li>{@code GETSTATIC Ttd.TTD_GEN} is a <em>volatile</em> read —
+     *       the JIT cannot hoist it out of a loop because volatile establishes
+     *       happens-before.  Seven volatile reads per loop iteration (one per
+     *       save-point) add measurable overhead even when the branch is always
+     *       taken (TTD_GEN==0).</li>
+     *   <li>{@code TTD_GEN_HANDLE.getOpaque()} uses the
+     *       {@code OPAQUE} access mode, which is weaker than volatile: it
+     *       guarantees the value is materialized but does <em>not</em> fence
+     *       subsequent reads.  HotSpot C2 treats {@code getLongOpaque} as an
+     *       intrinsic (see {@code designs/C.1/JIT.md}) and can hoist the read
+     *       out of the loop body, folding all seven per-iteration guard branches
+     *       into a single entry check.</li>
+     * </ul>
+     *
+     * <p>Bytecode emitted per save-point guard (after C.3 fold):
+     * <pre>
+     *   INVOKESTATIC Ttd.ttdGenIsZero()Z
+     *   IFNE afterAll          // if true (zero), skip saveFrame + lineHit
+     * </pre>
+     * (2 instructions vs the prior 4: GETSTATIC + LCONST_0 + LCMP + IFEQ).
+     * More importantly, the JIT can inline ttdGenIsZero() → getLongOpaque
+     * → intrinsic, and hoist the load out of the enclosing loop.
+     *
+     * <p>TODO: annotate with {@code @Internal} once unit A.4 merges.
+     */
+    public static boolean ttdGenIsZero() {
+        return (long) TTD_GEN_HANDLE.getOpaque() == 0L;
+    }
+
+    /**
      * Per-thread deque of {@link ResumeFrame} records pushed by
      * {@link #saveFrame}.
      *

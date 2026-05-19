@@ -115,11 +115,27 @@ final class LineMarkerTransformer implements ClassFileTransformer {
 
     /**
      * Descriptor of {@code Ttd.TTD_GEN} static field (C.1).
-     * Used by the no-session guard: emits a GETSTATIC + LCONST_0 + LCMP + IFEQ skip
-     * around save-frame snippets so array allocation is skipped when no session
-     * has ever fired (TTD_GEN == 0 pristine state).
+     * Kept for reference; used only in javadoc / historical context.
+     * C.3 replaced direct GETSTATIC of this field with a call to
+     * {@link #TTD_GEN_IS_ZERO_METHOD} so that the JIT can use getOpaque
+     * semantics and hoist the guard out of tight loops.
      */
+    @SuppressWarnings("unused")
     private static final String TTD_GEN_DESC = "J";
+
+    /**
+     * C.3: name + descriptor of {@code Ttd.ttdGenIsZero()Z}.
+     *
+     * <p>Emitted instead of {@code GETSTATIC Ttd.TTD_GEN + LCONST_0 + LCMP}
+     * so that the JIT can inline the getOpaque read and hoist it out of loops.
+     * The bytecode guard becomes:
+     * <pre>
+     *   INVOKESTATIC Ttd.ttdGenIsZero()Z
+     *   IFNE skipLabel          // IFNE = "if non-zero (true)", i.e. skip when no session
+     * </pre>
+     */
+    static final String TTD_GEN_IS_ZERO_METHOD = "ttdGenIsZero";
+    static final String TTD_GEN_IS_ZERO_DESC = "()Z";
 
     /**
      * Prefix for synthetic per-method-id static int fields emitted by C.2.
@@ -1213,19 +1229,36 @@ final class LineMarkerTransformer implements ClassFileTransformer {
                 if (lineSp != null && !lineSp.isCallsite) {
                     // Place the body label BEFORE the instruction (jump target for restore blocks).
                     mv.visitLabel(bodyLabels.get(lineSp.bci));
-                    // Emit save-frame snippet BEFORE the original instruction.
-                    // C.1: use a fresh skip label placed between the save-frame and lineHit
-                    // so that when TTD_GEN == 0 the save-frame allocs are skipped
-                    // but lineHit still executes (lineHit has its own CTX null-check).
-                    Label afterSaveLabel = new Label();
-                    emitSaveFrameSnippet(lineSp, afterSaveLabel);
-                    mv.visitLabel(afterSaveLabel);
-                    // Also emit lineHit for REPL display.
+                    // C.3: Guard BOTH saveFrame and lineHit with the TTD_GEN == 0 check.
+                    //
+                    // Previous design (C.1): the guard covered only save-frame allocs;
+                    // lineHit was always emitted, relying on its internal CTX null-check.
+                    // That ThreadLocal.get() per save-point added ~4.5x overhead in mode B
+                    // (measured by C.3 gate benchmark: 1,133 µs vs 240 µs baseline).
+                    //
+                    // C.3 fix: when TTD_GEN == 0 (no session has ever fired), skip BOTH
+                    // saveFrame and lineHit.  lineHit is only useful when CTX != null, which
+                    // requires an active session, which requires TTD_GEN != 0.  So skipping
+                    // lineHit when TTD_GEN == 0 is semantically correct: outside a session
+                    // the REPL has no context to receive the line event anyway.
+                    //
+                    // Bytecode structure:
+                    //   GETSTATIC Ttd.TTD_GEN (J)
+                    //   LCONST_0
+                    //   LCMP
+                    //   IFEQ afterAll          ← jump over both when TTD_GEN == 0
+                    //   [saveFrame body]
+                    //   [LDC + LDC + LDC + lineHit]
+                    //   afterAll:
+                    Label afterAllLabel = new Label();
+                    emitSaveFrameSnippet(lineSp, afterAllLabel);
+                    // Inside the TTD_GEN != 0 block: emit lineHit for REPL display.
                     mv.visitLdcInsn(ownerInternal);
                     mv.visitLdcInsn(analysis.mn.name + analysis.mn.desc);
                     mv.visitLdcInsn(lineSp.lineNumber);
                     mv.visitMethodInsn(Opcodes.INVOKESTATIC, TTD_OWNER, "lineHit",
                             LINEHIT_DESC, false);
+                    mv.visitLabel(afterAllLabel);
                 }
 
                 // Replay the original instruction.
@@ -1250,20 +1283,24 @@ final class LineMarkerTransformer implements ClassFileTransformer {
          * INVOKESTATIC Ttd.saveFrame(int, int, long[], Object[]) : void
          * </pre>
          *
-         * <p><b>C.1 no-session guard:</b> the array allocations ({@code NEWARRAY},
-         * {@code ANEWARRAY}) and the {@code saveFrame} call are wrapped in a
-         * {@code TTD_GEN == 0} early-exit:
+         * <p><b>C.3 no-session guard (updated from C.1):</b> the guard uses
+         * {@link Ttd#ttdGenIsZero()} instead of a direct {@code GETSTATIC
+         * Ttd.TTD_GEN} so that the JIT can inline the {@code getOpaque} read
+         * and hoist it out of tight loops:
          * <pre>
-         * GETSTATIC Ttd.TTD_GEN         ← long on stack
-         * LCONST_0
-         * LCMP                           ← int result (0 if equal)
-         * IFEQ skip_save_frame           ← jump if TTD_GEN == 0 (no session ever fired)
-         * [array allocs + saveFrame]
-         * skip_save_frame:
+         * INVOKESTATIC Ttd.ttdGenIsZero()Z   ← boolean: true if TTD_GEN==0
+         * IFNE skip_all                       ← jump if no session ever fired
+         * [saveFrame body]
+         * [lineHit call]
+         * skip_all:
          * </pre>
-         * This prevents array allocation on the no-session pristine hot path.
-         * The guard executes before {@code NEWARRAY}/{@code ANEWARRAY}, so the
-         * arrays are never created when {@code TTD_GEN == 0}.
+         *
+         * <p>The {@code GETSTATIC Ttd.TTD_GEN} pattern (C.1) was a volatile read,
+         * which the JIT cannot hoist out of loops.  Seven volatile reads per loop
+         * iteration (one per save-point) added ~4.5x overhead in the C.3 gate
+         * benchmark.  Using {@code ttdGenIsZero()} → {@code getOpaque} intrinsic
+         * allows C2 to hoist the guard, folding the entire save-frame block to
+         * dead code when {@code TTD_GEN == 0} in steady state.
          *
          * @param sp            the save point to emit
          * @param skipSaveLabel the label to jump to when {@code TTD_GEN == 0};
@@ -1271,12 +1308,13 @@ final class LineMarkerTransformer implements ClassFileTransformer {
          *                      fall-through in the session-active case
          */
         private void emitSaveFrameSnippet(SavePoint sp, Label skipSaveLabel) {
-            // C.1 no-session guard: GETSTATIC TTD_GEN (J) + LCONST_0 + LCMP + IFEQ skip.
-            mv.visitFieldInsn(Opcodes.GETSTATIC, TTD_OWNER,
-                    "TTD_GEN", TTD_GEN_DESC);
-            mv.visitInsn(Opcodes.LCONST_0);
-            mv.visitInsn(Opcodes.LCMP);
-            mv.visitJumpInsn(Opcodes.IFEQ, skipSaveLabel);
+            // C.3 no-session guard: INVOKESTATIC Ttd.ttdGenIsZero()Z + IFNE skip.
+            // Using ttdGenIsZero() instead of GETSTATIC Ttd.TTD_GEN (volatile) so the
+            // JIT can inline the getOpaque read and hoist it out of the enclosing loop.
+            // IFNE = "jump if true (non-zero result)", i.e. skip when no session active.
+            mv.visitMethodInsn(Opcodes.INVOKESTATIC, TTD_OWNER,
+                    TTD_GEN_IS_ZERO_METHOD, TTD_GEN_IS_ZERO_DESC, false);
+            mv.visitJumpInsn(Opcodes.IFNE, skipSaveLabel);
 
             // C.2: GETSTATIC $$ttd$mid$N replaces LDC + INVOKESTATIC internMethodId.
             emitGetMethodId();
