@@ -31,6 +31,11 @@ public final class TtdAgent {
         if (Boolean.getBoolean("crochet.ttd.debug")) {
             System.err.println("[ttd-agent] installed");
         }
+        // NondetTransformer must be installed BEFORE LineMarkerTransformer so
+        // that nondet call-site rewrites are visible to the line-marker pass.
+        // Both transformers are independent (nondet rewrites INVOKESTATIC/VIRTUAL;
+        // line markers emit new INVOKESTATIC Ttd.lineHit calls at line boundaries).
+        inst.addTransformer(new NondetTransformer(), true);
         inst.addTransformer(new LineMarkerTransformer(), true);
     }
 }
