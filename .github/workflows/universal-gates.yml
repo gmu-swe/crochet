@@ -1,7 +1,9 @@
 name: Universal Quality Gates
 
 # PLAN.md §"Universal quality gates" — 21 gates enforced on every PR and push
-# to java24-ttd and unit/* branches.
+# to java24-ttd, java24-port, and integration/** branches.
+# Unit branches (unit/**) are intentionally incomplete in the stacked-branch
+# model; their CI runs are skipped.
 #
 # Gate → job mapping:
 #   Gate 1  (unit tests)                   → unit-tests
@@ -26,12 +28,23 @@ name: Universal Quality Gates
 #   Gate 20 (CLAUDE.md updated)            → claude-md-check
 #   Gate 21 (design doc presence)          → design-doc-check
 
+# CI runs on:
+#   - push to java24-ttd / java24-port (the integration lines; post-merge verification)
+#   - push to integration/** (pre-merge integrated verification — see integration/staged-all)
+#   - PRs targeting integration lines (merge gating)
+#
+# CI does NOT run on push to unit/** branches. The stacked-branch
+# fleet-rollout model means individual unit branches are intentionally
+# incomplete (e.g., unit/B.4 doesn't include A.2's @CrochetSkip), so
+# running the full 21-gate suite against them produces noise, not signal.
+# Validate at integration time via integration/staged-all and at merge
+# time via PR.
 on:
   push:
     branches:
       - java24-ttd
       - java24-port
-      - 'unit/**'
+      - 'integration/**'
   pull_request:
     branches:
       - java24-ttd
