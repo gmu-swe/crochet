@@ -10,7 +10,7 @@ runs:
   steps:
     - name: Restore DaCapo zip cache
       id: cache-zip
-      uses: actions/cache@v4
+      uses: actions/cache/restore@v4
       with:
         path: ${{ runner.temp }}/dacapo-cache/dacapo-23.11-MR2-chopin.zip
         key: dacapo-zip-23.11-MR2-chopin-v1
@@ -28,6 +28,13 @@ runs:
         echo "Verifying SHA-256 ..."
         echo "70a1fd4ed959f09053bb7ef8b2745a19d6f28dd8a7d0b350362039d89b49eb26  dacapo-23.11-MR2-chopin.zip" | sha256sum -c -
 
+    - name: Save DaCapo zip cache
+      if: always() && steps.cache-zip.outputs.cache-hit != 'true'
+      uses: actions/cache/save@v4
+      with:
+        path: ${{ runner.temp }}/dacapo-cache/dacapo-23.11-MR2-chopin.zip
+        key: dacapo-zip-23.11-MR2-chopin-v1
+
     - name: Extract DaCapo
       shell: bash
       run: |
@@ -35,26 +42,26 @@ runs:
         cd "${RUNNER_TEMP}"
         echo "Extracting full DaCapo zip ..."
         unzip -q "${RUNNER_TEMP}/dacapo-cache/dacapo-23.11-MR2-chopin.zip"
-        # Result: ${RUNNER_TEMP}/dacapo-23.11-MR2-chopin/  (full data tree)
-        #         with the main jar at jar/dacapo-23.11-MR2-chopin.jar
-
-        # Point DACAPO_JAR at the jar inside the data tree.
-        # DaCapo derives its data path from the jar's parent's parent —
-        # since the jar lives at <ROOT>/dacapo-23.11-MR2-chopin/jar/dacapo-...jar,
-        # DaCapo will look for data at <ROOT>/dacapo-23.11-MR2-chopin/ which is
-        # exactly where we extracted it.
-        DACAPO_JAR_PATH="${RUNNER_TEMP}/dacapo-23.11-MR2-chopin/jar/dacapo-23.11-MR2-chopin.jar"
+        # Result:
+        #   ${RUNNER_TEMP}/dacapo-23.11-MR2-chopin.jar   <- main jar (flat path, root of zip)
+        #   ${RUNNER_TEMP}/dacapo-23.11-MR2-chopin/      <- data tree (sibling)
+        DACAPO_JAR_PATH="${RUNNER_TEMP}/dacapo-23.11-MR2-chopin.jar"
+        DACAPO_DATA_DIR="${RUNNER_TEMP}/dacapo-23.11-MR2-chopin"
         if [ ! -f "$DACAPO_JAR_PATH" ]; then
             echo "ERROR: expected jar not found at $DACAPO_JAR_PATH" >&2
-            find "${RUNNER_TEMP}/dacapo-23.11-MR2-chopin" -name '*.jar' | head -10 >&2
+            ls -la "${RUNNER_TEMP}/" | head -20 >&2
             exit 1
         fi
-        echo "Extracted; jar at $DACAPO_JAR_PATH"
+        if [ ! -d "$DACAPO_DATA_DIR" ]; then
+            echo "ERROR: expected data tree not found at $DACAPO_DATA_DIR" >&2
+            exit 1
+        fi
+        echo "Extracted: jar=$DACAPO_JAR_PATH data=$DACAPO_DATA_DIR"
 
     - name: Export path
       id: export
       shell: bash
       run: |
-        DACAPO_JAR_PATH="${RUNNER_TEMP}/dacapo-23.11-MR2-chopin/jar/dacapo-23.11-MR2-chopin.jar"
+        DACAPO_JAR_PATH="${RUNNER_TEMP}/dacapo-23.11-MR2-chopin.jar"
         echo "dacapo-jar=$DACAPO_JAR_PATH" >> "$GITHUB_OUTPUT"
         echo "DACAPO_JAR=$DACAPO_JAR_PATH" >> "$GITHUB_ENV"
