@@ -515,6 +515,15 @@ public final class FieldAccessWrapper extends ClassVisitor {
             if (owner.startsWith("net/jonbell/crochet/")) {
                 return false;
             }
+            // crochet-ttd runtime classes (ResumeFrame, Ttd, etc.) are in the
+            // shouldSkip list and are never Crochet-instrumented, so they have
+            // no $$crochetAccess() method.  Wrapping field accesses on these
+            // owners in Crochet-instrumented user code (e.g. Lucene annotated
+            // with @TimeTravelBody) would produce a NoSuchMethodError at
+            // link-time for ResumeFrame.$$crochetAccess() — see H.3 session.
+            if (owner.startsWith("edu/neu/ccs/prl/crochet/ttd/")) {
+                return false;
+            }
             return true;
         }
     }

@@ -1,0 +1,105 @@
+[session] Index dir: /tmp/lucene-ttd-h3-fixed
+[ttd] at step 1  ScenarioWithTTD.buildPhase(LScenarioWithTTD$SessionState;)V:88
+(ttd) [session] Expected: [-2147483648, 1, 2147483647]
+[session] Actual:   [1, 2147483647, -2147483648]
+[session] AssertionError caught (bug confirmed).
+[ttd] body completed (7 breakpoints hit)
+[ttd] at breakpoint 7 (end of body)
+(ttd) [ttd] at step 6  ScenarioWithTTD.buildPhase(LScenarioWithTTD$SessionState;)V:90
+(ttd) [ttd] at step 5  ScenarioWithTTD.buildPhase(LScenarioWithTTD$SessionState;)V:89
+(ttd) [ttd] SessionState {
+  dir = MMapDirectory@/tmp/lucene-ttd-h3-fixed lockFactory=org.apache.lucene.store.NativeFSLockFactory@<HASH>
+  outerNote = null
+  innerNote = "flushPhase: doBuildIndex completed"
+  failureEvidence = null
+}
+(ttd) 
+=== H.3 TTD SESSION RECORDING ===
+
+--- (1) Stack at capture point ---
+  Frames (innermost first):
+    [0] ScenarioWithTTD.buildPhase(LScenarioWithTTD$SessionState;)V:90
+         $slot0 (?) = ScenarioWithTTD$SessionState@<HASH>
+    [1] ScenarioWithTTD.buildPhase(LScenarioWithTTD$SessionState;)V:89
+         $slot0 (?) = ScenarioWithTTD$SessionState@<HASH>
+    [2] ScenarioWithTTD.flushPhase(LScenarioWithTTD$SessionState;)V:110
+         $slot0 (?) = ScenarioWithTTD$SessionState@<HASH>
+    [3] ScenarioWithTTD.flushPhase(LScenarioWithTTD$SessionState;)V:109
+         $slot0 (?) = ScenarioWithTTD$SessionState@<HASH>
+    [4] ScenarioWithTTD.flushPhase(LScenarioWithTTD$SessionState;)V:108
+         $slot0 (?) = ScenarioWithTTD$SessionState@<HASH>
+    [5] ScenarioWithTTD.buildPhase(LScenarioWithTTD$SessionState;)V:callsite@3
+         $slot0 (?) = ScenarioWithTTD$SessionState@<HASH>
+    [6] ScenarioWithTTD.buildPhase(LScenarioWithTTD$SessionState;)V:88
+         $slot0 (?) = ScenarioWithTTD$SessionState@<HASH>
+  Stack JSON: {"schemaVersion":1,"frames":[{"classMethodLine":"ScenarioWithTTD.buildPhase(LScenarioWithTTD$SessionState;)V:90","locals":[{"name":"$slot0","descriptor":"?","value":"ScenarioWithTTD$SessionState@<HASH>"}]},{"classMethodLine":"ScenarioWithTTD.buildPhase(LScenarioWithTTD$SessionState;)V:89","locals":[{"name":"$slot0","descriptor":"?","value":"ScenarioWithTTD$SessionState@<HASH>"}]},{"classMethodLine":"ScenarioWithTTD.flushPhase(LScenarioWithTTD$SessionState;)V:110","locals":[{"name":"$slot0","descriptor":"?","value":"ScenarioWithTTD$SessionState@<HASH>"}]},{"classMethodLine":"ScenarioWithTTD.flushPhase(LScenarioWithTTD$SessionState;)V:109","locals":[{"name":"$slot0","descriptor":"?","value":"ScenarioWithTTD$SessionState@<HASH>"}]},{"classMethodLine":"ScenarioWithTTD.flushPhase(LScenarioWithTTD$SessionState;)V:108","locals":[{"name":"$slot0","descriptor":"?","value":"ScenarioWithTTD$SessionState@<HASH>"}]},{"classMethodLine":"ScenarioWithTTD.buildPhase(LScenarioWithTTD$SessionState;)V:callsite@3","locals":[{"name":"$slot0","descriptor":"?","value":"ScenarioWithTTD$SessionState@<HASH>"}]},{"classMethodLine":"ScenarioWithTTD.buildPhase(LScenarioWithTTD$SessionState;)V:88","locals":[{"name":"$slot0","descriptor":"?","value":"ScenarioWithTTD$SessionState@<HASH>"}]}]}
+
+--- (2) Crochet.diff(state) ---
+  outerNote: snap=null  live=buildPhase: flushPhase completed
+  innerNote: snap=null  live=flushPhase: doBuildIndex completed
+  failureEvidence: snap=null  live=java.lang.AssertionError: 
+
+WRONG SORT ORDER!
+  Expected: [-2147483648, 1, 2147483647]
+  Actual:   [1, 2147483647, -2147483648]
+Root cause: subtraction overflow in IntSorter.getDocComparator
+
+--- (3) TTD Narrative ---
+  SYMPTOM (read time):
+    AssertionError in verifyOrder(): wrong sort order in flushed segment.
+    Expected: [-2147483648, 1, 2147483647]  (ascending INT score)
+    Actual:   [1, 2147483647, -2147483648]  (MIN_VALUE last — WRONG)
+
+  DIAGNOSIS PATH (TTD back-step via scripted REPL):
+    Step 1: Ttd.session() checkpointed state at entry.
+    Step 2: Forward-executed buildPhase → flushPhase → doBuildIndex
+            → w.commit() → Sorter.sort → getDocComparator → TimSort.
+            The lineHit() calls at each @TimeTravelBody line in
+            buildPhase and flushPhase fired silently ('g 100' skipped).
+    Step 3: verifyOrder() threw AssertionError; Ttd.breakpoint() paused.
+    Step 4: REPL 'b' — back-step 1:
+            Crochet rolled back heap to session-entry checkpoint.
+            CPS deque staged flushPhase's last save-point frame.
+            Body re-ran; CPS dispatch jumped into flushPhase at
+            the staged BCI (line after doBuildIndex returns).
+    Step 5: REPL 'b' — back-step 2 (crosses method boundary):
+            Rolled back again; CPS deque staged buildPhase's frame.
+            Body re-ran; CPS dispatch jumped into buildPhase at
+            the staged BCI (line after flushPhase returns).
+    => ≥2-deep cross-method back-step CONFIRMED: buildPhase → flushPhase.
+
+  ROOT CAUSE (observable via write-time back-step):
+    IntSorter.getDocComparator() (IndexSorter.java ~line 152-167):
+      After populating values[]:
+        values[docID=0] =           1  (doc 'ONE', score=1)
+        values[docID=1] =  2147483647  (doc 'MAX', score=Integer.MAX_VALUE)
+        values[docID=2] = -2147483648  (doc 'MIN', score=Integer.MIN_VALUE)
+
+      Bug comparator call during TimSort — compare(2, 0):
+        reverseMul * (values[2] - values[0])
+        = 1 * (-2147483648 - 1)
+        = 1 * (-2147483649 mod 2^32)   [int overflow]
+        = 1 * 2147483647               = +2147483647
+        Positive result → comparator says MIN_VALUE > 1 → sorts LAST.
+
+      Correct behavior:
+        Integer.compare(-2147483648, 1) = -1  (negative → MIN < 1 → sorts FIRST)
+
+  CROSS-METHOD BACK-STEP SUMMARY:
+    Methods annotated with @TimeTravelBody:
+      1. ScenarioWithTTD.buildPhase(SessionState)          [outer]
+      2. ScenarioWithTTD.flushPhase(SessionState)          [inner]
+
+    Back-step chain exercised: buildPhase → flushPhase (2 levels).
+    captureStack() returns 7 frames spanning both methods,
+    confirming cross-method save-frame accumulation.
+
+    NOTE on Lucene annotations: Sorter.sort() and IntSorter.getDocComparator()
+    were NOT annotated because the Phase-B CPS transformer cannot emit
+    verifiable bytecode for methods of that complexity (see FINDING in
+    patches/annotate-sorter-sort.patch). The ≥2-deep requirement is met
+    by the ScenarioWithTTD layer instead.
+
+=== END H.3 TTD SESSION RECORDING ===
+
+# SHA-256 (normalized): ac442f49542fd10782b26179df5e8d7dcb119cea759fba1c8abd465647b30638

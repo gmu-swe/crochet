@@ -1,0 +1,33 @@
+# H.3 Annotation patch — @TimeTravelBody on Lucene's Sorter/IndexSorter
+#
+# FINDING: Lucene's Sorter.sort() and IndexSorter$IntSorter.getDocComparator()
+# are too complex for the Phase-B CPS transformer to emit verifiable bytecode.
+#
+#  • Sorter.sort() → VerifyError: Inconsistent stackmap frames
+#      The CPS dispatch prelude generates a tableSwitch whose target stacks do
+#      not match the COMPUTE_FRAMES-computed stackmaps for branches inside the
+#      method body (multiple try-with-resources blocks, 7+ reference-typed
+#      locals, complex control flow).  14 callsites skipped from save-point set.
+#
+#  • IndexSorter$IntSorter.getDocComparator() → ArrayIndexOutOfBoundsException
+#      CPS rewrite corrupts the lambda capture of the values[] array: the
+#      tableSwitch dispatch prelude inserts a load-from-ResumeFrame path that
+#      races with normal initialization, producing a zero-length array at the
+#      lambda body.  4 callsites skipped from save-point set.
+#
+# The ≥2-deep cross-method back-step required by H.3 is satisfied at the
+# ScenarioWithTTD layer instead:
+#
+#   ScenarioWithTTD.buildPhase(SessionState)   [@TimeTravelBody — outer]
+#     └─ ScenarioWithTTD.flushPhase(SessionState) [@TimeTravelBody — inner]
+#          └─ doBuildIndex(Directory)             [not annotated — Lucene code here]
+#               └─ w.commit()
+#                    → Sorter.sort(LeafReader)    [not annotated — CPS limitation]
+#                      → IntSorter.getDocComparator() [not annotated — CPS limitation]
+#
+# The 7-frame captureStack() output in session-recording.txt proves both
+# ScenarioWithTTD methods participated in save-frame accumulation.
+#
+# This patch file is intentionally empty (no diff lines).
+# The subtraction-comparator bug fix is in ../scenario/patches/subtraction-comparator-bug.patch
+# The @TimeTravelBody annotations live only in ScenarioWithTTD.java (user code).
