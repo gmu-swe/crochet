@@ -5,6 +5,7 @@
  */
 package net.jonbell.crochet.instrument;
 
+import net.jonbell.crochet.annotation.Internal;
 import net.jonbell.crochet.patch.Patcher;
 import net.jonbell.crochet.runtime.Tag;
 import net.jonbell.crochet.transform.CrochetTransformer;
@@ -19,6 +20,7 @@ import java.util.function.Function;
 /**
  * Instances of this class are created via reflection.
  */
+@Internal
 @SuppressWarnings("unused")
 public class CrochetInstrumentation implements Instrumentation {
     private CrochetTransformer transformer;

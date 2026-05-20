@@ -14,6 +14,8 @@ import org.objectweb.asm.MethodVisitor;
 import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.Type;
 
+import net.jonbell.crochet.annotation.Internal;
+
 /**
  * Adds the CRIJInstrumented surface to every user class that passes the
  * CrochetTransformer filter.
@@ -51,6 +53,7 @@ import org.objectweb.asm.Type;
  * entry ({@link #emitVersionGuardedEntry}) is user-class-specific and stays
  * here.
  */
+@Internal
 public final class FieldAdder extends ClassVisitor {
 
     public static final String VERSION_FIELD = "$$crochetVersion";

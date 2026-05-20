@@ -2,10 +2,12 @@ package net.jonbell.crochet.agent;
 
 import java.lang.instrument.Instrumentation;
 
+import net.jonbell.crochet.annotation.Internal;
 import net.jonbell.crochet.runtime.ArrayRegistry;
 import net.jonbell.crochet.runtime.CheckpointRollbackAgent;
 import net.jonbell.crochet.runtime.RuntimeReady;
 
+@Internal
 public final class CrochetAgent {
 
     private CrochetAgent() {}

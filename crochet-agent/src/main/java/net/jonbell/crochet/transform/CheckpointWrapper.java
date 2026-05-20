@@ -11,6 +11,8 @@ import org.objectweb.asm.tree.MethodNode;
 import java.util.ArrayList;
 import java.util.List;
 
+import net.jonbell.crochet.annotation.Internal;
+
 /**
  * Class visitor that wraps methods annotated with
  * {@code @net.jonbell.crochet.annotation.CrochetCheckpoint} in a
@@ -63,6 +65,7 @@ import java.util.List;
  * skipped silently (the APT processor raises compile-time errors for those).
  * Methods with no {@code @CrochetRoot} parameter are likewise skipped.
  */
+@Internal
 public final class CheckpointWrapper extends ClassVisitor {
 
     // Internal name of the Crochet facade (INVOKESTATIC target).

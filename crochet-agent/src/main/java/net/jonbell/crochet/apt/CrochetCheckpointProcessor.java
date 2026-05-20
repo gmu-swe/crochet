@@ -14,6 +14,8 @@ import javax.tools.Diagnostic;
 import java.util.List;
 import java.util.Set;
 
+import net.jonbell.crochet.annotation.Internal;
+
 /**
  * Compile-time validation processor for
  * {@link net.jonbell.crochet.annotation.CrochetCheckpoint}.
@@ -40,6 +42,7 @@ import java.util.Set;
  * to avoid a bootstrapping cycle where javac tries to load the processor class
  * before it has been compiled.
  */
+@Internal
 @SupportedAnnotationTypes("net.jonbell.crochet.annotation.CrochetCheckpoint")
 @SupportedSourceVersion(SourceVersion.RELEASE_17)
 public class CrochetCheckpointProcessor extends AbstractProcessor {

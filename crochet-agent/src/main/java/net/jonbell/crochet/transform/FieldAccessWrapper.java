@@ -8,6 +8,8 @@ import org.objectweb.asm.MethodVisitor;
 import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.Type;
 
+import net.jonbell.crochet.annotation.Internal;
+
 /**
  * Wraps GETFIELD/PUTFIELD instructions whose owner is an instrumented user
  * class with a preceding call to {@code ownerRef.$$crochetAccess()}. When the
@@ -55,6 +57,7 @@ import org.objectweb.asm.Type;
  * read fields of {@code this} before the super-call), post-super instructions
  * are wrapped the same way as any ordinary method.
  */
+@Internal
 public final class FieldAccessWrapper extends ClassVisitor {
 
     /**

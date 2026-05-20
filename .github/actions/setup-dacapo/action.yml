@@ -28,7 +28,7 @@ runs:
         echo "Verifying SHA-256 ..."
         echo "70a1fd4ed959f09053bb7ef8b2745a19d6f28dd8a7d0b350362039d89b49eb26  dacapo-23.11-MR2-chopin.zip" | sha256sum -c -
 
-    - name: Extract DaCapo jar
+    - name: Extract DaCapo jar and data
       shell: bash
       run: |
         set -eu
@@ -48,6 +48,31 @@ runs:
         fi
         echo "Found DaCapo jar at: $DACAPO_JAR_FILE"
         cp "$DACAPO_JAR_FILE" "${RUNNER_TEMP}/dacapo-23.11-MR2-chopin.jar"
+
+        # DaCapo looks for benchmark data at <jar-path-without-.jar>/dat/.
+        # The jar is exported as ${RUNNER_TEMP}/dacapo-23.11-MR2-chopin.jar so
+        # DaCapo will look for ${RUNNER_TEMP}/dacapo-23.11-MR2-chopin/dat/.
+        # Extract the dat/ tree from the zip into that expected location.
+        # We strip the leading 'dacapo-23.11-MR2-chopin/' prefix (if present)
+        # using -j (junk paths) + manual mkdir so the result lands correctly.
+        DATA_DIR="${RUNNER_TEMP}/dacapo-23.11-MR2-chopin"
+        mkdir -p "${DATA_DIR}"
+        echo "Extracting dat/ directory to ${DATA_DIR} ..."
+        # The zip may contain 'dacapo-23.11-MR2-chopin/dat/...' or 'dat/...'
+        # Try both; the -j flag flattens directories so we need to preserve
+        # hierarchy — use -d with the target and let unzip do it.
+        unzip -o "${RUNNER_TEMP}/dacapo-cache/dacapo-23.11-MR2-chopin.zip" \
+          'dacapo-23.11-MR2-chopin/dat/*' -d "${RUNNER_TEMP}/dacapo-unzipped-dat" 2>/dev/null || \
+        unzip -o "${RUNNER_TEMP}/dacapo-cache/dacapo-23.11-MR2-chopin.zip" \
+          'dat/*' -d "${RUNNER_TEMP}/dacapo-unzipped-dat" 2>/dev/null || true
+        # Find where dat/ landed and move it to the expected data dir
+        DAT_SRC=$(find "${RUNNER_TEMP}/dacapo-unzipped-dat" -maxdepth 2 -name 'dat' -type d 2>/dev/null | head -1)
+        if [ -n "$DAT_SRC" ]; then
+          echo "Moving dat/ from $DAT_SRC to ${DATA_DIR}/dat"
+          mv "$DAT_SRC" "${DATA_DIR}/dat"
+        else
+          echo "WARNING: dat/ directory not found in zip; -s small benchmarks may fail"
+        fi
 
     - name: Export path
       id: export
