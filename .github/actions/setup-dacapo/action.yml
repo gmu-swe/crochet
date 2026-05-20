@@ -1,100 +1,50 @@
 name: 'Setup DaCapo'
-description: >
-  Download and cache the DaCapo 23.11-MR2-chopin benchmark suite jar.
-
-  The standalone jar (4.4 MB) is extracted from the full distribution zip
-  (https://download.dacapobench.org/chopin/dacapo-23.11-MR2-chopin.zip)
-  using an HTTP range request — only the deflate-compressed jar bytes are
-  fetched, not the 6 GB zip. The jar is self-contained for -s small runs:
-  all benchmark data is embedded. Verified SHA-256:
-    c488cc61fcd02bb04b87e601fd80517b8b0991c0baf564cae17538fdc1edb792
-
+description: 'Download and cache DaCapo 23.11-MR2-chopin'
 outputs:
   dacapo-jar:
-    description: 'Absolute path to dacapo-23.11-MR2-chopin.jar'
+    description: 'Path to the dacapo jar'
     value: ${{ steps.export.outputs.dacapo-jar }}
 
 runs:
   using: composite
   steps:
-    - name: Cache DaCapo jar
-      id: cache
+    - name: Restore DaCapo zip cache
+      id: cache-zip
       uses: actions/cache@v4
       with:
-        path: ${{ runner.temp }}/dacapo
-        key: dacapo-23.11-MR2-chopin-v1
+        path: ${{ runner.temp }}/dacapo-cache/dacapo-23.11-MR2-chopin.zip
+        key: dacapo-zip-23.11-MR2-chopin-v1
 
-    - name: Download DaCapo jar (cache miss)
-      if: steps.cache.outputs.cache-hit != 'true'
+    - name: Download DaCapo (cache miss)
+      if: steps.cache-zip.outputs.cache-hit != 'true'
       shell: bash
       run: |
         set -eu
-        mkdir -p "${RUNNER_TEMP}/dacapo"
+        mkdir -p "${RUNNER_TEMP}/dacapo-cache"
+        cd "${RUNNER_TEMP}/dacapo-cache"
+        echo "Downloading DaCapo 23.11-MR2-chopin (6 GB) ..."
+        curl -fsSL --retry 3 -o dacapo-23.11-MR2-chopin.zip \
+          "https://download.dacapobench.org/chopin/dacapo-23.11-MR2-chopin.zip"
+        echo "Verifying SHA-256 ..."
+        echo "70a1fd4ed959f09053bb7ef8b2745a19d6f28dd8a7d0b350362039d89b49eb26  dacapo-23.11-MR2-chopin.zip" | sha256sum -c -
 
-        # The release zip is hosted on download-r2.dacapobench.org (Cloudflare R2),
-        # which supports HTTP range requests.  The jar sits at a known byte range
-        # inside the 6 GB zip (deflate-compressed).  We fetch only those bytes and
-        # decompress with Python's zlib — avoids downloading 6 GB.
-        #
-        # Byte range verified against the local zip on 2026-05-20:
-        #   header_offset  : 6330058175
-        #   fname_len=27, extra_len=20  =>  data start = 6330058252
-        #   compress_size  : 4273915    =>  data end   = 6334332166
-        #
-        # The R2 URL is the redirect target of:
-        #   https://download.dacapobench.org/chopin/dacapo-23.11-MR2-chopin.zip
-        # HEAD on that URL returns 405 (R2 quirk); GET and Range-GET work fine.
-
-        RANGE_START=6330058252
-        RANGE_END=6334332166
-        ZIP_URL="https://download-r2.dacapobench.org/chopin/dacapo-23.11-MR2-chopin.zip"
-        DEST="${RUNNER_TEMP}/dacapo/dacapo-23.11-MR2-chopin.jar"
-        COMPRESSED="${RUNNER_TEMP}/dacapo/dacapo-23.11-MR2-chopin.jar.deflate"
-
-        echo "Fetching compressed jar bytes (range ${RANGE_START}-${RANGE_END}) from R2..."
-        curl -fsSL \
-          --range "${RANGE_START}-${RANGE_END}" \
-          -o "${COMPRESSED}" \
-          "${ZIP_URL}"
-
-        echo "Decompressing raw deflate stream..."
-        python3 - "${COMPRESSED}" "${DEST}" << 'PYEOF'
-        import sys, zlib, hashlib
-
-        src, dst = sys.argv[1], sys.argv[2]
-        with open(src, 'rb') as f:
-            compressed = f.read()
-
-        # zip uses raw deflate (wbits=-15, no zlib wrapper)
-        decompressed = zlib.decompress(compressed, -15)
-
-        expected_sha256 = 'c488cc61fcd02bb04b87e601fd80517b8b0991c0baf564cae17538fdc1edb792'
-        actual_sha256 = hashlib.sha256(decompressed).hexdigest()
-        if actual_sha256 != expected_sha256:
-            print(f'ERROR: SHA-256 mismatch: expected {expected_sha256}, got {actual_sha256}',
-                  file=sys.stderr)
-            sys.exit(1)
-
-        with open(dst, 'wb') as f:
-            f.write(decompressed)
-
-        print(f'OK: {dst} ({len(decompressed)} bytes, SHA-256 verified)')
-        PYEOF
-
-        rm -f "${COMPRESSED}"
-        echo "DaCapo jar ready at ${DEST}"
-
-    - name: Verify DaCapo jar is usable
+    - name: Extract DaCapo jar
       shell: bash
       run: |
-        JAR="${RUNNER_TEMP}/dacapo/dacapo-23.11-MR2-chopin.jar"
-        echo "Benchmarks available:"
-        java -jar "${JAR}" --list
+        set -eu
+        mkdir -p "${RUNNER_TEMP}/dacapo-unzipped"
+        cd "${RUNNER_TEMP}/dacapo-unzipped"
+        # Extract just the jar (sufficient for -s small; the dat/ directory is
+        # only needed for -s default/large runs).
+        # Zip layout: dacapo-23.11-MR2-chopin/jar/dacapo-23.11-MR2-chopin.jar
+        unzip -o "${RUNNER_TEMP}/dacapo-cache/dacapo-23.11-MR2-chopin.zip" \
+          'dacapo-23.11-MR2-chopin/jar/dacapo-23.11-MR2-chopin.jar'
+        cp dacapo-23.11-MR2-chopin/jar/dacapo-23.11-MR2-chopin.jar \
+           "${RUNNER_TEMP}/dacapo-23.11-MR2-chopin.jar"
 
     - name: Export path
       id: export
       shell: bash
       run: |
-        JAR="${RUNNER_TEMP}/dacapo/dacapo-23.11-MR2-chopin.jar"
-        echo "dacapo-jar=${JAR}" >> "${GITHUB_OUTPUT}"
-        echo "DACAPO_JAR=${JAR}" >> "${GITHUB_ENV}"
+        echo "dacapo-jar=${RUNNER_TEMP}/dacapo-23.11-MR2-chopin.jar" >> "$GITHUB_OUTPUT"
+        echo "DACAPO_JAR=${RUNNER_TEMP}/dacapo-23.11-MR2-chopin.jar" >> "$GITHUB_ENV"
