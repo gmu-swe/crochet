@@ -160,7 +160,7 @@ on Lucene's hottest paths.
 BENCHMARK.md §Table 1 reports `luindex` (DaCapo's Lucene indexer) at **2.23x
 overhead** — the second-worst of 22 benchmarks.  The BENCHMARK.md commentary reads:
 
-> "`luindex` at 1.50x is the second-worst — Lucene's indexer is heavy on String
+> "`luindex` at 2.23x is the second-worst — Lucene's indexer is heavy on String
 > operations even with String skipped (StringBuilder, byte[], CharSequence)."
 
 Our H.4 result (0.70x throughput = 1.43x slowdown) is consistent with DaCapo
