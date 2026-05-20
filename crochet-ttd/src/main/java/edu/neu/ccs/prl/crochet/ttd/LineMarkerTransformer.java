@@ -170,11 +170,14 @@ final class LineMarkerTransformer implements ClassFileTransformer {
                             byte[] classfileBuffer) {
         if (className == null) return null;
         // Skip bootstrap-loader classes and our own runtime to avoid loops.
+        // Also skip edu/neu/ccs/prl/crochet/agent/* — the crochet agent's
+        // shaded ASM is packed into java.base (bootstrap classloader) and
+        // must not be transformed by TTD agents.
         if (className.startsWith("java/")
                 || className.startsWith("jdk/")
                 || className.startsWith("sun/")
                 || className.startsWith("net/jonbell/crochet/")
-                || className.startsWith("edu/neu/ccs/prl/crochet/ttd/shaded/")) {
+                || className.startsWith("edu/neu/ccs/prl/crochet/")) {
             return null;
         }
         // Quick pre-filter: does the class file mention our annotation?

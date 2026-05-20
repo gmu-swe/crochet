@@ -43,6 +43,46 @@ public final class ClassMeta {
     }
 
     /**
+     * Force-initialize {@code ClassMeta} (and its static {@link #CACHE} ClassValue)
+     * during agent startup, before any checkpoint or PUTFIELD hook can fire.
+     *
+     * <p>The F.1 dirty-bit {@code noteDirty} path calls {@link #of} on the first
+     * post-checkpoint PUTFIELD. If {@code ClassMeta} has not been initialized by
+     * then, {@code CACHE} is still {@code null} and the {@code CACHE.get()} call
+     * in {@link #of} throws a {@link NullPointerException}. That NPE propagates
+     * through the {@code noteDirty} finally-block, arrives in the calling
+     * instrumented method as an {@link ExceptionInInitializerError}, and cascades
+     * into a {@link NoClassDefFoundError} for {@code ClassMeta} on every subsequent
+     * reference — killing all 21 demo scenarios.
+     *
+     * <p>This method forces {@link ClassMeta} class-initialization (which sets
+     * {@code CACHE} to a live {@link ClassValue} object) while we are still inside
+     * {@code CrochetAgent.install()}, before {@link RuntimeReady#VERSION_GATE} can
+     * become non-zero. After this call returns, {@link #of} is always safe to call.
+     */
+    public static void warmup() {
+        // Touching any static member of ClassMeta forces <clinit>. Using
+        // Class.class as a sentinel key avoids creating a real ClassMeta entry
+        // (Class is in the CrochetTransformer skip-list and therefore not a valid
+        // user class — ClassMeta.of(Class.class) would be an invalid call in
+        // production, but the warmup just needs to initialize CACHE).
+        //
+        // We do NOT call CACHE.get(Class.class) because that would trigger
+        // ClassValue.get() → ClassValue$ClassValueMap initialization. On an
+        // instrumented JDK, ClassValueMap extends WeakHashMap (instrumented),
+        // so ClassValueMap's <clinit> fires noteDirty → ClassMeta.of() →
+        // CACHE.get() → ClassValue.get() → ClassCircularityError. That error
+        // permanently poisons ClassValueMap, breaking all checkpoint/rollback.
+        // Instead, simply reference the CACHE field to force ClassMeta.<clinit>;
+        // noteDirty's JDK-loader guard prevents the circularity at runtime.
+        //
+        // Force <clinit> by referencing CACHE, which is a static field:
+        if (CACHE == null) {
+            throw new AssertionError("ClassMeta.CACHE should not be null after <clinit>");
+        }
+    }
+
+    /**
      * Immutable binding of a preallocated shadow instance and the klass-pointer
      * int extracted from its header. Publication by writing the reference to a
      * volatile field is sufficient because {@code final} fields on the

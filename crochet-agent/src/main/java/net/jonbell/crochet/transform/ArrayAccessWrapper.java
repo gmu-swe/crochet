@@ -83,42 +83,71 @@ public final class ArrayAccessWrapper extends ClassVisitor {
                 super.visitInsnPostSuper(opcode);
                 return;
             }
-            int slot = locals.sharedScratch(vt);
-            int storeOp = vt.getOpcode(Opcodes.ISTORE);
-            int loadOp = vt.getOpcode(Opcodes.ILOAD);
             // Site-level VERSION_GATE check: skip the entire stash + dup +
-            // hook + restore dance when no checkpoint has fired. The hook
-            // shape would still produce a no-op via {@link RuntimeReady#beforeStore}
-            // but inlining the gate at every xASTORE site lets the
-            // interpreter / C1 tier avoid the dispatch entirely.
+            // hook + restore dance when no checkpoint has fired.
             // stack: [..., arr, idx, val]
             Label skip = new Label();
             mv.visitFieldInsn(Opcodes.GETSTATIC,
                     "net/jonbell/crochet/runtime/RuntimeReady",
                     "VERSION_GATE", "I");
             mv.visitJumpInsn(Opcodes.IFEQ, skip);
-            // Scratch store/load emitted via locals.emitVarInsn — bypasses
-            // the LVS remap table so the slot lands at its allocated index
-            // rather than being aliased with an original local of the same
-            // numeric index (LVS keys remap by var+size, not by type).
-            // stack: [..., arr, idx, val]    (val is 1 or 2 slots)
-            locals.emitVarInsn(storeOp, slot);
-            // stack: [..., arr, idx]
-            mv.visitInsn(Opcodes.SWAP);
-            // stack: [..., idx, arr]
-            mv.visitInsn(Opcodes.DUP);
-            // stack: [..., idx, arr, arr]
-            mv.visitMethodInsn(Opcodes.INVOKESTATIC, REGISTRY_INTERNAL,
-                    "beforeStore", BEFORE_STORE_DESC, false);
-            // stack: [..., idx, arr]
-            mv.visitInsn(Opcodes.SWAP);
-            // stack: [..., arr, idx]
-            locals.emitVarInsn(loadOp, slot);
-            // stack: [..., arr, idx, val]
+
+            if (vt == OBJECT_TYPE) {
+                // AASTORE: value is a 1-slot reference (category-1).
+                // Use pure stack manipulation to avoid allocating an Object-typed
+                // scratch slot via sharedScratch. An Object scratch slot allocated
+                // by LocalVariablesSorter can collide with exception-handler locals
+                // that hold narrower reference types (Throwable, ClassLoader, etc.)
+                // at the same slot index, causing COMPUTE_FRAMES to widen those
+                // locals to Object — breaking subsequent INVOKESPECIAL or ARETURN
+                // verification (VerifyError "Type Object not assignable to Throwable").
+                //
+                // DUP2_X1 on category-1 triple [arr, idx, val] inserts copies of
+                // (idx, val) below arr, giving [idx, val, arr, idx, val].
+                // POP2 removes (idx, val) from top, giving [idx, val, arr].
+                // DUP_X2 inserts a copy of arr below (idx, val), giving
+                // [arr, idx, val, arr].
+                // INVOKESTATIC beforeStore(arr) consumes arr, leaving [arr, idx, val].
+                // stack: [..., arr, idx, val]
+                mv.visitInsn(Opcodes.DUP2_X1);
+                // stack: [..., idx, val, arr, idx, val]
+                mv.visitInsn(Opcodes.POP2);
+                // stack: [..., idx, val, arr]
+                mv.visitInsn(Opcodes.DUP_X2);
+                // stack: [..., arr, idx, val, arr]
+                mv.visitMethodInsn(Opcodes.INVOKESTATIC, REGISTRY_INTERNAL,
+                        "beforeStore", BEFORE_STORE_DESC, false);
+                // stack: [..., arr, idx, val]
+            } else {
+                // Non-reference stores (int, long, float, double, byte, char, short).
+                // These use typed scratch slots (INT_TYPE, LONG_TYPE, etc.) allocated
+                // via sharedScratch, which do NOT conflict with reference-typed
+                // exception handler locals (the verifier and COMPUTE_FRAMES keep
+                // int/long/float/double slots strictly separate from reference slots).
+                int slot = locals.sharedScratch(vt);
+                int storeOp = vt.getOpcode(Opcodes.ISTORE);
+                int loadOp = vt.getOpcode(Opcodes.ILOAD);
+                // Scratch store/load emitted via locals.emitVarInsn — bypasses
+                // the LVS remap table so the slot lands at its allocated index
+                // rather than being aliased with an original local of the same
+                // numeric index (LVS keys remap by var+size, not by type).
+                // stack: [..., arr, idx, val]    (val is 1 or 2 slots)
+                locals.emitVarInsn(storeOp, slot);
+                // stack: [..., arr, idx]
+                mv.visitInsn(Opcodes.SWAP);
+                // stack: [..., idx, arr]
+                mv.visitInsn(Opcodes.DUP);
+                // stack: [..., idx, arr, arr]
+                mv.visitMethodInsn(Opcodes.INVOKESTATIC, REGISTRY_INTERNAL,
+                        "beforeStore", BEFORE_STORE_DESC, false);
+                // stack: [..., idx, arr]
+                mv.visitInsn(Opcodes.SWAP);
+                // stack: [..., arr, idx]
+                locals.emitVarInsn(loadOp, slot);
+                // stack: [..., arr, idx, val]
+            }
             mv.visitLabel(skip);
-            // Both paths converge with stack [..., arr, idx, val] — the hook
-            // path roundtripped val through the scratch local; the skip path
-            // never disturbed it.
+            // Both paths converge with stack [..., arr, idx, val].
             mv.visitInsn(opcode);
         }
 

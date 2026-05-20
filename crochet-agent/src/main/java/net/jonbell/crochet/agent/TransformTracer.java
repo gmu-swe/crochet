@@ -29,7 +29,10 @@ import java.util.concurrent.atomic.AtomicLong;
 final class TransformTracer {
 
     /** True iff {@code -Dcrochet.traceTransform=true} was set at agent load. */
-    static final boolean ENABLED = Boolean.getBoolean("crochet.traceTransform");
+    @SuppressWarnings("removal")
+    static final boolean ENABLED = java.security.AccessController.doPrivileged(
+            (java.security.PrivilegedAction<Boolean>) () ->
+                    Boolean.getBoolean("crochet.traceTransform"));
 
     private static final String LOG_PATH = "/tmp/crochet-transform-trace.log";
 

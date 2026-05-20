@@ -78,10 +78,23 @@ for dir in scenarios/*/; do
     COMPILE_CP="$AGENT_JAR"
     RUN_CP=".:$AGENT_JAR"
     TTD_AGENTS=""
+    # Extract the numeric prefix of the scenario (e.g. "22" from "22-cross-method-backstep").
+    # Only scenarios 22+ are @TimeTravelBody scenarios that need the TTD agent attached.
+    # Attaching the TTD javaagent to scenarios 01-21 triggers NondetRecorder class
+    # initialisation during SafeClassWriter setup, which causes a NoClassDefFoundError
+    # that is caught silently by TransformerWrapper — Main.class goes un-instrumented
+    # and rollback has no snapshot to restore.
+    scenario_num="${scenario%%-*}"
+    IS_TTD_SCENARIO=0
+    if [ -n "${TTD_JAR:-}" ] && [ -f "$TTD_JAR" ] && [ "$scenario_num" -ge 22 ] 2>/dev/null; then
+        IS_TTD_SCENARIO=1
+    fi
     if [ -n "${TTD_JAR:-}" ] && [ -f "$TTD_JAR" ]; then
         COMPILE_CP="$AGENT_JAR:$TTD_JAR"
         RUN_CP=".:$AGENT_JAR:$TTD_JAR"
-        TTD_AGENTS="-javaagent:$TTD_JAR"
+        if [ "$IS_TTD_SCENARIO" = "1" ]; then
+            TTD_AGENTS="-javaagent:$TTD_JAR"
+        fi
     fi
 
     (cd "$dir" && rm -f *.class && $JAVAC_CMD -cp "$COMPILE_CP" *.java) >/tmp/compile.log 2>&1
@@ -93,7 +106,14 @@ for dir in scenarios/*/; do
         continue
     fi
 
-    out=$(cd "$dir" && $JAVA_CMD $EXTRA_ARGS -cp "$RUN_CP" $TTD_AGENTS -javaagent:"$AGENT_JAR" Main 2>&1)
+    # Crochet agent must be listed BEFORE the TTD agent so that the crochet
+    # transformer sees original class bytes. If TTD runs first, it injects
+    # NondetRecorder call-sites into Main.class; crochet's SafeClassWriter then
+    # tries to copy the NondetRecorder-bearing bootstrap methods and throws
+    # NoClassDefFoundError (NondetRecorder is in a partially-initialised state
+    # during its own Lambda-<clinit>). Running crochet first avoids this:
+    # crochet transforms unmodified bytes, TTD then transforms crochet output.
+    out=$(cd "$dir" && $JAVA_CMD $EXTRA_ARGS -cp "$RUN_CP" -javaagent:"$AGENT_JAR" $TTD_AGENTS Main 2>&1)
     ec=$?
     if [ $ec -eq 0 ] && echo "$out" | grep -q "SCENARIO OK"; then
         echo "PASS"

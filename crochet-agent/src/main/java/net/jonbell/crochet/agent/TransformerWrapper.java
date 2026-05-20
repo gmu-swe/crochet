@@ -73,6 +73,7 @@ final class TransformerWrapper implements ClassFileTransformer {
             // on LineBreakUtils.init0(). Stay silent by default; opt in via
             // -Dcrochet.verboseCompat=true for diagnostic sessions.
             if (Boolean.getBoolean("crochet.verboseCompat")) {
+                System.err.println("[crochet] transform failed for class: " + className);
                 t.printStackTrace();
             }
             return null;

@@ -74,8 +74,11 @@ import org.objectweb.asm.Opcodes;
 final class InstrumentedSurfaceVerifier implements ClassFileTransformer {
 
     /** System-property gate; zero-cost when off. */
+    @SuppressWarnings("removal")
     static final boolean ENABLED =
-            Boolean.getBoolean("crochet.verifyInstrumented");
+            java.security.AccessController.doPrivileged(
+                    (java.security.PrivilegedAction<Boolean>) () ->
+                            Boolean.getBoolean("crochet.verifyInstrumented"));
 
     /**
      * Whether the running JDK was pre-instrumented by the jlink pipeline.

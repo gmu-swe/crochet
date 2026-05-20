@@ -6,7 +6,6 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
-import java.util.logging.Logger;
 
 /**
  * Registry for external-state hooks that participate in
@@ -94,8 +93,6 @@ final class ExternalStateRegistry {
 
     private ExternalStateRegistry() {}
 
-    private static final Logger LOG = Logger.getLogger(ExternalStateRegistry.class.getName());
-
     /**
      * Internal hook record. The {@code restore} consumer is typed as
      * {@code Consumer<Object>} (erased from the user-provided wildcard) so we
@@ -169,7 +166,7 @@ final class ExternalStateRegistry {
         synchronized (LOCK) {
             Hook old = BY_NAME.put(name, hook);
             if (old != null) {
-                LOG.warning("ExternalStateRegistry: replacing existing hook \"" + name + "\"");
+                System.err.println("[crochet] ExternalStateRegistry: replacing existing hook \"" + name + "\"");
                 // Replace in-place in HOOKS to keep stable position.
                 int idx = HOOKS.indexOf(old);
                 if (idx >= 0) {

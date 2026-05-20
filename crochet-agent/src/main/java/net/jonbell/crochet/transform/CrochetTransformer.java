@@ -44,10 +44,21 @@ public class CrochetTransformer {
      * ({@code -Dcrochet.reflectionRewriter=true}) on workloads that
      * actually enumerate our injected members (Hibernate/ByteBuddy
      * subclass generation, h2o Schema.fillFromParms).
+     *
+     * <p>The property is read via {@code AccessController.doPrivileged} so that
+     * the agent's static initializer succeeds even when a restrictive
+     * {@link SecurityManager} is installed before the agent's premain runs
+     * (e.g. Lucene's {@code TestSecurityManager} denies
+     * {@code PropertyPermission("crochet.*","read")} to unprivileged callers).
+     * The agent is always trusted code (loaded from the boot classpath via
+     * {@code -javaagent}), so reading our own system properties is safe.
      */
+    @SuppressWarnings("removal")
     private static final boolean REFLECTION_REWRITER_ENABLED =
             Boolean.parseBoolean(
-                    System.getProperty("crochet.reflectionRewriter", "false"));
+                    java.security.AccessController.doPrivileged(
+                            (java.security.PrivilegedAction<String>) () ->
+                                    System.getProperty("crochet.reflectionRewriter", "false")));
 
     public byte[] transform(byte[] classFileBuffer, boolean hostedAnonymous) {
         return transform(classFileBuffer, hostedAnonymous, null);
@@ -186,7 +197,54 @@ public class CrochetTransformer {
         }
         // EXPAND_FRAMES: required by LocalVariablesSorter, used by any
         // visitor that spills 2-slot values (long/double) via scratch locals.
-        reader.accept(chain, ClassReader.EXPAND_FRAMES);
+        try {
+            reader.accept(chain, ClassReader.EXPAND_FRAMES);
+        } catch (LinkageError le) {
+            // A LinkageError (typically NoClassDefFoundError for a class
+            // referenced in a bootstrap method constant) can propagate from
+            // SymbolTable.addBootstrapMethod when one or more bootstrap-
+            // method arguments reference a class that is in an error state
+            // (e.g. NondetRecorder during TTD agent initialisation). This
+            // path is hit even though the INPUT bytes contain no such
+            // reference, because the InvokeDynamic's bootstrap arguments
+            // are resolved via addConstant() which can trigger class loading.
+            //
+            // Recovery: rebuild the writer without a shared reader so that
+            // the SymbolTable starts fresh. The retry is semantically
+            // equivalent — COMPUTE_FRAMES/COMPUTE_MAXS recompute all
+            // frames and maxs from scratch regardless — the only difference
+            // is that the output class file's constant pool is generated
+            // from scratch rather than sharing indices with the input file.
+            SafeClassWriter retryWriter = new SafeClassWriter(null,
+                    ClassWriter.COMPUTE_MAXS | ClassWriter.COMPUTE_FRAMES, loader);
+            ClassVisitor retryChain = retryWriter;
+            retryChain = new AnnotationStamper(Opcodes.ASM9, retryChain);
+            retryChain = new LookupInjector(Opcodes.ASM9, retryChain);
+            retryChain = new FieldAdder(Opcodes.ASM9, retryChain,
+                    /*emitClinitRegistration=*/ !isJdkClass);
+            SharedLocalsProvider retryLocals = new SharedLocalsProvider(Opcodes.ASM9, retryChain);
+            retryChain = retryLocals;
+            retryChain = new ArrayAccessWrapper(Opcodes.ASM9, retryChain, retryLocals);
+            retryChain = new StaticFieldRewriter(Opcodes.ASM9, retryChain, loader);
+            retryChain = new ArrayCopyInterceptor(Opcodes.ASM9, retryChain);
+            retryChain = new FieldAccessWrapper(Opcodes.ASM9, retryChain, retryLocals, loader);
+            if (bbTarget != null) {
+                retryChain = new ByteBuddyClassLoaderPatcher(Opcodes.ASM9, retryChain,
+                        bbTarget.internalName, bbTarget.methodName,
+                        bbTarget.methodDesc, bbTarget.nameLocalSlot);
+            }
+            if (!isJdkClass && REFLECTION_REWRITER_ENABLED) {
+                retryChain = new ReflectionRewriter(Opcodes.ASM9, retryChain);
+            }
+            if (!isJdkClass) {
+                retryChain = new CheckpointWrapper(Opcodes.ASM9, retryChain);
+            }
+            if (needsJsrInlining) {
+                retryChain = new JsrInliner(Opcodes.ASM9, retryChain);
+            }
+            reader.accept(retryChain, ClassReader.EXPAND_FRAMES);
+            return retryWriter.toByteArray();
+        }
         return writer.toByteArray();
     }
 
@@ -234,8 +292,38 @@ public class CrochetTransformer {
         private final ClassLoader loader;
 
         SafeClassWriter(ClassReader reader, int flags, ClassLoader loader) {
-            super(reader, flags);
+            super(safeReader(reader), flags);
             this.loader = loader;
+        }
+
+        /**
+         * Guards {@code ClassWriter(ClassReader, int)} against
+         * {@link NoClassDefFoundError} thrown by
+         * {@code SymbolTable.copyBootstrapMethods} when the input class
+         * references a bootstrap-method handle whose owner class is in an
+         * error state (e.g. {@code NondetRecorder} during TTD agent
+         * initialisation). In that case we fall back to {@code null}, which
+         * makes {@code ClassWriter(ClassReader, int)} behave like
+         * {@code ClassWriter(int)} — it loses the ability to copy the constant
+         * pool verbatim but still produces a valid class file. The only
+         * observable consequence is that the output class file recomputes its
+         * constant pool from scratch rather than reusing the reader's pool,
+         * which is always safe.
+         */
+        private static ClassReader safeReader(ClassReader reader) {
+            if (reader == null) return null;
+            try {
+                // Probe: does copyBootstrapMethods succeed for this reader?
+                // Use flag=0 (no COMPUTE_FRAMES/COMPUTE_MAXS) so the writer
+                // does the minimum work — we discard the result immediately.
+                new ClassWriter(reader, 0);
+                return reader;
+            } catch (LinkageError ignored) {
+                // A class referenced by a bootstrap method constant in this
+                // class file is in an error state. Return null so the outer
+                // ClassWriter(null, flags) constructor skips copyBootstrapMethods.
+                return null;
+            }
         }
 
         /**
@@ -288,7 +376,20 @@ public class CrochetTransformer {
             return result;
         }
 
+        @SuppressWarnings("removal")
         private String superOfUncached(String type) {
+            // Wrap resource reads in doPrivileged so that a restrictive
+            // SecurityManager (e.g. Lucene's TestSecurityManager) does not
+            // block the ClassLoader.getResourceAsStream() call with an
+            // AccessControlException. The agent is always trusted code loaded
+            // from the boot classpath; reading class-file bytes for frame-
+            // computation purposes is safe and necessary.
+            return java.security.AccessController.doPrivileged(
+                    (java.security.PrivilegedAction<String>) () ->
+                            superOfUncachedPrivileged(type));
+        }
+
+        private String superOfUncachedPrivileged(String type) {
             ClassLoader effective = loader != null ? loader
                     : SafeClassWriter.class.getClassLoader();
             // Walk the loader chain so user-jar classes and JDK classes both
@@ -299,6 +400,8 @@ public class CrochetTransformer {
                         return new ClassReader(in).getSuperName();
                     }
                 } catch (java.io.IOException ignored) {
+                } catch (SecurityException ignored) {
+                    // SecurityManager blocked the resource read; try the next loader.
                 }
             }
             try (java.io.InputStream in = ClassLoader.getSystemResourceAsStream(type + ".class")) {
@@ -306,6 +409,8 @@ public class CrochetTransformer {
                     return new ClassReader(in).getSuperName();
                 }
             } catch (java.io.IOException ignored) {
+            } catch (SecurityException ignored) {
+                // SecurityManager blocked the system resource read; fall through.
             }
             return null;
         }
@@ -430,6 +535,26 @@ public class CrochetTransformer {
                 || internalName.startsWith("java/lang/ThreadLocal$")) {
             return true;
         }
+        // java.lang.ClassValue and its nested classes (ClassValueMap,
+        // ClassValueMap$Entry, Identity, Version, etc.): ClassMeta uses a
+        // ClassValue<ClassMeta> as its per-class metadata cache. Instrumenting
+        // ClassValue causes a ClassCircularityError on ClassValue$ClassValueMap:
+        //
+        //   noteDirty(inst) → ClassMeta.of(c) → CACHE.get(c)
+        //     → ClassValue.get() → [ClassValue$ClassValueMap.<clinit>]
+        //       → GETSTATIC hook → noteStaticAccess(ClassValue$ClassValueMap)
+        //         → ClassMeta.of(ClassValue$ClassValueMap) → CACHE.get(...)
+        //           → ClassValue$ClassValueMap (ALREADY INITIALIZING) →
+        //             ClassCircularityError
+        //
+        // Skipping ClassValue and its nested classes avoids this recursion
+        // entirely. ClassValue instances hold only internal JVM bookkeeping
+        // (class-specific cached metadata), not user-visible mutable state, so
+        // missing checkpoint/rollback on them is semantically safe.
+        if (internalName.equals("java/lang/ClassValue")
+                || internalName.startsWith("java/lang/ClassValue$")) {
+            return true;
+        }
         // Our own runtime/transform/agent/patch/annotation code must never
         // recurse — the instrumentation chain uses these classes directly.
         if (internalName.startsWith(RUNTIME_PACKAGE_PREFIX)
@@ -448,6 +573,23 @@ public class CrochetTransformer {
         if (internalName.startsWith("edu/neu/ccs/prl/crochet/agent/shaded/")) {
             return true;
         }
+        // crochet-ttd (time-travel debugger) runtime and its shaded ASM. When
+        // the TTD jar is on the classpath alongside the crochet agent (as in
+        // run-all.sh --instrumented), crochet's transformer would otherwise
+        // try to instrument TTD's own transformer classes
+        // (NondetTransformer$NondetMethodVisitor, etc.). Those classes use
+        // invokedynamic bootstrap methods whose arguments reference
+        // NondetRecorder — a class that is itself mid-load at the point
+        // SafeClassWriter tries to initialise, producing a
+        // NoClassDefFoundError: NondetRecorder inside copyBootstrapMethods.
+        // The error is caught silently by TransformerWrapper, so Main.class
+        // is returned un-instrumented (missing PUTFIELD hooks), which causes
+        // rollback to restore nothing. TTD classes carry no user-visible
+        // mutable state and must not be checkpointed/rolled-back, so skipping
+        // them is both safe and necessary.
+        if (internalName.startsWith("edu/neu/ccs/prl/crochet/ttd/")) {
+            return true;
+        }
         // crochet-instrument's own classes (jlink plugins, runtime support
         // for the instrument process itself) and its shaded ASM+JaCoCo.
         if (internalName.startsWith("net/jonbell/crochet/instrument/")) {
@@ -464,6 +606,68 @@ public class CrochetTransformer {
         // deadlocks or confounds the state Fray is tracking. See Fray issue
         // #424 investigation notes.
         if (internalName.startsWith("org/pastalab/fray/")) {
+            return true;
+        }
+        // Gradle build-tool infrastructure (org/gradle/**). When Crochet runs
+        // as a javaagent inside a Gradle test executor JVM (e.g. during the
+        // Lucene showcase), Gradle's worker classes are on the classpath and
+        // get instrumented like any other user class. Two failure modes:
+        //
+        // 1. serialVersionUID mismatch: Gradle's TestWorker implements
+        //    Serializable without an explicit serialVersionUID, so the JVM
+        //    computes it from the class structure. Crochet's field injection
+        //    ($$crochetVersion int + $$crochetSnap Object) changes the
+        //    computed UID, breaking the serialised-object protocol between the
+        //    Gradle daemon and the test executor worker JVM.
+        //
+        // 2. VerifyError in GradleWorkerMain: COMPUTE_FRAMES merges two
+        //    branches where a slot holds ClassLoader on one path and Object on
+        //    the other (after an AASTORE scratch-store typed as Object), and
+        //    cannot resolve GradleWorkerMain's super chain via resource lookup,
+        //    so it falls back to java/lang/Object — breaking the subsequent
+        //    invokevirtual ClassLoader.loadClass().
+        //
+        // Gradle classes carry no user-visible mutable state worth
+        // checkpointing; skipping them is safe for all workloads.
+        if (internalName.startsWith("org/gradle/")
+                || internalName.startsWith("worker/org/gradle/")) {
+            return true;
+        }
+        // carrotsearch randomizedtesting framework (com/carrotsearch/**):
+        // used by Apache Lucene's test infrastructure. RandomizedRunner and
+        // related classes contain exception-handler bytecode patterns where
+        // COMPUTE_FRAMES merges the scratch-slot's Object type with an
+        // exception-caught local, producing Object at the join point instead
+        // of the original Throwable type — then the INVOKESPECIAL of the
+        // exception constructor (which needs an uninitialized ref on the
+        // stack, not Object) fails verification. This framework is test
+        // scaffolding with no user-visible state to checkpoint; skipping it
+        // is safe for the Lucene showcase and all other workloads.
+        if (internalName.startsWith("com/carrotsearch/")) {
+            return true;
+        }
+        // JUnit test framework classes (org/junit/**) and the legacy junit.framework
+        // package (junit/framework/**). Test framework code is scaffolding loaded
+        // into the test executor JVM alongside the workload. Instrumenting JUnit's
+        // reflection-heavy runner infrastructure produces VerifyErrors (same
+        // COMPUTE_FRAMES exception-handler issue as com/carrotsearch above) and
+        // serialVersionUID mismatches. JUnit classes hold no user-visible mutable
+        // state to checkpoint.
+        if (internalName.startsWith("org/junit/")
+                || internalName.startsWith("junit/")) {
+            return true;
+        }
+        // Lucene test-framework classes (org/apache/lucene/tests/**). These are
+        // test scaffolding (LuceneTestCase, TestUtil, etc.) that extend JUnit and
+        // carrotsearch's RandomizedRunner. They are NOT the system under test —
+        // the actual Lucene library classes live under org/apache/lucene/ without
+        // the /tests/ infix. Instrumenting LuceneTestCase and its siblings
+        // produces VerifyErrors in methods that have exception-handler locals
+        // narrower than Object (e.g. _expectThrows returns Throwable, but
+        // COMPUTE_FRAMES widens local 2 to Object when it can't resolve the
+        // caught exception's super chain through the agent's resource-stream
+        // walk at transform time).
+        if (internalName.startsWith("org/apache/lucene/tests/")) {
             return true;
         }
         // JVM-fabricated classes: lambdas, proxies, reflection-generated

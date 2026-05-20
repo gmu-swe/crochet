@@ -4,6 +4,7 @@ import java.lang.instrument.Instrumentation;
 
 import net.jonbell.crochet.runtime.ArrayRegistry;
 import net.jonbell.crochet.runtime.CheckpointRollbackAgent;
+import net.jonbell.crochet.runtime.ClassMeta;
 import net.jonbell.crochet.runtime.RuntimeReady;
 
 public final class CrochetAgent {
@@ -45,6 +46,16 @@ public final class CrochetAgent {
         // class initializers indirectly invoke early-exits in RuntimeReady.
         try {
             ArrayRegistry.warmup();
+        } catch (Throwable ignored) {
+        }
+        // Eagerly initialize ClassMeta so that its static CACHE ClassValue is
+        // non-null before any PUTFIELD hook can fire noteDirty → ClassMeta.of().
+        // If ClassMeta is not initialized by the time the first checkpoint fires
+        // (setting VERSION_GATE non-zero), noteDirty's ClassMeta.of() call sees
+        // a null CACHE and throws NPE, cascading to NoClassDefFoundError for
+        // ClassMeta on every subsequent reference. See ClassMeta.warmup() javadoc.
+        try {
+            ClassMeta.warmup();
         } catch (Throwable ignored) {
         }
 

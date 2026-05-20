@@ -108,12 +108,21 @@ final class NondetTransformer implements ClassFileTransformer {
                             byte[] classfileBuffer) {
         if (className == null) return null;
         // Skip JDK classes — we instrument call sites in user code only.
+        // Also skip the Crochet agent's own classes (net/jonbell/crochet/* and
+        // edu/neu/ccs/prl/crochet/agent/*). The agent's shaded ASM is packed
+        // into java.base at jlink time, which means those classes are loaded by
+        // the bootstrap classloader. Rewriting Object.hashCode() calls in those
+        // classes to INVOKESTATIC NondetRecorder.fetchOrCallObjectHashCode()
+        // causes NoClassDefFoundError when java.base code tries to load
+        // NondetRecorder from the app classpath — the bootstrap classloader
+        // cannot find it. The crochet-ttd classes themselves are also excluded
+        // to prevent circular transformation.
         if (className.startsWith("java/")
                 || className.startsWith("jdk/")
                 || className.startsWith("sun/")
                 || className.startsWith("com/sun/")
                 || className.startsWith("net/jonbell/crochet/")
-                || className.startsWith("edu/neu/ccs/prl/crochet/ttd/")) {
+                || className.startsWith("edu/neu/ccs/prl/crochet/")) {
             return null;
         }
         // Quick scan: does the constant pool mention any of our target method names?

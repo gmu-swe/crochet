@@ -319,7 +319,14 @@ final class FastProxySupport {
         if (inst == null) {
             return;
         }
-        int slot = (int) (Thread.currentThread().threadId() & 0x1FFL);
+        // Use identityHashCode instead of Thread.threadId() for the guard slot.
+        // On the instrumented JDK, Thread.threadId() has a $$crochetAccess guard
+        // (VERSION_GATE check) that fires when a checkpoint is active. This causes
+        // infinite recursion: noteDirty → threadId() → $$crochetAccess(thread) →
+        // fastAccess(thread) → ... → threadId() → ∞. System.identityHashCode is a
+        // native method that reads the mark word directly without any bytecode
+        // instrumentation, so it is safe to call from within noteDirty.
+        int slot = System.identityHashCode(Thread.currentThread()) & 0x1FF;
         if (NOTE_DIRTY_GUARD[slot]) {
             // Re-entrant: a JDK-internal PUTFIELD (e.g. ClassValue$Version)
             // was encountered while resolving the ClassMeta for the outermost
@@ -329,6 +336,16 @@ final class FastProxySupport {
         }
         NOTE_DIRTY_GUARD[slot] = true;
         try {
+            // Only track dirty bits on instrumented user classes. JDK or
+            // other skipped classes (e.g. ClassValue, ThreadLocal) are not
+            // CRIJInstrumented and have no $$crochetDirty field. Calling
+            // ClassMeta.of() on them can trigger ClassCircularityError when
+            // their class initializers reference ClassValue$ClassValueMap
+            // (which ClassMeta.of() itself uses internally). Skipping them
+            // is safe: fastAccess treats absent dirty handles as always-dirty.
+            if (!(inst instanceof CRIJInstrumented)) {
+                return;
+            }
             Class<?> c = inst.getClass();
             // Walk past any Fast proxy layer to the real user class.
             while (c != null && CRIJFast.class.isAssignableFrom(c)) {
@@ -337,7 +354,48 @@ final class FastProxySupport {
             if (c == null) {
                 return;
             }
-            ClassMeta.VersionHandles handles = ClassMeta.of(c).versionHandles();
+            // Reject JDK classes that inherit CRIJInstrumented from an instrumented
+            // parent (e.g. ClassValue$ClassValueMap extends WeakHashMap, which IS
+            // instrumented). Such classes pass the instanceof CRIJInstrumented check
+            // above, but their concrete class is itself not instrumented (no
+            // $$crochetLookup), and calling ClassMeta.of() on them triggers
+            // ClassValue.get() → ClassValue$ClassValueMap init → noteDirty (re-entry
+            // via WeakHashMap constructor) → ClassMeta.of(ClassValue$ClassValueMap)
+            // → ClassValue.get() → ClassCircularityError, which permanently poisons
+            // ClassValue$ClassValueMap and makes all subsequent ClassValue.get()
+            // calls throw NoClassDefFoundError.
+            //
+            // The fast check: a class that belongs to a JDK module (loaded by the
+            // bootstrap or platform loader) is guaranteed to not be a user class.
+            // Bootstrap loader == null; platform loader is the ancestor of the app
+            // loader but != null. User classes always use the app (or a custom)
+            // loader which is a descendant of the platform loader.
+            ClassLoader cl = c.getClassLoader();
+            if (cl == null || cl == ClassLoader.getPlatformClassLoader()) {
+                return;
+            }
+            ClassMeta.VersionHandles handles;
+            try {
+                handles = ClassMeta.of(c).versionHandles();
+            } catch (IllegalStateException notInstrumented) {
+                // c inherits CRIJInstrumented from an instrumented superclass but is
+                // itself a skipped class (e.g. ClassValue$ClassValueMap extends
+                // WeakHashMap: WeakHashMap is instrumented, ClassValue$ClassValueMap
+                // is in shouldSkip). Such classes lack $$crochetLookup so
+                // resolveLookup() throws IllegalStateException. Treat as "not
+                // instrumented" — fastAccess will use always-dirty fallback.
+                return;
+            } catch (ClassCircularityError cce) {
+                // Defensive: ClassMeta.of(c) calls ClassValue.get(c) internally.
+                // If c is a class whose <clinit> is currently running on this
+                // thread, ClassValue.get() can throw ClassCircularityError. The
+                // JDK-loader check above should prevent this for the known cases
+                // (ClassValue$ClassValueMap, etc.), but if a user's custom
+                // ClassLoader subtypes an instrumented JDK class, this catch
+                // prevents a hard crash. fastAccess treats absent dirty handles
+                // as always-dirty.
+                return;
+            }
             if (handles.dirty == null) {
                 // Pre-F.1 class or failed VarHandle resolution: no dirty field.
                 // Safe to skip — fastAccess treats missing dirty handle as always-dirty.
