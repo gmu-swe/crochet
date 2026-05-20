@@ -1,0 +1,13 @@
+--- a/lucene/core/src/java/org/apache/lucene/index/IndexSorter.java
++++ b/lucene/core/src/java/org/apache/lucene/index/IndexSorter.java
+@@ -163,7 +163,9 @@ public interface IndexSorter {
+         values[docID] = (int) dvs.longValue();
+       }
+
+-      return (docID1, docID2) -> reverseMul * Integer.compare(values[docID1], values[docID2]);
++      // BUG: use subtraction instead of Integer.compare — overflows for extreme values
++      // (e.g. Integer.MIN_VALUE minus any positive int wraps to positive, inverting sort order)
++      return (docID1, docID2) -> reverseMul * (values[docID1] - values[docID2]);
+     }
+
+     @Override
