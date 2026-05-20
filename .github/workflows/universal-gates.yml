@@ -149,9 +149,13 @@ jobs:
 
   # ─────────────────────────────────────────────────────────────────────────
   # Gate 4: DaCapo functional sweep
-  # Vacuous when DACAPO_JAR is absent (CI has no license). The script
-  # exits 0 with DRY_RUN=true when the JAR is not found.
-  # Run on PR only (slow, requires ~10 minutes).
+  # Verifies every benchmark in the DaCapo 23.11-MR2-chopin suite exits 0
+  # with the Crochet agent attached (stock JDK, -javaagent mode).
+  # AGENT_ONLY_MODE=true skips the instrumented-JDK requirement; h2o is
+  # omitted in this mode (it requires an instrumented Java 17 JDK).
+  # Gate 6 (no-regression) stays vacuous-pass until a baseline is committed
+  # — that is a separate concern, tracked in eval/phase-A-baseline/.
+  # Run on PR only (slow, ~10-15 minutes).
   # ─────────────────────────────────────────────────────────────────────────
   dacapo-functional:
     name: "Gate 4 — DaCapo Functional Sweep"
@@ -168,16 +172,32 @@ jobs:
           distribution: 'temurin'
           cache: 'maven'
 
+      - name: Set up DaCapo
+        uses: ./.github/actions/setup-dacapo
+        id: dacapo
+
       - name: Build all modules (skip tests)
         run: |
           mvn -B install -DskipTests \
             -Dmaven.repo.local=/tmp/m2-gates
 
-      - name: Run DaCapo functional sweep (dry-run when JAR absent)
+      - name: Run DaCapo functional sweep (agent-only mode, stock JDK)
+        env:
+          DACAPO_JAR: ${{ steps.dacapo.outputs.dacapo-jar }}
+          AGENT_ONLY_MODE: "true"
         run: |
-          # DRY_RUN=true makes the script exit 0 when DACAPO_JAR is absent.
-          # Set to false and provide DACAPO_JAR=/path/to/dacapo.jar for a real run.
-          DRY_RUN=true bash eval/dacapo-func/run.sh 2>&1
+          # AGENT_ONLY_MODE=true: runs every J21 benchmark with -javaagent on
+          # the stock Temurin 21 JDK.  No instrumented JDK is built in CI
+          # (instrument step takes ~15 min and is not gated here).  h2o is
+          # skipped automatically by run.sh when AGENT_ONLY_MODE=true.
+          bash eval/dacapo-func/run.sh 2>&1
+
+      - name: Upload DaCapo logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dacapo-functional-logs
+          path: eval/dacapo-func/scratch/
 
   # ─────────────────────────────────────────────────────────────────────────
   # Gate 5: Bytecode verification strict
@@ -223,7 +243,11 @@ jobs:
 
   # ─────────────────────────────────────────────────────────────────────────
   # Gate 6: DaCapo no-regression budget
-  # Vacuous when no baseline file is present (eval/phase-A-baseline/ absent).
+  # Vacuous-pass when no baseline file is present (eval/phase-A-baseline/
+  # absent).  This is intentional: the local baseline run failed, and no
+  # committed baseline exists yet.  Gate 6 will become a hard gate once a
+  # baseline is committed — that is a separate work item, independent of
+  # the DaCapo download/cache infrastructure added here.
   # ─────────────────────────────────────────────────────────────────────────
   dacapo-regression:
     name: "Gate 6 — DaCapo No-Regression"
@@ -241,6 +265,8 @@ jobs:
           else
             echo "baseline_present=false" >> $GITHUB_OUTPUT
             echo "No baseline found at eval/phase-A-baseline/results.json — gate 6 passes vacuously."
+            echo "To activate: commit a baseline via eval/dacapo/driver.sh and save results to"
+            echo "eval/phase-A-baseline/results.json."
           fi
 
       - name: Run regression check (only if baseline present)
