@@ -412,6 +412,32 @@ In rough priority order, where to invest next if reducing overhead matters:
 runs). Driver: `/tmp/crochet-bench/driver.sh`. Per-bench runner: `/tmp/crochet-bench/run_bench.sh`.
 Runtime traces: `/tmp/crochet-bench/trace-{h2,lusearch,tradebeans,graphchi,eclipse}.log`.*
 
+## Phase H: Lucene 9.11.0 Showcase
+
+Phase H applied Crochet + TTD to Lucene 9.11.0, a mature 350K-line search library, as an
+end-to-end correctness and performance showcase.  H.1 ran Lucene's full `core` test suite
+(5,997 tests) under the instrumented JDK with the Crochet agent attached, yielding a **99.82%
+pass rate** (11 failures, 194 skipped).  All 11 failures are instrumentation-visibility
+artefacts — Lucene's reflective `RamUsageTester` and API-surface checkers trip over
+the injected `$$crochetSnap`/`$$crochetVersion` fields — and none indicate a correctness
+problem with checkpoint or rollback semantics (see `eval/showcase/lucene/FAILURES.md`).
+H.4 measured indexing throughput on a 50,000-document synthetic corpus (5 warmup + 7
+measurement iterations, seeded corpus, `MMapDirectory`): **baseline 480,928 docs/sec;
+instrumented-idle 337,187 docs/sec; ratio 0.70x (−29.9% overhead)**.  This is consistent
+with `BENCHMARK.md`'s pre-existing `luindex` result (2.23x overhead in the full DaCapo
+sweep) — Lucene's field-access-heavy indexing loop is Crochet's worst-case workload.
+The root cause is `RuntimeReady.VERSION_GATE`, a volatile static field read inserted before
+every `GETFIELD`/`PUTFIELD` by `FieldAccessWrapper`; the JVM's happens-before rules prevent
+the JIT from hoisting this read out of loops even when the gate value is always zero (no
+checkpoint ever taken).  The indicated follow-on optimization is to replace the volatile read
+with an opaque `VarHandle` read (same technique applied to `TTD_GEN` in C.3), which would
+allow C2 to hoist the check and reduce idle overhead to near zero on loop-heavy workloads.
+Active-TTD mode (c) measured 57,471 docs/sec (−88.0%), reflecting the combined cost of
+volatile-gate reads, per-session checkpoint on user state, and save-frame allocation at each
+`@TimeTravelBody` save-point; this number is informational and not subject to a gate.
+Full methodology and diagnosis log: `eval/showcase/lucene/OVERHEAD.md`.
+Full artefact (case study, session recording, scripts): `eval/showcase/lucene/`.
+
 ---
 
 ## 9. SwitchPoint experiment (post-benchmark) — negative result

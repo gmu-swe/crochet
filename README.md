@@ -16,6 +16,13 @@ reference and is not wired into the Maven reactor.
 Published work: J. Bell and L. Pina. *CROCHET: Checkpoint and Rollback via
 Lightweight Heap Traversal on Stock JVMs.* ECOOP 2018. (See `crochet.pdf`.)
 
+**Lucene showcase.** For a worked end-to-end example of Crochet + TTD on a
+real-world library — including a TTD session that back-steps across two
+`@TimeTravelBody` methods into Lucene's indexing path, a functional test of
+Lucene 9.11.0 core (99.82% pass rate), and a performance overhead analysis —
+see [`eval/showcase/lucene/CASE_STUDY.md`](eval/showcase/lucene/CASE_STUDY.md)
+and the accompanying [`eval/showcase/lucene/README.md`](eval/showcase/lucene/README.md).
+
 ## Requirements
 
 - **JDK 21** — Temurin 21 or OpenJDK 21. Set `JAVA_HOME` before building.
@@ -141,6 +148,7 @@ harnesses expect the benchmark jar at `/tmp/dacapo/dacapo-23.11-chopin.jar`
 | Paper §5.1 microbench (4 structures × 4 sizes × 3 configs, 320 iters) | `bash eval/microbench/run.sh && eval/microbench/aggregate.py` | 320/320 checksums OK; geomean CROCHET ≈ paper's 1.07x | ~2 min |
 | DaCapo 23.11-chopin functional sweep (22 benches, -n 1 -s small) | `bash eval/dacapo-func/run.sh` | `22 passed, 0 failed` | ~5 min |
 | DaCapo 23.11-chopin performance sweep (22 × {base, inst} × 3 runs) | `bash eval/dacapo/driver.sh && eval/dacapo/parse_results.py eval/dacapo/results/results.csv` | Median overhead **1.04x** | ~36 min |
+| **Lucene 9.11.0 showcase** (H-phase: functional baseline, TTD session, overhead) | see `eval/showcase/lucene/README.md` | 99.82% Lucene core pass rate; 2-deep cross-method back-step; −29.9% idle overhead | ~40 min total |
 
 Each harness defaults to the repo-local agent jar and `/tmp/jdk-inst`; each
 respects environment-variable overrides (`AGENT_JAR`, `JDK_INST`, `BASE_JDK`,
