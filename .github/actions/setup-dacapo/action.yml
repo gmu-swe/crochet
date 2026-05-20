@@ -33,14 +33,21 @@ runs:
       run: |
         set -eu
         mkdir -p "${RUNNER_TEMP}/dacapo-unzipped"
-        cd "${RUNNER_TEMP}/dacapo-unzipped"
-        # Extract just the jar (sufficient for -s small; the dat/ directory is
-        # only needed for -s default/large runs).
-        # Zip layout: dacapo-23.11-MR2-chopin/jar/dacapo-23.11-MR2-chopin.jar
+        # Extract any *.jar from the zip into a flat staging dir.
+        # The zip layout has changed across releases (e.g. the jar has appeared
+        # at 'dacapo-23.11-MR2-chopin/jar/dacapo-*.jar', 'jar/dacapo-*.jar',
+        # and 'dacapo-*.jar' at the root). Glob-extract is robust to all of them.
         unzip -o "${RUNNER_TEMP}/dacapo-cache/dacapo-23.11-MR2-chopin.zip" \
-          'dacapo-23.11-MR2-chopin/jar/dacapo-23.11-MR2-chopin.jar'
-        cp dacapo-23.11-MR2-chopin/jar/dacapo-23.11-MR2-chopin.jar \
-           "${RUNNER_TEMP}/dacapo-23.11-MR2-chopin.jar"
+          '*.jar' -d "${RUNNER_TEMP}/dacapo-unzipped"
+        # Find the main dacapo jar (ignore benchmark-internal jars if any).
+        DACAPO_JAR_FILE=$(find "${RUNNER_TEMP}/dacapo-unzipped" -name 'dacapo-*.jar' | head -1)
+        if [ -z "$DACAPO_JAR_FILE" ]; then
+          echo "ERROR: no dacapo-*.jar found in zip; listing zip contents:" >&2
+          unzip -l "${RUNNER_TEMP}/dacapo-cache/dacapo-23.11-MR2-chopin.zip" | head -50 >&2
+          exit 1
+        fi
+        echo "Found DaCapo jar at: $DACAPO_JAR_FILE"
+        cp "$DACAPO_JAR_FILE" "${RUNNER_TEMP}/dacapo-23.11-MR2-chopin.jar"
 
     - name: Export path
       id: export
