@@ -1,0 +1,85 @@
+[ttd] at step 1  ScenarioWithTTD.formatPhase(LScenarioWithTTD$SessionState;)V:96
+(ttd) [session] FastDateFormat.format() result: [fredag, week 01]
+[session] Expected:                       [fredag, week 53]
+[session] AssertionError caught (bug confirmed).
+[ttd] body completed (2 breakpoints hit)
+[ttd] at breakpoint 2 (end of body)
+(ttd) [ttd] at step 1  ScenarioWithTTD.formatPhase(LScenarioWithTTD$SessionState;)V:96
+(ttd) [ttd] SessionState {
+  date = Fri Jan 01 11:00:00 UTC 2010
+  locale = sv_SE
+  resultNote = null
+  failureEvidence = null
+}
+(ttd) 
+=== H.6 COMMONS-LANG TTD SESSION RECORDING ===
+
+--- (1) Stack at capture point ---
+  Frames (innermost first):
+    [0] ScenarioWithTTD.formatPhase(LScenarioWithTTD$SessionState;)V:callsite@3
+         $slot0 (?) = ScenarioWithTTD$SessionState@<HASH>
+    [1] ScenarioWithTTD.formatPhase(LScenarioWithTTD$SessionState;)V:96
+         $slot0 (?) = ScenarioWithTTD$SessionState@<HASH>
+  Stack JSON: {"schemaVersion":1,"frames":[{"classMethodLine":"ScenarioWithTTD.formatPhase(LScenarioWithTTD$SessionState;)V:callsite@3","locals":[{"name":"$slot0","descriptor":"?","value":"ScenarioWithTTD$SessionState@<HASH>"}]},{"classMethodLine":"ScenarioWithTTD.formatPhase(LScenarioWithTTD$SessionState;)V:96","locals":[{"name":"$slot0","descriptor":"?","value":"ScenarioWithTTD$SessionState@<HASH>"}]}]}
+
+--- (2) Crochet.diff(state) ---
+  failureEvidence: snap=null  live=java.lang.AssertionError: LANG-645 bug: expected=[fredag, week 53] actual=[fredag, week 01]
+
+--- (3) TTD Narrative ---
+  SYMPTOM:
+    AssertionError in doFormatAndVerify():
+    FastDateFormat.format() returned 'fredag, week 01'
+    but SimpleDateFormat (reference) says 'fredag, week 53'.
+    The two formatters agree on locale (both sv_SE) but diverge
+    on week-of-year because FastDateFormat uses the WRONG locale
+    when constructing its internal GregorianCalendar.
+
+  DEFECTS4J BUG: Lang-26 (LANG-645)
+  Buggy commit:  f7f19a3d2f98f48924d38fec2308dc3db83445d8
+  Fixed commit:  14a0cc2a9baf84a97348263975082ef3857daf97
+
+  DIAGNOSIS PATH (TTD back-step via scripted REPL):
+    Step 1: Ttd.session() checkpointed state at session entry.
+    Step 2: Forward-executed formatPhase → doFormatAndVerify
+            → FastDateFormat.format(date).
+            The lineHit() calls in formatPhase fired silently
+            ('g 100' skipped all prompts).
+    Step 3: AssertionError thrown; Ttd.breakpoint() paused.
+    Step 4: REPL 'b' — back-step:
+            Crochet rolled back heap to session-entry checkpoint.
+            state.resultNote reset to null;
+            state.failureEvidence reset to null.
+            CPS deque staged formatPhase's last save-point frame.
+            Body re-ran; CPS dispatch jumped into formatPhase at
+            the staged BCI (line after doFormatAndVerify returns).
+    Step 5: REPL 'i' — inspect state:
+            state.resultNote == null  (write was rolled back)
+            state.failureEvidence == null (AssertionError rolled back)
+    => Back-step into pre-bug state CONFIRMED.
+
+  ROOT CAUSE (visible after back-step to formatPhase entry):
+    FastDateFormat.format(Date date) in FastDateFormat.java ~line 820:
+      BUGGY:  Calendar c = new GregorianCalendar(mTimeZone);
+      FIXED:  Calendar c = new GregorianCalendar(mTimeZone, mLocale);
+
+    GregorianCalendar(TimeZone) sets firstDayOfWeek and
+    minimalDaysInFirstWeek from the JVM DEFAULT locale (US),
+    not from mLocale (sv_SE).  US defaults: firstDay=Sunday,
+    minDays=1.  Swedish defaults: firstDay=Monday, minDays=4.
+
+    With US calendar rules applied to 2010-01-01:
+      First week of 2010 starts on the nearest Sunday (Jan 3).
+      Jan 1-2 are in 'week 1' by US convention => reports week 01.
+
+    With sv_SE calendar rules applied to 2010-01-01:
+      ISO-8601: week 1 must contain >= 4 days of the new year.
+      Jan 1-3 are Fri/Sat/Sun — only 3 days of 2010 in that week.
+      => Not a new week yet; Jan 1 belongs to week 53 of 2009.
+
+  METHOD ANNOTATED WITH @TimeTravelBody:
+    ScenarioWithTTD.formatPhase(SessionState)
+    (1-level TTD session; wrapper pattern used because
+    FastDateFormat.format() is a library method with complex
+    internal state that exceeds CPS transformer's ceiling.)
+
+=== END H.6 COMMONS-LANG TTD SESSION RECORDING ===

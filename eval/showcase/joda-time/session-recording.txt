@@ -1,0 +1,83 @@
+[ttd] at step 1  ScenarioWithTTD.parsePhase(LScenarioWithTTD$SessionState;)V:90
+(ttd) [session] Before parse: 2004-01-01T00:00:00.000-05:00
+[session] IllegalFieldValueException: Cannot parse "2 29": Value 29 for dayOfMonth must be in the range [1,28]
+[session] AssertionError caught (bug confirmed).
+[ttd] body completed (2 breakpoints hit)
+[ttd] at breakpoint 2 (end of body)
+(ttd) [ttd] at step 1  ScenarioWithTTD.parsePhase(LScenarioWithTTD$SessionState;)V:90
+(ttd) [ttd] SessionState {
+  tz = America/New_York
+  resultNote = null
+  error = null
+}
+(ttd) 
+=== H.6 JODA-TIME TTD SESSION RECORDING ===
+
+--- (1) Stack at capture point ---
+  Frames (innermost first):
+    [0] ScenarioWithTTD.parsePhase(LScenarioWithTTD$SessionState;)V:callsite@3
+         $slot0 (?) = ScenarioWithTTD$SessionState@<HASH>
+    [1] ScenarioWithTTD.parsePhase(LScenarioWithTTD$SessionState;)V:90
+         $slot0 (?) = ScenarioWithTTD$SessionState@<HASH>
+  Stack JSON: {"schemaVersion":1,"frames":[{"classMethodLine":"ScenarioWithTTD.parsePhase(LScenarioWithTTD$SessionState;)V:callsite@3","locals":[{"name":"$slot0","descriptor":"?","value":"ScenarioWithTTD$SessionState@<HASH>"}]},{"classMethodLine":"ScenarioWithTTD.parsePhase(LScenarioWithTTD$SessionState;)V:90","locals":[{"name":"$slot0","descriptor":"?","value":"ScenarioWithTTD$SessionState@<HASH>"}]}]}
+
+--- (2) Crochet.diff(state) ---
+  error: snap=null  live=org.joda.time.IllegalFieldValueException: Cannot parse "2 29": Value 29 for dayOfMonth must be in the range [1,28]
+
+--- (3) TTD Narrative ---
+  SYMPTOM:
+    IllegalFieldValueException in DateTimeFormatter.parseInto():
+    'Cannot parse "2 29": Value 29 for dayOfMonth must be in [1,28]'
+    Parsing Feb 29 into a MutableDateTime(2004, 1, 1, ..., NEW_YORK)
+    should succeed (2004 is a leap year) but fails because the
+    parser's internal defaultYear is computed as 2003 (non-leap).
+
+  DEFECTS4J BUG: Time-7 (GitHub issue #21)
+  Buggy commit:  6bf5bba0f77f3023dec23a1de6e0a8cef8585f61
+  Fixed commit:  1adb1e69863dcd1ff282692bf1452c422528eeb9
+
+  DIAGNOSIS PATH (TTD back-step via scripted REPL):
+    Step 1: Ttd.session() checkpointed state at session entry.
+    Step 2: Forward-executed parsePhase → doParseAndVerify
+            → DateTimeFormatter.parseInto(result, '2 29', 0).
+            Inside parseInto, DateTimeParserBucket is constructed
+            with defaultYear = chrono.year().get(instantLocal)
+            where instantLocal = millis + tz.getOffset(millis).
+            For New York at 2004-01-01T00:00:00-05:00:
+              instantMillis = 2004-01-01T05:00:00Z (UTC)
+              offset        = -5 hours = -18000000 ms
+              instantLocal  = millis - 18000000 = 2003-12-31T19:00:00
+              chrono.year().get(2003-12-31T...) = 2003
+              => defaultYear = 2003 (WRONG; should be 2004)
+            computeMillis() tries to set dayOfMonth=29 for Feb 2003;
+            2003 is not a leap year => range is [1,28] => EXCEPTION.
+    Step 3: AssertionError thrown; Ttd.breakpoint() paused.
+    Step 4: REPL 'b' — back-step:
+            Crochet rolled back heap to session-entry checkpoint.
+            state.error reset to null;
+            state.resultNote reset to null.
+            CPS deque staged parsePhase's last save-point frame.
+            Body re-ran; CPS dispatch jumped into parsePhase at
+            the staged BCI (line after doParseAndVerify returns).
+    Step 5: REPL 'i' — inspect state:
+            state.error == null       (exception was rolled back)
+            state.resultNote == null  (write was rolled back)
+    => Back-step into pre-exception state CONFIRMED.
+
+  ROOT CAUSE (visible in DateTimeFormatter.java ~line 706):
+    BUGGY:  chrono.year().get(instantLocal)
+    FIXED:  DateTimeUtils.getChronology(chrono).year().get(instantMillis)
+
+    instantLocal adds the timezone offset BEFORE querying the year.
+    For UTC-5 timezones, this pushes midnight Jan 1 back into
+    the previous year.  The fix uses instantMillis directly,
+    which always refers to the correct calendar year of the input.
+
+  METHOD ANNOTATED WITH @TimeTravelBody:
+    ScenarioWithTTD.parsePhase(SessionState)
+    (1-level TTD session; wrapper pattern used because
+    DateTimeFormatter.parseInto() is a library method with
+    complex bucket-setup/sort/compute flow that exceeds the
+    CPS transformer's ceiling.)
+
+=== END H.6 JODA-TIME TTD SESSION RECORDING ===
