@@ -19,7 +19,9 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 
 DACAPO_JAR="${DACAPO_JAR:-/tmp/dacapo/dacapo-23.11-MR2-chopin.jar}"
-AGENT_JAR="${AGENT_JAR:-$REPO_ROOT/crochet-agent/target/crochet-agent-1.0.0-SNAPSHOT.jar}"
+# Resolve agent jar via glob so it is version-agnostic (avoids hardcoding 1.0.0-SNAPSHOT).
+_AGENT_GLOB=("$REPO_ROOT"/crochet-agent/target/crochet-agent-*-SNAPSHOT.jar)
+AGENT_JAR="${AGENT_JAR:-${_AGENT_GLOB[0]}}"
 JDK_INST="${JDK_INST:-/tmp/jdk-inst}"
 JDK_INST_J17="${JDK_INST_J17:-/tmp/jdk-inst-j17}"
 SCRATCH_ROOT="${SCRATCH_ROOT:-$SCRIPT_DIR/scratch}"

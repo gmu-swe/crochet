@@ -1,5 +1,7 @@
 package edu.neu.ccs.prl.crochet.ttd.nondet;
 
+import net.jonbell.crochet.annotation.Stable;
+
 /**
  * A single recorded nondeterministic return value.
  *
@@ -15,6 +17,7 @@ package edu.neu.ccs.prl.crochet.ttd.nondet;
  * <p>The {@code kind} byte allows the replay path to validate
  * that recording and replay are calling the same method shape.
  */
+@Stable
 public final class NondetEvent {
 
     /** INT: covers int-returning methods (nextInt, next, nextBoolean, identityHashCode, hashCode). */

@@ -1,6 +1,7 @@
 package edu.neu.ccs.prl.crochet.ttd;
 
 import java.lang.instrument.Instrumentation;
+import net.jonbell.crochet.annotation.Internal;
 
 /**
  * Java agent for crochet-ttd Phase 1. Registers a
@@ -15,6 +16,7 @@ import java.lang.instrument.Instrumentation;
  * touch ordinary INVOKESTATIC instructions, so this composition is
  * safe (verified by smoke tests).
  */
+@Internal
 public final class TtdAgent {
 
     private TtdAgent() {}

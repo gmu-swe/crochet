@@ -5,6 +5,8 @@ import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
+import net.jonbell.crochet.annotation.Stable;
+
 /**
  * Marks a method whose every source line should become an implicit
  * time-travel pause point. The {@link TtdAgent} javaagent transforms
@@ -22,6 +24,7 @@ import java.lang.annotation.Target;
  * method without our annotation. To make a lambda body time-travelable,
  * extract it into a named method and annotate that.
  */
+@Stable
 @Retention(RetentionPolicy.RUNTIME)
 @Target(ElementType.METHOD)
 public @interface TimeTravelBody {}

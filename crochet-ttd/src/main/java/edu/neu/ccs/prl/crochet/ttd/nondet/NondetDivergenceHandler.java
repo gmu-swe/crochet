@@ -1,5 +1,7 @@
 package edu.neu.ccs.prl.crochet.ttd.nondet;
 
+import net.jonbell.crochet.annotation.Stable;
+
 /**
  * Callback for replay divergence events.
  *
@@ -7,6 +9,7 @@ package edu.neu.ccs.prl.crochet.ttd.nondet;
  * to {@link System#err}. The TTD REPL installs its own handler to route
  * events through the REPL output stream.
  */
+@Stable
 @FunctionalInterface
 public interface NondetDivergenceHandler {
 

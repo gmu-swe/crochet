@@ -7,6 +7,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import net.jonbell.crochet.annotation.Internal;
+
 import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.Type;
 import org.objectweb.asm.tree.analysis.Analyzer;
@@ -64,6 +66,7 @@ import org.objectweb.asm.tree.MethodNode;
  * @see LiveLocal
  * @since B.1
  */
+@Internal
 public final class LivenessAnalyzer {
 
     /**

@@ -1,5 +1,7 @@
 package edu.neu.ccs.prl.crochet.ttd.nondet;
 
+import net.jonbell.crochet.annotation.Stable;
+
 /**
  * Structured event emitted when a replay diverges from its recording.
  *
@@ -19,6 +21,7 @@ package edu.neu.ccs.prl.crochet.ttd.nondet;
  * The REPL installs its own handler to route divergence events through
  * the REPL output channel.
  */
+@Stable
 public final class NondetDivergenceEvent {
 
     /** siteId was queued but the deque was empty (extra replay call). */

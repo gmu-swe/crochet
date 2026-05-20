@@ -444,6 +444,7 @@ jobs:
           )
           NON_API_INFIXES = (
               '/src/test/',
+              '/src/jmh/',
               '/scenario/',
           )
 

@@ -9,6 +9,7 @@ import java.lang.reflect.Modifier;
 
 import edu.neu.ccs.prl.crochet.ttd.nondet.NondetDivergenceEvent;
 import edu.neu.ccs.prl.crochet.ttd.nondet.NondetRecorder;
+import net.jonbell.crochet.annotation.Experimental;
 
 /**
  * REPL frontend for {@link Ttd}. Phase 0: line-oriented stdin/stdout.
@@ -31,6 +32,7 @@ import edu.neu.ccs.prl.crochet.ttd.nondet.NondetRecorder;
  * inspecting non-root state, use {@link #setRoot}-style overloads in a
  * future phase or print from inside the body via {@link #println}.
  */
+@Experimental
 public final class Repl {
 
     private final BufferedReader in;
