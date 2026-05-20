@@ -16,9 +16,10 @@
     <description>End-to-end integration tests that run against a Crochet-instrumented JDK produced by the Maven plugin.</description>
 
     <properties>
-        <!-- Path to the instrumented JDK image. Override on the command line:
-             -DjdkInst=/path/to/other-jdk -->
-        <jdkInst>/tmp/jdk-inst-D.2</jdkInst>
+        <!-- Path to the instrumented JDK image. Defaults to the running JAVA_HOME
+             so CI works without a pre-built instrumented JDK. Override with:
+             -DjdkInst=/path/to/instrumented-jdk -->
+        <jdkInst>${env.JAVA_HOME}</jdkInst>
         <!-- Path to the crochet-agent shaded jar. Defaults to the local
              Maven repository install from the current build. -->
         <crochetAgentJar>${settings.localRepository}/edu/neu/ccs/prl/crochet/crochet-agent/${project.version}/crochet-agent-${project.version}.jar</crochetAgentJar>
