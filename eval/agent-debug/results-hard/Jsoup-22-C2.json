@@ -19,5 +19,29 @@
   "judge_reasoning": "The agent correctly identifies the root cause: Element.siblingElements() returned parent().children() without filtering out 'this', so the element was included in its own sibling list. The fix uses reference identity (el != this) to exclude self, matching the ground-truth's identification of identity-based self-exclusion. The agent also correctly extends the fix to companion methods with analogous bugs.\n",
   "verify_log": "Running ant (compile.tests)................................................ OK\nRunning ant (run.dev.tests)................................................ OK\nFailing tests: 1\n  - org.jsoup.nodes.ElementTest::elementIsNotASiblingOfItself\n",
   "baseline_failing_tests": [],
-  "compile_log": "Running ant (compile)...................................................... OK\nRunning ant (compile.tests)................................................ OK\n"
+  "compile_log": "Running ant (compile)...................................................... OK\nRunning ant (compile.tests)................................................ OK\n",
+  "agent_modified_files": [
+    "maven-build.xml",
+    "src/main/java/org/jsoup/nodes/Element.java",
+    "src/main/java/org/jsoup/nodes/Node.java"
+  ],
+  "canonical_modified_files": [
+    "src/main/java/org/jsoup/nodes/Element.java",
+    "src/main/java/org/jsoup/nodes/Node.java",
+    "src/main/java/org/jsoup/select/Elements.java"
+  ],
+  "agent_modified_prod_files": [
+    "src/main/java/org/jsoup/nodes/Element.java",
+    "src/main/java/org/jsoup/nodes/Node.java"
+  ],
+  "file_overlap": [
+    "src/main/java/org/jsoup/nodes/Element.java",
+    "src/main/java/org/jsoup/nodes/Node.java"
+  ],
+  "missed_canonical": [
+    "src/main/java/org/jsoup/select/Elements.java"
+  ],
+  "extra_prod_files": [],
+  "fix_locality_score": 0.5,
+  "test_pass_strict": true
 }

@@ -23,5 +23,27 @@
     "org.jsoup.parser.XmlTreeBuilderTest::testDetectCharsetEncodingDeclaration",
     "org.jsoup.parser.XmlTreeBuilderTest::testParseDeclarationAttributes"
   ],
-  "compile_log": "Running ant (compile)...................................................... OK\nRunning ant (compile.tests)................................................ OK\n"
+  "compile_log": "Running ant (compile)...................................................... OK\nRunning ant (compile.tests)................................................ OK\n",
+  "agent_modified_files": [
+    "maven-build.xml",
+    "src/main/java/org/jsoup/nodes/XmlDeclaration.java"
+  ],
+  "canonical_modified_files": [
+    "src/main/java/org/jsoup/helper/DataUtil.java",
+    "src/main/java/org/jsoup/nodes/XmlDeclaration.java",
+    "src/main/java/org/jsoup/parser/XmlTreeBuilder.java"
+  ],
+  "agent_modified_prod_files": [
+    "src/main/java/org/jsoup/nodes/XmlDeclaration.java"
+  ],
+  "file_overlap": [
+    "src/main/java/org/jsoup/nodes/XmlDeclaration.java"
+  ],
+  "missed_canonical": [
+    "src/main/java/org/jsoup/helper/DataUtil.java",
+    "src/main/java/org/jsoup/parser/XmlTreeBuilder.java"
+  ],
+  "extra_prod_files": [],
+  "fix_locality_score": 0.5,
+  "test_pass_strict": true
 }

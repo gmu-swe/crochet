@@ -19,5 +19,30 @@
   "judge_reasoning": "The agent correctly identified that isValid checked at the wrong structural level (post-parseBodyFragment, after fixups), explaining both the head-flattening and tree-builder auto-correction mechanisms that mask invalid input. It precisely names the fix: a new isValidBodyHtml(String) that uses ParseErrorList to track parse errors before whitelist checking, plus the Parser.parseFragment overload \u2014 matching the ground-truth summary exactly.\n",
   "verify_log": "Running ant (compile.tests)................................................ OK\nRunning ant (run.dev.tests)................................................ OK\nFailing tests: 1\n  - org.jsoup.safety.CleanerTest::testIsValidBodyHtml\n",
   "baseline_failing_tests": [],
-  "compile_log": "Running ant (compile)...................................................... OK\nRunning ant (compile.tests)................................................ OK\n"
+  "compile_log": "Running ant (compile)...................................................... OK\nRunning ant (compile.tests)................................................ OK\n",
+  "agent_modified_files": [
+    "maven-build.xml",
+    "src/main/java/org/jsoup/Jsoup.java",
+    "src/main/java/org/jsoup/parser/Parser.java",
+    "src/main/java/org/jsoup/safety/Cleaner.java"
+  ],
+  "canonical_modified_files": [
+    "src/main/java/org/jsoup/Jsoup.java",
+    "src/main/java/org/jsoup/parser/Parser.java",
+    "src/main/java/org/jsoup/safety/Cleaner.java"
+  ],
+  "agent_modified_prod_files": [
+    "src/main/java/org/jsoup/Jsoup.java",
+    "src/main/java/org/jsoup/parser/Parser.java",
+    "src/main/java/org/jsoup/safety/Cleaner.java"
+  ],
+  "file_overlap": [
+    "src/main/java/org/jsoup/Jsoup.java",
+    "src/main/java/org/jsoup/parser/Parser.java",
+    "src/main/java/org/jsoup/safety/Cleaner.java"
+  ],
+  "missed_canonical": [],
+  "extra_prod_files": [],
+  "fix_locality_score": 1.0,
+  "test_pass_strict": true
 }

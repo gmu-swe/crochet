@@ -19,5 +19,30 @@
   "judge_reasoning": "The agent correctly identified that ContextualRenameInverter was refactored to extend AbstractPostOrderCallback instead of using ScopedCallback, and explained precisely why this breaks the algorithm: without enterScope/exitScope hooks maintaining the referenceStack, the inverter cannot detect name clashes with descendant scopes. This matches the ground-truth fix exactly, and the agent additionally explained the concrete failure mechanism (post-order inversion of inner a$$2/a$$3 to a, clashing with outer a$$1 \u2192 a).\n",
   "verify_log": "Running ant (compile.tests)................................................ OK\nRunning ant (run.dev.tests)................................................ OK\nFailing tests: 1\n  - com.google.javascript.jscomp.MakeDeclaredNamesUniqueTest::testOnlyInversion3\n",
   "baseline_failing_tests": [],
-  "compile_log": "Running ant (compile)...................................................... OK\nRunning ant (compile.tests)................................................ OK\n"
+  "compile_log": "Running ant (compile)...................................................... OK\nRunning ant (compile.tests)................................................ OK\n",
+  "agent_modified_files": [
+    "build.xml",
+    "src/com/google/javascript/jscomp/MakeDeclaredNamesUnique.java",
+    "src/com/google/javascript/jscomp/NodeUtil.java",
+    "src/com/google/javascript/jscomp/Normalize.java"
+  ],
+  "canonical_modified_files": [
+    "src/com/google/javascript/jscomp/MakeDeclaredNamesUnique.java",
+    "src/com/google/javascript/jscomp/NodeUtil.java",
+    "src/com/google/javascript/jscomp/Normalize.java"
+  ],
+  "agent_modified_prod_files": [
+    "src/com/google/javascript/jscomp/MakeDeclaredNamesUnique.java",
+    "src/com/google/javascript/jscomp/NodeUtil.java",
+    "src/com/google/javascript/jscomp/Normalize.java"
+  ],
+  "file_overlap": [
+    "src/com/google/javascript/jscomp/MakeDeclaredNamesUnique.java",
+    "src/com/google/javascript/jscomp/NodeUtil.java",
+    "src/com/google/javascript/jscomp/Normalize.java"
+  ],
+  "missed_canonical": [],
+  "extra_prod_files": [],
+  "fix_locality_score": 1.0,
+  "test_pass_strict": true
 }

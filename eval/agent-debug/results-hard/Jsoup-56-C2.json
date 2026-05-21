@@ -19,5 +19,38 @@
   "judge_reasoning": "The agent correctly identified that the tokeniser/parser discards the PUBLIC/SYSTEM keyword distinction, which prevents the serializer's outerHtmlHead from emitting the correct keyword on round-trip. This matches the ground-truth that the parse\u2192serialize pipeline fails to preserve the distinction, and the agent pinpoints the exact mechanism (missing pubSysKey field on Token.Doctype, threading through tree builders, and outerHtmlHead emission) along with a concrete fix that preserves backward compatibility.\n",
   "verify_log": "Running ant (compile.tests)................................................ OK\nRunning ant (run.dev.tests)................................................ OK\nFailing tests: 1\n  - org.jsoup.nodes.DocumentTypeTest::testRoundTrip\n",
   "baseline_failing_tests": [],
-  "compile_log": "Running ant (compile)...................................................... OK\nRunning ant (compile.tests)................................................ OK\n"
+  "compile_log": "Running ant (compile)...................................................... OK\nRunning ant (compile.tests)................................................ OK\n",
+  "agent_modified_files": [
+    "maven-build.xml",
+    "src/main/java/org/jsoup/nodes/DocumentType.java",
+    "src/main/java/org/jsoup/parser/HtmlTreeBuilderState.java",
+    "src/main/java/org/jsoup/parser/Token.java",
+    "src/main/java/org/jsoup/parser/TokeniserState.java",
+    "src/main/java/org/jsoup/parser/XmlTreeBuilder.java"
+  ],
+  "canonical_modified_files": [
+    "src/main/java/org/jsoup/nodes/DocumentType.java",
+    "src/main/java/org/jsoup/parser/HtmlTreeBuilderState.java",
+    "src/main/java/org/jsoup/parser/Token.java",
+    "src/main/java/org/jsoup/parser/TokeniserState.java",
+    "src/main/java/org/jsoup/parser/XmlTreeBuilder.java"
+  ],
+  "agent_modified_prod_files": [
+    "src/main/java/org/jsoup/nodes/DocumentType.java",
+    "src/main/java/org/jsoup/parser/HtmlTreeBuilderState.java",
+    "src/main/java/org/jsoup/parser/Token.java",
+    "src/main/java/org/jsoup/parser/TokeniserState.java",
+    "src/main/java/org/jsoup/parser/XmlTreeBuilder.java"
+  ],
+  "file_overlap": [
+    "src/main/java/org/jsoup/nodes/DocumentType.java",
+    "src/main/java/org/jsoup/parser/HtmlTreeBuilderState.java",
+    "src/main/java/org/jsoup/parser/Token.java",
+    "src/main/java/org/jsoup/parser/TokeniserState.java",
+    "src/main/java/org/jsoup/parser/XmlTreeBuilder.java"
+  ],
+  "missed_canonical": [],
+  "extra_prod_files": [],
+  "fix_locality_score": 1.0,
+  "test_pass_strict": true
 }

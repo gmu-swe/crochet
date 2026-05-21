@@ -19,5 +19,26 @@
   "judge_reasoning": "The agent correctly identified that the buggy version was missing the entire :matchText pseudo-class feature, including the PseudoTextElement class, the Evaluator.MatchText inner class, and the QueryParser arm that dispatches to it. This matches the ground-truth summary precisely \u2014 the pseudo-class evaluator did not account for PseudoTextElement because it (and its evaluator) didn't exist. The diagnosis names the exact classes, methods, and the mechanism by which text splitting on <br> falls out of the parent/child relationships.\n",
   "verify_log": "Running ant (compile.tests)................................................ OK\nRunning ant (run.dev.tests)................................................ OK\nFailing tests: 1\n  - org.jsoup.select.SelectorTest::splitOnBr\n",
   "baseline_failing_tests": [],
-  "compile_log": "Running ant (compile)...................................................... OK\nRunning ant (compile.tests)................................................ OK\n"
+  "compile_log": "Running ant (compile)...................................................... OK\nRunning ant (compile.tests)................................................ OK\n",
+  "agent_modified_files": [
+    "maven-build.xml",
+    "src/main/java/org/jsoup/select/Evaluator.java",
+    "src/main/java/org/jsoup/select/QueryParser.java"
+  ],
+  "canonical_modified_files": [
+    "src/main/java/org/jsoup/select/Evaluator.java",
+    "src/main/java/org/jsoup/select/QueryParser.java"
+  ],
+  "agent_modified_prod_files": [
+    "src/main/java/org/jsoup/select/Evaluator.java",
+    "src/main/java/org/jsoup/select/QueryParser.java"
+  ],
+  "file_overlap": [
+    "src/main/java/org/jsoup/select/Evaluator.java",
+    "src/main/java/org/jsoup/select/QueryParser.java"
+  ],
+  "missed_canonical": [],
+  "extra_prod_files": [],
+  "fix_locality_score": 1.0,
+  "test_pass_strict": true
 }

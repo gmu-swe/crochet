@@ -19,5 +19,30 @@
   "judge_reasoning": "The agent correctly identifies that the validation logic operated at the wrong structural level \u2014 specifically that isValid(Document) only inspected body() and missed content moved to head() and parse errors during fragment repair. The diagnosis matches the ground truth precisely, naming both the missing head-content check and the missing parse-error tracking, and references the specific methods (Cleaner.isValidBodyHtml, Parser.parseFragment with ParseErrorList) involved in the fix.\n",
   "verify_log": "Running ant (compile.tests)................................................ OK\nRunning ant (run.dev.tests)................................................ OK\nFailing tests: 1\n  - org.jsoup.safety.CleanerTest::testIsValidBodyHtml\n",
   "baseline_failing_tests": [],
-  "compile_log": "Running ant (compile)...................................................... OK\nRunning ant (compile.tests)................................................ OK\n"
+  "compile_log": "Running ant (compile)...................................................... OK\nRunning ant (compile.tests)................................................ OK\n",
+  "agent_modified_files": [
+    "maven-build.xml",
+    "src/main/java/org/jsoup/Jsoup.java",
+    "src/main/java/org/jsoup/parser/Parser.java",
+    "src/main/java/org/jsoup/safety/Cleaner.java"
+  ],
+  "canonical_modified_files": [
+    "src/main/java/org/jsoup/Jsoup.java",
+    "src/main/java/org/jsoup/parser/Parser.java",
+    "src/main/java/org/jsoup/safety/Cleaner.java"
+  ],
+  "agent_modified_prod_files": [
+    "src/main/java/org/jsoup/Jsoup.java",
+    "src/main/java/org/jsoup/parser/Parser.java",
+    "src/main/java/org/jsoup/safety/Cleaner.java"
+  ],
+  "file_overlap": [
+    "src/main/java/org/jsoup/Jsoup.java",
+    "src/main/java/org/jsoup/parser/Parser.java",
+    "src/main/java/org/jsoup/safety/Cleaner.java"
+  ],
+  "missed_canonical": [],
+  "extra_prod_files": [],
+  "fix_locality_score": 1.0,
+  "test_pass_strict": true
 }
