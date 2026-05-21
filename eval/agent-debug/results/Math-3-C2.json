@@ -1,0 +1,23 @@
+{
+  "bug": "Math-3",
+  "condition": "C2",
+  "started_at": "2026-05-21T02:10:26+00:00",
+  "duration_seconds": 56,
+  "tool_calls": 10,
+  "compile_fail": false,
+  "primary_pass": true,
+  "test_pass": true,
+  "baseline_failing_count": 0,
+  "agent_induced_regressions": [],
+  "regressed_tests": [],
+  "diagnosis_quality": 5,
+  "agent_exit_code": 0,
+  "bug_reproduced_pretest": true,
+  "agent_patch": "diff --git a/build.xml b/build.xml\nindex fd1f1423b..001313b26 100644\n--- a/build.xml\n+++ b/build.xml\n@@ -102,8 +102,8 @@\n   <property name=\"source.encoding\"         value=\"UTF-8\"/>\n     \n   <!-- JDK level -->\n-  <property name=\"compile.source\"          value=\"1.6\"/>\n-  <property name=\"compile.target\"          value=\"1.6\"/>\n+  <property name=\"compile.source\"          value=\"1.8\"/>\n+  <property name=\"compile.target\"          value=\"1.8\"/>\n \n   <!-- Base compile classpath -->\n   <path id=\"compile.classpath\">\ndiff --git a/src/main/java/org/apache/commons/math3/util/MathArrays.java b/src/main/java/org/apache/commons/math3/util/MathArrays.java\nindex 325fd9430..8f83d96a5 100644\n--- a/src/main/java/org/apache/commons/math3/util/MathArrays.java\n+++ b/src/main/java/org/apache/commons/math3/util/MathArrays.java\n@@ -818,7 +818,10 @@ public class MathArrays {\n             throw new DimensionMismatchException(len, b.length);\n         }\n \n+        if (len == 1) {\n             // Revert to scalar multiplication.\n+            return a[0] * b[0];\n+        }\n \n         final double[] prodHigh = new double[len];\n         double prodLowSum = 0;\n",
+  "agent_log": "{\"type\":\"result\",\"subtype\":\"success\",\"is_error\":false,\"api_error_status\":null,\"duration_ms\":54659,\"duration_api_ms\":41211,\"ttft_ms\":2787,\"num_turns\":10,\"result\":\"Test passes. The task is complete and small enough not to warrant task tracking.\\n\\nDIAGNOSIS COMPLETE\\n\\nThe root cause was in `MathArrays.linearCombination(double[], double[])` at line 846. After computing per-element products into `prodHigh`, the method unconditionally read `prodHigh[1]` to seed a compensated summation loop. When called with single-element input arrays (`len == 1`), `prodHigh` has length 1, so the access to index 1 threw `ArrayIndexOutOfBoundsException`. The fix adds an early return for `len == 1` that simply returns `a[0] * b[0]` \u2014 there is nothing to sum compensatedly in a one-term combination, so the scalar product is exact and matches the test's expectation.\",\"stop_reason\":\"end_turn\",\"session_id\":\"cdf63a4d-7188-4d37-8651-15aa41bc168a\",\"total_cost_usd\":0.32914799999999994,\"usage\":{\"input_tokens\":14,\"cache_creation_input_tokens\":18378,\"cache_read_input_tokens\":328281,\"output_tokens\":2003,\"server_tool_use\":{\"web_search_requests\":0,\"web_fetch_requests\":0},\"service_tier\":\"standard\",\"cache_creation\":{\"ephemeral_1h_input_tokens\":18378,\"ephemeral_5m_input_tokens\":0},\"inference_geo\":\"\",\"iterations\":[{\"input_tokens\":1,\"output_tokens\":253,\"cache_read_input_tokens\":36513,\"cache_creation_input_tokens\":364,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":364},\"type\":\"message\"}],\"speed\":\"standard\"},\"modelUsage\":{\"claude-opus-4-7[1m]\":{\"inputTokens\":14,\"outputTokens\":2003,\"cacheReadInputTokens\":328281,\"cacheCreationInputTokens\":18378,\"webSearchRequests\":0,\"costUSD\":0.32914799999999994,\"contextWindow\":1000000,\"maxOutputTokens\":64000}},\"permission_denials\":[],\"terminal_reason\":\"completed\",\"fast_mode_state\":\"off\",\"uuid\":\"1ea6ccdb-7b73-479f-a3fd-3eb8b671356c\"}\n",
+  "agent_stderr": "",
+  "judge_reasoning": "The agent correctly identified the exact method (MathArrays.linearCombination), the specific line (846), and the precise mechanism: unconditional access to prodHigh[1] when the input arrays have length 1 causes ArrayIndexOutOfBoundsException. This matches the ground-truth summary exactly, and the proposed fix (early return for len==1) is sound and well-justified.\n",
+  "verify_log": "Running ant (compile.tests)................................................ OK\nRunning ant (run.dev.tests)................................................ OK\nFailing tests: 1\n  - org.apache.commons.math3.util.MathArraysTest::testLinearCombinationWithSingleElementArray\n",
+  "baseline_failing_tests": [],
+  "compile_log": "Running ant (compile)...................................................... OK\nRunning ant (compile.tests)................................................ OK\n"
+}

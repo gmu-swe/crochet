@@ -1,0 +1,23 @@
+{
+  "bug": "Math-27",
+  "condition": "C2",
+  "started_at": "2026-05-21T02:06:52+00:00",
+  "duration_seconds": 36,
+  "tool_calls": 9,
+  "compile_fail": false,
+  "primary_pass": true,
+  "test_pass": true,
+  "baseline_failing_count": 0,
+  "agent_induced_regressions": [],
+  "regressed_tests": [],
+  "diagnosis_quality": 5,
+  "agent_exit_code": 0,
+  "bug_reproduced_pretest": true,
+  "agent_patch": "diff --git a/build.xml b/build.xml\nindex a836fbe9b..0de0bf811 100644\n--- a/build.xml\n+++ b/build.xml\n@@ -99,8 +99,8 @@\n   <property name=\"compile.optimize\"        value=\"true\"/>\n     \n   <!-- JDK level -->\n-  <property name=\"compile.source\"          value=\"1.6\"/>\n-  <property name=\"compile.target\"          value=\"1.6\"/>\n+  <property name=\"compile.source\"          value=\"1.8\"/>\n+  <property name=\"compile.target\"          value=\"1.8\"/>\n \n   <!-- Base compile classpath -->\n   <path id=\"compile.classpath\">\ndiff --git a/src/main/java/org/apache/commons/math3/fraction/Fraction.java b/src/main/java/org/apache/commons/math3/fraction/Fraction.java\nindex f84218ebd..f81ff0a94 100644\n--- a/src/main/java/org/apache/commons/math3/fraction/Fraction.java\n+++ b/src/main/java/org/apache/commons/math3/fraction/Fraction.java\n@@ -594,7 +594,7 @@ public class Fraction\n      * @return the fraction percentage as a <tt>double</tt>.\n      */\n     public double percentageValue() {\n-        return multiply(100).doubleValue();\n+        return 100 * doubleValue();\n     }\n \n     /**\n",
+  "agent_log": "{\"type\":\"result\",\"subtype\":\"success\",\"is_error\":false,\"api_error_status\":null,\"duration_ms\":35378,\"duration_api_ms\":32308,\"ttft_ms\":2993,\"num_turns\":9,\"result\":\"Test passes.\\n\\nDIAGNOSIS COMPLETE\\n\\nThe root cause was integer overflow in `Fraction.percentageValue()`. The original implementation `multiply(100).doubleValue()` first constructs a new `Fraction` with numerator `numerator * 100` using `int` arithmetic. When the numerator approaches `Integer.MAX_VALUE` (as in the test, `Integer.MAX_VALUE / 99` \u2248 21,691,754), multiplying by 100 overflows the `int` range, producing a wrong (negative) numerator and thus a wrong percentage. The fix performs the multiplication in `double` after converting the fraction: `100 * doubleValue()`. This computes the value in floating-point, which has the dynamic range to handle values up to roughly `Integer.MAX_VALUE * 100` without overflow, giving the mathematically correct result.\",\"stop_reason\":\"end_turn\",\"session_id\":\"8a74ba3e-27f3-41f9-8fbb-60b15b5f3a11\",\"total_cost_usd\":0.28916575,\"usage\":{\"input_tokens\":13,\"cache_creation_input_tokens\":16425,\"cache_read_input_tokens\":287939,\"output_tokens\":1699,\"server_tool_use\":{\"web_search_requests\":0,\"web_fetch_requests\":0},\"service_tier\":\"standard\",\"cache_creation\":{\"ephemeral_1h_input_tokens\":16425,\"ephemeral_5m_input_tokens\":0},\"inference_geo\":\"\",\"iterations\":[{\"input_tokens\":1,\"output_tokens\":296,\"cache_read_input_tokens\":34705,\"cache_creation_input_tokens\":219,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":219},\"type\":\"message\"}],\"speed\":\"standard\"},\"modelUsage\":{\"claude-opus-4-7[1m]\":{\"inputTokens\":13,\"outputTokens\":1699,\"cacheReadInputTokens\":287939,\"cacheCreationInputTokens\":16425,\"webSearchRequests\":0,\"costUSD\":0.28916575,\"contextWindow\":1000000,\"maxOutputTokens\":64000}},\"permission_denials\":[],\"terminal_reason\":\"completed\",\"fast_mode_state\":\"off\",\"uuid\":\"8ef41911-d1da-47f8-a4d3-daa9cdc251ed\"}\n",
+  "agent_stderr": "",
+  "judge_reasoning": "The agent correctly identifies the root cause as integer overflow in Fraction.percentageValue(), specifically pinpointing that multiply(100) performs int arithmetic on the numerator which overflows when numerator * 100 exceeds Integer.MAX_VALUE. This precisely matches the ground-truth summary, including the specific method, the overflow mechanism, and the resulting negative/wrong value.\n",
+  "verify_log": "Running ant (compile.tests)................................................ OK\nRunning ant (run.dev.tests)................................................ OK\nFailing tests: 1\n  - org.apache.commons.math3.fraction.FractionTest::testMath835\n",
+  "baseline_failing_tests": [],
+  "compile_log": "Running ant (compile)...................................................... OK\nRunning ant (compile.tests)................................................ OK\n"
+}
