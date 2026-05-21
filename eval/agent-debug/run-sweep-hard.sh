@@ -209,15 +209,21 @@ log "Total trials: ${#TRIAL_PAIRS[@]}"
 push_and_commit() {
     local worktree_root
     worktree_root="$(cd "$SCRIPT_DIR/../.." && pwd)"
+    local current_branch
+    current_branch=$(git -C "$worktree_root" rev-parse --abbrev-ref HEAD 2>/dev/null || echo "unit/III.4-phase-ii-sonnet-haiku")
     (
         cd "$worktree_root"
         git add -f eval/agent-debug/results-hard/ 2>/dev/null || true
         git add eval/agent-debug/results-hard/ 2>/dev/null || true
+        git add -f eval/agent-debug/results-hard-sonnet-4-6/ 2>/dev/null || true
+        git add eval/agent-debug/results-hard-sonnet-4-6/ 2>/dev/null || true
+        git add -f eval/agent-debug/results-hard-haiku-4-5/ 2>/dev/null || true
+        git add eval/agent-debug/results-hard-haiku-4-5/ 2>/dev/null || true
         local count
         count=$(git diff --cached --name-only | wc -l)
         if [[ "$count" -gt 0 ]]; then
-            git commit -m "feat(II.3): sweep results — incremental push ($(date '+%Y-%m-%d %H:%M'))" 2>/dev/null || true
-            git push origin unit/II.3-sweep 2>/dev/null || true
+            git commit -m "feat(III.4): sweep results — incremental push ($(date '+%Y-%m-%d %H:%M'))" 2>/dev/null || true
+            git push origin "$current_branch" 2>/dev/null || true
             log "  Incremental push: $count result file(s) committed"
         fi
     ) 2>&1 | while IFS= read -r line; do echo "[sweep-hard/push] $line" >&2; done || true
