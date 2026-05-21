@@ -21,5 +21,30 @@
   "judge_reasoning": "The agent precisely identified the root cause: Jsoup.isValid was rerouted through isValid(Document) instead of isValidBodyHtml, which lost parse-error detection because the Parser.parseFragment overload with ParseErrorList was also removed. This matches the ground-truth observation that validation was applied at the wrong structural level, flagging valid HTML as invalid (or vice versa), and the agent correctly named the specific methods and the mechanism.\n",
   "verify_log": "Running ant (compile.tests)................................................ OK\nRunning ant (run.dev.tests)................................................ OK\nFailing tests: 1\n  - org.jsoup.safety.CleanerTest::testIsValidBodyHtml\n",
   "baseline_failing_tests": [],
-  "compile_log": "Running ant (compile)...................................................... OK\nRunning ant (compile.tests)................................................ OK\n"
+  "compile_log": "Running ant (compile)...................................................... OK\nRunning ant (compile.tests)................................................ OK\n",
+  "agent_modified_files": [
+    "maven-build.xml",
+    "src/main/java/org/jsoup/Jsoup.java",
+    "src/main/java/org/jsoup/parser/Parser.java",
+    "src/main/java/org/jsoup/safety/Cleaner.java"
+  ],
+  "canonical_modified_files": [
+    "src/main/java/org/jsoup/Jsoup.java",
+    "src/main/java/org/jsoup/parser/Parser.java",
+    "src/main/java/org/jsoup/safety/Cleaner.java"
+  ],
+  "agent_modified_prod_files": [
+    "src/main/java/org/jsoup/Jsoup.java",
+    "src/main/java/org/jsoup/parser/Parser.java",
+    "src/main/java/org/jsoup/safety/Cleaner.java"
+  ],
+  "file_overlap": [
+    "src/main/java/org/jsoup/Jsoup.java",
+    "src/main/java/org/jsoup/parser/Parser.java",
+    "src/main/java/org/jsoup/safety/Cleaner.java"
+  ],
+  "missed_canonical": [],
+  "extra_prod_files": [],
+  "fix_locality_score": 1.0,
+  "test_pass_strict": true
 }

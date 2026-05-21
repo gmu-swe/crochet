@@ -29,5 +29,23 @@
     "com.google.javascript.jscomp.InlineVariablesTest::testIssue378ModifiedArguments1",
     "com.google.javascript.jscomp.InlineVariablesTest::testIssue378ModifiedArguments2"
   ],
-  "compile_log": "Running ant (compile)...................................................... OK\nRunning ant (compile.tests)................................................ OK\n"
+  "compile_log": "Running ant (compile)...................................................... OK\nRunning ant (compile.tests)................................................ OK\n",
+  "agent_modified_files": [
+    "build.xml"
+  ],
+  "canonical_modified_files": [
+    "src/com/google/javascript/jscomp/InlineVariables.java",
+    "src/com/google/javascript/jscomp/ReferenceCollectingCallback.java",
+    "src/com/google/javascript/jscomp/Scope.java"
+  ],
+  "agent_modified_prod_files": [],
+  "file_overlap": [],
+  "missed_canonical": [
+    "src/com/google/javascript/jscomp/InlineVariables.java",
+    "src/com/google/javascript/jscomp/ReferenceCollectingCallback.java",
+    "src/com/google/javascript/jscomp/Scope.java"
+  ],
+  "extra_prod_files": [],
+  "fix_locality_score": 0.0,
+  "test_pass_strict": false
 }
