@@ -33,7 +33,7 @@ import net.jonbell.crochet.annotation.Experimental;
  * future phase or print from inside the body via {@link #println}.
  */
 @Experimental
-public final class Repl {
+public class Repl {
 
     private final BufferedReader in;
     private final PrintStream out;

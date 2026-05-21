@@ -23,6 +23,7 @@
         <module>crochet-junit5</module>
         <module>crochet-compose-kit</module>
         <module>crochet-ttd</module>
+        <module>crochet-debug</module>
         <module>crochet-integration-tests</module>
     </modules>
 
