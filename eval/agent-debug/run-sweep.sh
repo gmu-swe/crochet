@@ -99,13 +99,13 @@ except Exception:
     local trial_start
     trial_start=$(date +%s)
 
-    # Run with timeout
+    # Run with timeout (--timeout is NOT a run-trial.sh flag; timeout is
+    # enforced by the outer `timeout` command only)
     local exit_code=0
     timeout "$TRIAL_TIMEOUT" bash "$TRIAL_SCRIPT" \
         --bug "$bug" \
         --condition "$condition" \
         --out "$out_file" \
-        --timeout "$TRIAL_TIMEOUT" \
         $DRY_RUN_FLAG \
         2>&1 | while IFS= read -r line; do
             echo "[sweep/$bug/$condition] $line" >&2
@@ -201,12 +201,14 @@ push_and_commit() {
     worktree_root="$(cd "$SCRIPT_DIR/../.." && pwd)"
     (
         cd "$worktree_root"
+        # Force-add results (they are gitignored at the repo level but we have
+        # a .gitignore override inside eval/agent-debug/results/)
+        git add -f eval/agent-debug/results/ 2>/dev/null || true
         git add eval/agent-debug/results/ 2>/dev/null || true
         local count
         count=$(git diff --cached --name-only | wc -l)
         if [[ "$count" -gt 0 ]]; then
-            git commit -m "feat(I.4): sweep results — incremental push ($(date '+%Y-%m-%d %H:%M'))" \
-                --no-gpg-sign 2>/dev/null || true
+            git commit -m "feat(I.4): sweep results — incremental push ($(date '+%Y-%m-%d %H:%M'))" 2>/dev/null || true
             git push origin unit/I.4-trial-sweep 2>/dev/null || true
             log "  Incremental push: $count result file(s) committed"
         fi
@@ -291,57 +293,52 @@ print(f'Aggregated {len(all_results)} trial results')
 "
 
 # ── Print summary table ───────────────────────────────────────────────────────
-python3 << 'PYEOF'
+# Pass variables via environment so the heredoc can be single-quoted for safety
+SWEEP_DURATION_VAL="$SWEEP_DURATION"
+RESULTS_DIR_VAL="$RESULTS_DIR"
+CORPUS_JSON_VAL="$CORPUS_JSON"
+
+python3 -c "
 import json, os, sys
 
-results_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'results')
+results_dir = os.environ.get('RESULTS_DIR_VAL', '$RESULTS_DIR')
+corpus_file = os.environ.get('CORPUS_JSON_VAL', '$CORPUS_JSON')
+sweep_duration = int(os.environ.get('SWEEP_DURATION_VAL', '0'))
 sweep_file = os.path.join(results_dir, 'sweep-results.json')
 
 try:
     with open(sweep_file) as f:
         results = json.load(f)
 except Exception as e:
-    print(f"ERROR: Could not load sweep-results.json: {e}", file=sys.stderr)
+    print(f'ERROR: Could not load sweep-results.json: {e}', file=sys.stderr)
     sys.exit(1)
 
-# Index by (bug, condition)
 index = {}
 for r in results:
     key = (r.get('bug', '?'), r.get('condition', '?'))
     index[key] = r
 
-# Load bug order from corpus
-corpus_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'corpus.json')
 with open(corpus_file) as f:
     corpus = json.load(f)
 bug_ids = [b['id'] for b in corpus['bugs']]
-conditions = ['C1', 'C2', 'C3']
 
 def cell(r):
-    if r is None:
-        return 'MISS  '
-    if r.get('timeout'):
-        return 'TOUT  '
-    if r.get('harness_error') or r.get('setup_error'):
-        return 'ERR   '
-    if r.get('compile_fail'):
-        return 'CFAIL '
-    return 'PASS  ' if r.get('test_pass') else 'FAIL  '
+    if r is None: return 'MISS'
+    if r.get('timeout'): return 'TOUT'
+    if r.get('harness_error') or r.get('setup_error'): return 'ERR'
+    if r.get('compile_fail'): return 'CFAIL'
+    return 'PASS' if r.get('test_pass') else 'FAIL'
 
 def cell_flag(r):
-    if r is None:
-        return ''
-    if r.get('timeout'):
-        return 't'
-    if r.get('harness_error') or r.get('setup_error'):
-        return 'e'
-    if r.get('compile_fail'):
-        return 'c'
+    if r is None: return ''
+    if r.get('timeout'): return 't'
+    if r.get('harness_error') or r.get('setup_error'): return 'e'
+    if r.get('compile_fail'): return 'c'
     return ''
 
 lines = []
-header = f"| {'Bug':<11} | {'C1':^8} | {'C2':^8} | {'C3':^8} | Score |"
-sep    = f"|{'-'*13}|{'-'*10}|{'-'*10}|{'-'*10}|{'-'*7}|"
+header = '| {:<11} | {:^8} | {:^8} | {:^8} | Score |'.format('Bug', 'C1', 'C2', 'C3')
+sep    = '|{:-<13}|{:-<10}|{:-<10}|{:-<10}|{:-<7}|'.format('', '', '', '', '')
 lines.append(header)
 lines.append(sep)
 
@@ -352,73 +349,61 @@ for bug in bug_ids:
     r1 = index.get((bug, 'C1'))
     r2 = index.get((bug, 'C2'))
     r3 = index.get((bug, 'C3'))
-
     p1 = r1.get('test_pass', False) if r1 else False
     p2 = r2.get('test_pass', False) if r2 else False
     p3 = r3.get('test_pass', False) if r3 else False
-
     c1_pass += int(p1)
     c2_pass += int(p2)
     c3_pass += int(p3)
-
     score = sum([p1, p2, p3])
-
-    c1_str = ('PASS' if p1 else cell(r1).strip())
-    c2_str = ('PASS' if p2 else cell(r2).strip())
-    c3_str = ('PASS' if p3 else cell(r3).strip())
-
-    flag = ''
-    for r in [r1, r2, r3]:
-        f = cell_flag(r)
-        if f:
-            flag += f
-
-    row = f"| {bug:<11} | {c1_str:^8} | {c2_str:^8} | {c3_str:^8} | {score}/3   |"
+    c1_str = 'PASS' if p1 else cell(r1)
+    c2_str = 'PASS' if p2 else cell(r2)
+    c3_str = 'PASS' if p3 else cell(r3)
+    flag = ''.join(cell_flag(r) for r in [r1,r2,r3] if cell_flag(r))
+    row = '| {:<11} | {:^8} | {:^8} | {:^8} | {}/3   |'.format(bug, c1_str, c2_str, c3_str, score)
     if flag:
-        row += f"  [{flag}]"
+        row += '  [{}]'.format(flag)
     lines.append(row)
-
-    # Anomaly: C3 worse than C1 (C1 pass, C3 fail)
     if p1 and not p3:
-        anomalies.append(f"  {bug}: C1=PASS C3={cell(r3).strip()} — Crochet TTD underperforms baseline")
+        anomalies.append('  {}: C1=PASS C3={} -- Crochet TTD underperforms baseline'.format(bug, cell(r3)))
 
 lines.append(sep)
-total_row = f"| {'TOTAL':<11} | {c1_pass}/11{' ':4} | {c2_pass}/11{' ':4} | {c3_pass}/11{' ':4} | {'':5} |"
+total_row = '| {:<11} | {:^8} | {:^8} | {:^8} | {:5} |'.format(
+    'TOTAL', '{}/11'.format(c1_pass), '{}/11'.format(c2_pass), '{}/11'.format(c3_pass), '')
 lines.append(total_row)
 
 table = '\n'.join(lines)
-print("\n" + table + "\n")
-print(f"Wall-clock: {int('$SWEEP_DURATION')}s ({int('$SWEEP_DURATION')//60}m {int('$SWEEP_DURATION')%60}s)")
+print('\n' + table + '\n')
+print('Wall-clock: {}s ({}m {}s)'.format(sweep_duration, sweep_duration//60, sweep_duration%60))
 
 if anomalies:
-    print("\nAnomalies (C3 underperforms C1):")
+    print('\nAnomalies (C3 underperforms C1):')
     for a in anomalies:
         print(a)
 else:
-    print("\nNo C3-underperforms-C1 anomalies detected.")
+    print('\nNo C3-underperforms-C1 anomalies detected.')
 
-# Write sweep-summary.md
 summary_path = os.path.join(results_dir, 'sweep-summary.md')
 with open(summary_path, 'w') as f:
-    f.write("# Sweep Summary — I.4 Trial Results\n\n")
-    f.write(table + "\n\n")
-    f.write(f"**Wall-clock:** {int('$SWEEP_DURATION')}s ({int('$SWEEP_DURATION')//60}m {int('$SWEEP_DURATION')%60}s)\n\n")
-    f.write("## Legend\n")
-    f.write("- PASS: test_pass=true (primary test passes, zero agent-induced regressions)\n")
-    f.write("- FAIL: test_pass=false (primary test still failing)\n")
-    f.write("- CFAIL: agent patch broke compilation\n")
-    f.write("- TOUT: trial timed out (>600s)\n")
-    f.write("- ERR: harness or setup error\n")
-    f.write("- MISS: result file not found\n\n")
-    f.write("## Footnote: compile_fail vs primary_fail\n")
-    f.write("CFAIL = agent's patch introduced a compilation error (distinct from the test failing to pass).\n")
-    f.write("FAIL without CFAIL = code compiled, but target test still fails.\n\n")
+    f.write('# Sweep Summary -- I.4 Trial Results\n\n')
+    f.write(table + '\n\n')
+    f.write('**Wall-clock:** {}s ({}m {}s)\n\n'.format(sweep_duration, sweep_duration//60, sweep_duration%60))
+    f.write('## Legend\n')
+    f.write('- PASS: test_pass=true (primary test passes, zero agent-induced regressions)\n')
+    f.write('- FAIL: test_pass=false (primary test still failing)\n')
+    f.write('- CFAIL: agent patch broke compilation\n')
+    f.write('- TOUT: trial timed out (>600s)\n')
+    f.write('- ERR: harness or setup error\n')
+    f.write('- MISS: result file not found\n\n')
+    f.write('## Footnote: compile_fail vs primary_fail\n')
+    f.write('CFAIL = agent patch introduced a compilation error (distinct from test failing to pass).\n')
+    f.write('FAIL without CFAIL = code compiled, but target test still fails.\n\n')
     if anomalies:
-        f.write("## Anomalies\n")
+        f.write('## Anomalies\n')
         for a in anomalies:
-            f.write(a.strip() + "\n")
-print(f"\nSummary written to: {summary_path}")
-PYEOF
+            f.write(a.strip() + '\n')
+print('\nSummary written to: ' + summary_path)
+" RESULTS_DIR_VAL="$RESULTS_DIR_VAL" CORPUS_JSON_VAL="$CORPUS_JSON_VAL" SWEEP_DURATION_VAL="$SWEEP_DURATION_VAL"
 
 # ── Final incremental push ─────────────────────────────────────────────────────
 push_and_commit
