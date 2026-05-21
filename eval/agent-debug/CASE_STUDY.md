@@ -1,6 +1,6 @@
 # Phase I Case Study: Crochet TTD for LLM-Assisted Java Debugging
 
-**Experiment:** Does Crochet time-travel debugging help a Claude Sonnet agent debug real Java bugs better than no debugger (C1) or standard jdb (C2)?
+**Experiment:** Does Crochet time-travel debugging help a Claude Opus 4.7 (`claude-opus-4-7[1m]`, 1M context) agent debug real Java bugs better than no debugger (C1) or standard jdb (C2)?
 
 **Result in one sentence:** On a corpus of 11 tractable Defects4J bugs, Crochet TTD (C3) does not change whether the agent fixes the bug — all 33 trials pass — but it does change how: C3 uses 7% fewer tool calls, runs 21% faster on average, and produces a marginally better diagnosis score, with the strongest single-bug signal being a 50% tool-call reduction on the timezone recurrence bug (Time-11).
 
@@ -8,7 +8,7 @@
 
 ## 1. The Question
 
-A Claude Sonnet agent can read source code, run tests, and apply patches autonomously. The question is whether giving it access to a time-travel debugger changes outcomes — or how it reaches them. Specifically:
+A Claude Opus 4.7 (`claude-opus-4-7[1m]`, 1M context) agent can read source code, run tests, and apply patches autonomously. The question is whether giving it access to a time-travel debugger changes outcomes — or how it reaches them. Specifically:
 
 - **C1 (no debugger):** The agent reads source, runs `defects4j test`, and patches.
 - **C2 (jdb):** The agent additionally has access to standard jdb for forward stepping and breakpoints.
@@ -26,7 +26,7 @@ The hypothesis going in: for bugs where symptom and cause are separated by signi
 
 ### Conditions
 
-All three conditions use the same Claude Sonnet model (`claude-sonnet-4-6`) running in the same agentic harness (`run-trial.sh`). The harness provides the agent with a Defects4J checkout, a failing test to reproduce, and the appropriate tool set for its condition. The 600-second wall-clock cap is per trial.
+All three conditions use the same Claude Opus 4.7 model (`claude-opus-4-7[1m]`, 1M context) running in the same agentic harness (`run-trial.sh`). The harness provides the agent with a Defects4J checkout, a failing test to reproduce, and the appropriate tool set for its condition. The 600-second wall-clock cap is per trial.
 
 ### Scoring
 
@@ -134,9 +134,9 @@ Closure-10 is the Closure Compiler's `PeepholeFoldConstants` string+number addit
 
 **n=11 is small.** This is the most important caveat. No statistical claim of significance is possible from 11 bugs × 3 conditions = 33 trials. The C3 secondary-metric advantages are consistent in direction but small in magnitude, and single-bug swings (Time-11 alone contributes −18 to C3's tool-call mean) can move the averages substantially. These results should be treated as directional, not confirmatory.
 
-**Ceiling effect on test_pass.** All 11 bugs were chosen from a "tractable for LLMs" tier. Claude Sonnet solves all of them without any debugger. The primary metric is therefore useless for distinguishing conditions. A harder corpus — bugs where C1 fails some of the time — would make test_pass the measurable axis and give a cleaner comparison.
+**Ceiling effect on test_pass.** All 11 bugs were chosen from a "tractable for LLMs" tier. Claude Opus 4.7 solves all of them without any debugger. The primary metric is therefore useless for distinguishing conditions. A harder corpus — bugs where C1 fails some of the time — would make test_pass the measurable axis and give a cleaner comparison.
 
-**One model, one corpus.** The results are specific to Claude Sonnet on Defects4J Lang/Time/Math/Closure. Different model families (GPT-4, Opus, smaller models) may have very different tool-call budgets and debugging strategies. Other corpora (Android bugs, concurrent bugs, memory bugs) may favor or disfavor TTD differently.
+**One model, one corpus.** The results are specific to Claude Opus 4.7 on Defects4J Lang/Time/Math/Closure. Different model families (GPT-4, Sonnet, Haiku, smaller models) may have very different tool-call budgets and debugging strategies. Other corpora (Android bugs, concurrent bugs, memory bugs) may favor or disfavor TTD differently.
 
 **LLM-as-judge for diagnosis quality.** The judge prompt was designed to score against ground-truth fix summaries, but the judge itself is a language model that may reward fluent narration and penalize terse-but-correct diagnoses. The Time-11 anomaly (all three agents fixed the test but scored 1/1/2 on diagnosis) suggests the judge correctly detected that the agents fixed by trial-and-error rather than by understanding, which is a real signal. But the possibility of systematic judge bias toward well-narrated wrong diagnoses cannot be ruled out.
 
@@ -145,6 +145,8 @@ Closure-10 is the Closure Compiler's `PeepholeFoldConstants` string+number addit
 **No repeated trials per condition.** Each (bug, condition) pair has exactly one trial. Single-trial noise could explain some of the per-bug variance. The Lang-10 C2 duration anomaly (294s vs C3's 154s) and the Closure-1 C2 duration anomaly (312s vs C3's 123s) look like outliers that would average out over repeated trials.
 
 **One trial per (bug, condition) precludes variance estimation.** The aggregate numbers (avg tool calls, avg duration) are point estimates with no associated uncertainty. Treat them accordingly.
+
+**Model selection.** Trials used Claude Opus 4.7, the most capable Claude model available at experiment time. The ceiling effect observed in Phase I (11/11 pass across all conditions) may be partially attributable to model strength: a model strong enough to solve every bug via forward-stepping has limited need for back-step/diff affordances. Phase III re-runs the experiment on Sonnet and Haiku to test the hypothesis that weaker models benefit more from TTD's added tools.
 
 ---
 
@@ -182,7 +184,7 @@ Based on the data and the theoretical TTD-suitedness criteria:
 
 **Harder bug corpus.** The most important next step is selecting bugs where C1 fails some of the time — either harder Defects4J bugs, or bugs from projects where the LLM has less prior knowledge. The "hard" tier in Defects4J (bugs that automated APR tools fail on) is a natural starting point. Alternatively, hand-picking known symptom-far-from-cause bugs (cases where the Defects4J fix diff is in a completely different file from the failing test) would ensure the corpus is structurally suited to TTD evaluation.
 
-**Multiple agent backends.** Claude Sonnet has strong code comprehension that may compensate for lacking TTD in many cases. A smaller model (Haiku, or GPT-3.5-class) might show a larger TTD benefit because it is less able to reason through complex call chains by reading source alone. Testing across model families would bound the generalizability of these results.
+**Multiple agent backends.** Claude Opus 4.7 has strong code comprehension that may compensate for lacking TTD in many cases. A smaller model (Sonnet, Haiku, or GPT-3.5-class) might show a larger TTD benefit because it is less able to reason through complex call chains by reading source alone. Testing across model families would bound the generalizability of these results.
 
 **Human developer user study.** LLM agents are an interesting proxy but not the actual target user. A controlled study where human developers debug the same bugs with and without Crochet TTD — measuring time-to-fix and asking for think-aloud protocols — would reveal whether the same TTD-suited pattern holds for human cognition.
 

@@ -1,6 +1,6 @@
 # Phase II Case Study: Crochet TTD for LLM-Assisted Java Debugging
 
-**Experiment:** Does Crochet time-travel debugging help a Claude Sonnet agent debug real Java bugs
+**Experiment:** Does Crochet time-travel debugging help a Claude Opus 4.7 (`claude-opus-4-7[1m]`, 1M context) agent debug real Java bugs
 better than standard jdb (C2) or no debugger (C1), on a corpus designed to defeat C1?
 
 **Result in one sentence:** On 12 multi-file Defects4J bugs in Closure, JacksonDatabind, and Jsoup,
@@ -17,7 +17,7 @@ fixes, delivering at best a statistically insignificant 0.17-point diagnosis-qua
 
 Phase I (11 bugs from Lang, Math, Time, Closure) found a ceiling effect: all 33 trials passed
 across all three conditions. The primary metric — test_pass — could not distinguish C1, C2, and C3
-because Claude Sonnet solved every bug in the corpus without any debugger. The secondary metrics
+because Claude Opus 4.7 solved every bug in the corpus without any debugger. The secondary metrics
 (tool calls, duration, diagnosis quality) suggested a modest C3 advantage, but with n=11 and no
 repeated trials, nothing was confirmable.
 
@@ -180,7 +180,7 @@ providing direct evidence of debugger value.
 C3: 27 tools, 191s). The prescreen failure was a false signal.
 
 The 0/2 prescreen result was almost certainly LLM variability, not a genuine C1 weakness.
-Claude Sonnet's stochastic output at the same temperature produces genuinely different
+Claude Opus 4.7's stochastic output at the same temperature produces genuinely different
 exploration paths across runs. Two unlucky seeds can both fail a bug that a third seed solves.
 The pre-screen used n=2, which is insufficient to establish a reliable failure probability.
 
@@ -226,6 +226,10 @@ C3) or all three in a mechanistic patch sweep (C1). No condition understood the 
 the "lucky wrong fix" pathology: the agent iterates on a patch until the test passes without
 developing a model of the cause. In this case, more tool calls and file coverage under C1 did
 not produce more understanding — just more code churn.
+
+### 5.5 Model selection
+
+**Model selection.** Trials used Claude Opus 4.7 (`claude-opus-4-7[1m]`). The finding that C3's TTD affordances were never invoked in 12/12 trials may be model-dependent: Opus's strength means it solves these multi-file bugs via jdb's forward-stepping without reaching for the more elaborate back-step/diff workflow. Phase III tests Sonnet + Haiku to check whether weaker models exhibit the same non-invocation pattern.
 
 ---
 
@@ -393,4 +397,4 @@ produced measurably different behavior on tractable-for-C1 bugs. On Jsoup-71 the
 ---
 
 *Phase II sweep: 36 trials, 12 bugs × {C1, C2, C3}, 900s timeout, 1 seed per cell.
-Model: claude-sonnet-4-6. Sweep completed 2026-05-21. Branch: unit/II.4-writeup.*
+Model: claude-opus-4-7[1m] (1M context). Sweep completed 2026-05-21. Branch: unit/II.4-writeup.*
