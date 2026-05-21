@@ -5,6 +5,7 @@
     "bug_test": "org.apache.commons.math3.complex.ComplexTest::testReciprocalZero",
     "condition": "C3",
     "date": "2026-05-21",
+    "baseline_subtraction_note": "I.3.2 baseline subtraction not retroactively applied to this C3 infrastructure smoke test (it validates TTD tooling, not patch scoring). Stage 3 trials will use the corrected scorer from run-trial.sh which subtracts pre-existing baseline failures before counting agent-induced regressions.",
     "instrumented_jdk": "/tmp/jdk-inst",
     "crochet_agent_jar": "/home/jon/crochet/crochet-agent/target/crochet-agent-2.0.0-SNAPSHOT.jar",
     "crochet_debug_jar": "/home/jon/crochet/crochet-debug/target/crochet-debug-2.0.0-SNAPSHOT-standalone.jar"

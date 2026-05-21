@@ -403,59 +403,138 @@ if (cd "$BUGGY_WORKDIR" && git status --short 2>/dev/null | grep -q '.'); then
     (cd "$BUGGY_WORKDIR" && git diff HEAD 2>/dev/null || true) > "$WORKDIR/agent.patch"
 fi
 
-# ── Step 9: Score — test pass/fail ────────────────────────────────────────────
-log "Step 9: Scoring — running failing test against agent's state ..."
+# ── Step 9: Capture baseline failures BEFORE running the scored test ───────────
+# Defects4J snapshots may have pre-existing failures under JDK 21 that are not
+# caused by the agent's patch.  We must subtract these from the post-trial
+# failure set so that pre-existing failures don't count as "regressions".
+# Strategy: run the full suite twice (two baseline passes) and take the UNION of
+# failures — any test that fails in either pass is considered a baseline failure.
+# This absorbs flaky tests that fail randomly and prevents noisy false-positive
+# regressions.
+log "Step 9a: Capturing baseline failing tests (2× for flakiness) ..."
 
-POST_TEST_LOG="$WORKDIR/post-test.log"
-(cd "$BUGGY_WORKDIR" && "$D4J_BIN" test -t "$FAILING_TEST" 2>&1) > "$POST_TEST_LOG" || true
+BASELINE_LOG1="$WORKDIR/baseline-test-1.log"
+BASELINE_LOG2="$WORKDIR/baseline-test-2.log"
+BASELINE_FAILING="$WORKDIR/baseline-failing-tests.txt"
+
+# First baseline pass
+(cd "$BUGGY_WORKDIR" && "$D4J_BIN" test 2>&1) > "$BASELINE_LOG1" || true
+
+# Second baseline pass (catches flaky failures)
+(cd "$BUGGY_WORKDIR" && "$D4J_BIN" test 2>&1) > "$BASELINE_LOG2" || true
+
+# Union of both passes → conservative baseline (anything failing in either run)
+python3 -c "
+import re, sys
+def extract_failures(logfile):
+    try:
+        with open(logfile) as f:
+            content = f.read()
+    except Exception:
+        return set()
+    return set(m.strip() for m in re.findall(r'^\s+- (.+)$', content, re.MULTILINE))
+
+f1 = extract_failures('$BASELINE_LOG1')
+f2 = extract_failures('$BASELINE_LOG2')
+union = sorted(f1 | f2)
+for t in union:
+    print(t)
+" > "$BASELINE_FAILING" 2>/dev/null || true
+
+BASELINE_FAIL_COUNT=$(wc -l < "$BASELINE_FAILING" | tr -d ' ')
+log "  Baseline: $BASELINE_FAIL_COUNT failing tests (union of 2 passes — will be subtracted from post-trial regressions)"
+
+# ── Step 9b: Compile-check after agent patch ──────────────────────────────────
+log "Step 9b: Compile-checking after agent's patch ..."
+COMPILE_FAIL=false
+COMPILE_LOG="$WORKDIR/post-compile.log"
+if ! (cd "$BUGGY_WORKDIR" && "$D4J_BIN" compile 2>&1) > "$COMPILE_LOG"; then
+    COMPILE_FAIL=true
+    log "  COMPILE FAILED — agent's patch breaks compilation; skipping test phase."
+fi
+
+# ── Step 9c: Score — test pass/fail ───────────────────────────────────────────
+log "Step 9c: Scoring — running failing test against agent's state ..."
 
 PRIMARY_PASS=false
-if grep -q "Failing tests: 0" "$POST_TEST_LOG"; then
-    PRIMARY_PASS=true
-    log "  PRIMARY: Test PASSES after agent intervention."
-else
-    log "  PRIMARY: Test still FAILS after agent intervention."
-fi
+AGENT_INDUCED_REGRESSIONS="[]"
+REGRESSION_COUNT=0
+TEST_PASS=false
 
-# Always run the full test suite to detect regressions.
-# test_pass is STRICT: requires the originally-failing test to pass AND zero
-# previously-passing tests to now fail.  regressed_tests is informational.
-# Rationale: an agent that fixes the target test by breaking 71 others has not
-# actually fixed the bug — it has shifted the failure.
-REGRESSED_TESTS="[]"
-REGRESSION_LOG="$WORKDIR/regression.log"
-if [[ "$PRIMARY_PASS" == "true" ]]; then
-    log "  Running full test suite to check for regressions ..."
+if [[ "$COMPILE_FAIL" == "true" ]]; then
+    log "  STRICT SCORE: FAIL (compile failed; patch is invalid)."
+else
+    POST_TEST_LOG="$WORKDIR/post-test.log"
+    (cd "$BUGGY_WORKDIR" && "$D4J_BIN" test -t "$FAILING_TEST" 2>&1) > "$POST_TEST_LOG" || true
+
+    if grep -q "Failing tests: 0" "$POST_TEST_LOG"; then
+        PRIMARY_PASS=true
+        log "  PRIMARY: Test PASSES after agent intervention."
+    else
+        log "  PRIMARY: Test still FAILS after agent intervention."
+    fi
+
+    # Always run the full test suite to detect agent-induced regressions.
+    # test_pass is STRICT: requires the originally-failing test to pass AND zero
+    # *agent-induced* (previously-passing tests that now fail) regressions.
+    # Pre-existing baseline failures are excluded.
+    # Rationale: an agent that breaks 71 pre-existing JDK-21 incompatible tests
+    # has not introduced any new regressions; an agent that passes the target by
+    # breaking truly-passing tests has shifted the failure and must not score PASS.
+    POSTTRIAL_FAILING="$WORKDIR/posttrial-failing-tests.txt"
+    AGENT_REGRESSIONS_FILE="$WORKDIR/agent-regressions.txt"
+    REGRESSION_LOG="$WORKDIR/regression.log"
+
+    log "  Running full test suite to check for agent-induced regressions ..."
     (cd "$BUGGY_WORKDIR" && "$D4J_BIN" test 2>&1) > "$REGRESSION_LOG" || true
-    REGRESSED_TESTS=$(python3 -c "
-import re, json
+
+    # Extract post-trial failing tests
+    python3 -c "
+import re
 with open('$REGRESSION_LOG') as f:
     content = f.read()
-# Parse failing tests list
-failing = re.findall(r'^\s+- (.+)$', content, re.MULTILINE)
-# Exclude the original failing test (it should pass now)
+failing = sorted(set(m.strip() for m in re.findall(r'^\s+- (.+)$', content, re.MULTILINE)))
+for t in failing:
+    print(t)
+" > "$POSTTRIAL_FAILING" 2>/dev/null || true
+
+    # Agent-induced regressions = post-trial failures NOT in baseline.
+    # comm -23 requires sorted input (both files are sorted by construction).
+    comm -23 "$POSTTRIAL_FAILING" "$BASELINE_FAILING" > "$AGENT_REGRESSIONS_FILE" 2>/dev/null || true
+
+    # Also remove the primary failing test itself from the regressions list:
+    # if it was in baseline (expected — it's the bug's failing test) it's already
+    # excluded; but if it appears in post-trial it means the primary did NOT pass,
+    # which is already captured by PRIMARY_PASS=false.  Either way it's not an
+    # agent-induced regression.
+    AGENT_INDUCED_REGRESSIONS=$(python3 -c "
+import json
+with open('$AGENT_REGRESSIONS_FILE') as f:
+    lines = [l.strip() for l in f if l.strip()]
+# Exclude the primary failing test from the regression list
 orig = '$FAILING_TEST'
-# Strip project prefix variants
-regressions = [t.strip() for t in failing if t.strip() != orig and not t.strip().startswith(orig.split('::')[0] + '::' + orig.split('::')[-1])]
-print(json.dumps(regressions))
+lines = [l for l in lines if l != orig]
+print(json.dumps(lines))
 " 2>/dev/null || echo "[]")
+
+    # Write to temp file to avoid any quoting issues with test names
+    echo "$AGENT_INDUCED_REGRESSIONS" > "$WORKDIR/agent-induced-regressions-tmp.json"
+    REGRESSION_COUNT=$(python3 -c "import json; print(len(json.load(open('$WORKDIR/agent-induced-regressions-tmp.json'))))" 2>/dev/null || echo "0")
+
+    if [[ "$PRIMARY_PASS" == "true" && "$REGRESSION_COUNT" == "0" ]]; then
+        TEST_PASS=true
+        log "  STRICT SCORE: PASS (target test passes, zero agent-induced regressions)."
+    elif [[ "$PRIMARY_PASS" == "true" ]]; then
+        log "  STRICT SCORE: FAIL (target test passes but $REGRESSION_COUNT agent-induced regression(s) — fix is not clean)."
+    else
+        log "  STRICT SCORE: FAIL (target test still failing)."
+    fi
 fi
 
-# Strict test_pass: primary must pass AND no regressions introduced.
-# Write REGRESSED_TESTS to a temp file to avoid shell-quoting issues with
-# test names that may contain apostrophes or other special characters.
+# Compat alias: regressed_tests → agent_induced_regressions (both written to output)
+REGRESSED_TESTS="$AGENT_INDUCED_REGRESSIONS"
 REGRESSED_TESTS_FILE="$WORKDIR/regressed-tests.json"
 echo "$REGRESSED_TESTS" > "$REGRESSED_TESTS_FILE"
-REGRESSION_COUNT=$(python3 -c "import json; print(len(json.load(open('$REGRESSED_TESTS_FILE'))))" 2>/dev/null || echo "0")
-TEST_PASS=false
-if [[ "$PRIMARY_PASS" == "true" && "$REGRESSION_COUNT" == "0" ]]; then
-    TEST_PASS=true
-    log "  STRICT SCORE: PASS (target test passes, zero regressions)."
-elif [[ "$PRIMARY_PASS" == "true" ]]; then
-    log "  STRICT SCORE: FAIL (target test passes but $REGRESSION_COUNT regression(s) detected — fix is not clean)."
-else
-    log "  STRICT SCORE: FAIL (target test still failing)."
-fi
 
 # ── Step 10: LLM-as-judge for diagnosis quality ────────────────────────────────
 log "Step 10: Running LLM-as-judge for diagnosis quality ..."
@@ -502,17 +581,33 @@ log "  Judge reasoning: $(cat "$WORKDIR/judge-reasoning.txt" | head -3)"
 log "Step 11: Writing output to $OUT_PATH ..."
 
 # Write scalar fields to a JSON metadata file (no multiline string issues)
+# Write the agent-induced regressions JSON array to a file for safe reading
+AGENT_INDUCED_FILE="$WORKDIR/agent-induced-regressions.json"
+echo "$AGENT_INDUCED_REGRESSIONS" > "$AGENT_INDUCED_FILE"
+
 METADATA_FILE="$WORKDIR/metadata.json"
 python3 -c "
 import json, datetime
+
+def read_json_file(path, default):
+    try:
+        with open(path) as f:
+            return json.load(f)
+    except Exception:
+        return default
+
 meta = {
     'bug': '$BUG_ID',
     'condition': '$CONDITION',
     'started_at': datetime.datetime.fromtimestamp($AGENT_START_TS, tz=datetime.timezone.utc).isoformat(),
     'duration_seconds': $DURATION,
     'tool_calls': $TOOL_CALL_COUNT,
+    'compile_fail': $( [[ "$COMPILE_FAIL" == "true" ]] && echo "True" || echo "False" ),
+    'primary_pass': $( [[ "$PRIMARY_PASS" == "true" ]] && echo "True" || echo "False" ),
     'test_pass': $( [[ "$TEST_PASS" == "true" ]] && echo "True" || echo "False" ),
-    'regressed_tests': $REGRESSED_TESTS,
+    'baseline_failing_count': $BASELINE_FAIL_COUNT,
+    'agent_induced_regressions': read_json_file('$AGENT_INDUCED_FILE', []),
+    'regressed_tests': read_json_file('$REGRESSED_TESTS_FILE', []),
     'diagnosis_quality': $DIAGNOSIS_QUALITY,
     'agent_exit_code': $AGENT_EXIT,
     'bug_reproduced_pretest': $( [[ "$BUG_REPRODUCED" == "true" ]] && echo "True" || echo "False" ),
@@ -538,6 +633,8 @@ meta['agent_log'] = read_file('$AGENT_JSON_FILE')
 meta['agent_stderr'] = read_file('$AGENT_LOG_FILE')
 meta['judge_reasoning'] = read_file('$WORKDIR/judge-reasoning.txt')
 meta['verify_log'] = read_file('$VERIFY_LOG')
+meta['baseline_failing_tests'] = [l for l in read_file('$BASELINE_FAILING').splitlines() if l.strip()]
+meta['compile_log'] = read_file('$COMPILE_LOG')
 
 with open('$OUT_PATH', 'w') as f:
     json.dump(meta, f, indent=2, default=str)
