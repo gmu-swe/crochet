@@ -19,6 +19,14 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# Ensure the prescreen runs from a stable cwd that won't be cleaned up.
+# The trial workdirs under /tmp get rm-rf'd by run-trial.sh's cleanup trap.
+# If the parent shell's cwd is inside one of those (or any other transient dir),
+# subsequent trials inherit a deleted cwd and defects4j's `java -version` parsing
+# fails with "shell-init: error retrieving current directory: getcwd: cannot access
+# parent directories". Pin to $HOME (or /tmp which always exists) to avoid this.
+cd "$HOME" || cd /tmp
 CANDIDATES_JSON="$SCRIPT_DIR/candidates.json"
 RESULTS_DIR="$SCRIPT_DIR/prescreen-results"
 TRIAL_SCRIPT="$SCRIPT_DIR/run-trial.sh"
@@ -98,17 +106,25 @@ except Exception:
     local trial_start
     trial_start=$(date +%s)
 
+    # Always run the trial from a stable cwd ($HOME) so that defects4j's
+    # `java -version` parsing works.  Without this, the child inherits the
+    # parent's cwd which may have been rm-rf'd by an earlier trial's cleanup.
+    # set +o pipefail so we can capture the timeout/bash exit code (PIPESTATUS[0])
+    # rather than the always-zero exit of the `while read` consumer.
     local exit_code=0
-    timeout "$TRIAL_TIMEOUT" bash "$TRIAL_SCRIPT" \
+    set +o pipefail
+    (cd "$HOME" && timeout "$TRIAL_TIMEOUT" bash "$TRIAL_SCRIPT" \
         --bug "$bug" \
         --condition C1 \
         --out "$out_file" \
         --seed "$seed" \
         --workdir "/tmp/prescreen-${bug}-seed${seed}" \
         $DRY_RUN_FLAG \
-        2>&1 | while IFS= read -r line; do
+        2>&1) | while IFS= read -r line; do
             echo "[prescreen/$bug/seed$seed] $line" >&2
-        done || exit_code=$?
+        done
+    exit_code=${PIPESTATUS[0]}
+    set -o pipefail
 
     local trial_end
     trial_end=$(date +%s)
