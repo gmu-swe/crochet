@@ -409,19 +409,23 @@ log "Step 9: Scoring — running failing test against agent's state ..."
 POST_TEST_LOG="$WORKDIR/post-test.log"
 (cd "$BUGGY_WORKDIR" && "$D4J_BIN" test -t "$FAILING_TEST" 2>&1) > "$POST_TEST_LOG" || true
 
-TEST_PASS=false
+PRIMARY_PASS=false
 if grep -q "Failing tests: 0" "$POST_TEST_LOG"; then
-    TEST_PASS=true
+    PRIMARY_PASS=true
     log "  PRIMARY: Test PASSES after agent intervention."
 else
     log "  PRIMARY: Test still FAILS after agent intervention."
 fi
 
-# Check for regressions (run the full test suite — but only if primary passed)
+# Always run the full test suite to detect regressions.
+# test_pass is STRICT: requires the originally-failing test to pass AND zero
+# previously-passing tests to now fail.  regressed_tests is informational.
+# Rationale: an agent that fixes the target test by breaking 71 others has not
+# actually fixed the bug — it has shifted the failure.
 REGRESSED_TESTS="[]"
-if [[ "$TEST_PASS" == "true" ]]; then
+REGRESSION_LOG="$WORKDIR/regression.log"
+if [[ "$PRIMARY_PASS" == "true" ]]; then
     log "  Running full test suite to check for regressions ..."
-    REGRESSION_LOG="$WORKDIR/regression.log"
     (cd "$BUGGY_WORKDIR" && "$D4J_BIN" test 2>&1) > "$REGRESSION_LOG" || true
     REGRESSED_TESTS=$(python3 -c "
 import re, json
@@ -435,6 +439,18 @@ orig = '$FAILING_TEST'
 regressions = [t.strip() for t in failing if t.strip() != orig and not t.strip().startswith(orig.split('::')[0] + '::' + orig.split('::')[-1])]
 print(json.dumps(regressions))
 " 2>/dev/null || echo "[]")
+fi
+
+# Strict test_pass: primary must pass AND no regressions introduced.
+REGRESSION_COUNT=$(python3 -c "import json,sys; print(len(json.loads('''$REGRESSED_TESTS''')))" 2>/dev/null || echo "0")
+TEST_PASS=false
+if [[ "$PRIMARY_PASS" == "true" && "$REGRESSION_COUNT" == "0" ]]; then
+    TEST_PASS=true
+    log "  STRICT SCORE: PASS (target test passes, zero regressions)."
+elif [[ "$PRIMARY_PASS" == "true" ]]; then
+    log "  STRICT SCORE: FAIL (target test passes but $REGRESSION_COUNT regression(s) detected — fix is not clean)."
+else
+    log "  STRICT SCORE: FAIL (target test still failing)."
 fi
 
 # ── Step 10: LLM-as-judge for diagnosis quality ────────────────────────────────

@@ -4,7 +4,8 @@
   "started_at": "2026-05-21T01:08:00+00:00",
   "duration_seconds": 163,
   "tool_calls": 14,
-  "test_pass": true,
+  "test_pass": false,
+  "test_pass_note": "Rescored under strict criterion (2026-05-21): target test passes but 71 regressions detected. test_pass requires zero regressions — an agent that breaks other tests to pass the target has not applied a clean fix.",
   "regressed_tests": [
     "org.apache.commons.lang3.builder.CompareToBuilderTest::testReflectionHierarchyCompareExcludeFields",
     "org.apache.commons.lang3.builder.CompareToBuilderTest::testReflectionHierarchyCompare",
