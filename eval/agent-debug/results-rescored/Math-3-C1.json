@@ -1,0 +1,40 @@
+{
+  "bug": "Math-3",
+  "condition": "C1",
+  "started_at": "2026-05-21T02:10:05+00:00",
+  "duration_seconds": 111,
+  "tool_calls": 10,
+  "compile_fail": false,
+  "primary_pass": true,
+  "test_pass": true,
+  "baseline_failing_count": 0,
+  "agent_induced_regressions": [],
+  "regressed_tests": [],
+  "diagnosis_quality": 5,
+  "agent_exit_code": 0,
+  "bug_reproduced_pretest": true,
+  "agent_patch": "diff --git a/build.xml b/build.xml\nindex fd1f1423b..001313b26 100644\n--- a/build.xml\n+++ b/build.xml\n@@ -102,8 +102,8 @@\n   <property name=\"source.encoding\"         value=\"UTF-8\"/>\n     \n   <!-- JDK level -->\n-  <property name=\"compile.source\"          value=\"1.6\"/>\n-  <property name=\"compile.target\"          value=\"1.6\"/>\n+  <property name=\"compile.source\"          value=\"1.8\"/>\n+  <property name=\"compile.target\"          value=\"1.8\"/>\n \n   <!-- Base compile classpath -->\n   <path id=\"compile.classpath\">\ndiff --git a/src/main/java/org/apache/commons/math3/util/MathArrays.java b/src/main/java/org/apache/commons/math3/util/MathArrays.java\nindex 325fd9430..9ce51336b 100644\n--- a/src/main/java/org/apache/commons/math3/util/MathArrays.java\n+++ b/src/main/java/org/apache/commons/math3/util/MathArrays.java\n@@ -842,17 +842,13 @@ public class MathArrays {\n         }\n \n \n-        final double prodHighCur = prodHigh[0];\n-        double prodHighNext = prodHigh[1];\n-        double sHighPrev = prodHighCur + prodHighNext;\n-        double sPrime = sHighPrev - prodHighNext;\n-        double sLowSum = (prodHighNext - (sHighPrev - sPrime)) + (prodHighCur - sPrime);\n-\n-        final int lenMinusOne = len - 1;\n-        for (int i = 1; i < lenMinusOne; i++) {\n-            prodHighNext = prodHigh[i + 1];\n+        double sHighPrev = prodHigh[0];\n+        double sLowSum = 0;\n+\n+        for (int i = 1; i < len; i++) {\n+            final double prodHighNext = prodHigh[i];\n             final double sHighCur = sHighPrev + prodHighNext;\n-            sPrime = sHighCur - prodHighNext;\n+            final double sPrime = sHighCur - prodHighNext;\n             sLowSum += (prodHighNext - (sHighCur - sPrime)) + (sHighPrev - sPrime);\n             sHighPrev = sHighCur;\n         }\n",
+  "agent_log": "{\"type\":\"result\",\"subtype\":\"success\",\"is_error\":false,\"api_error_status\":null,\"duration_ms\":110807,\"duration_api_ms\":43125,\"ttft_ms\":2661,\"num_turns\":10,\"result\":\"All tests pass. Final diagnosis below.\\n\\nDIAGNOSIS COMPLETE\\n\\nThe buggy version of `MathArrays.linearCombination(double[], double[])` (lines 845-849) unconditionally read `prodHigh[1]` after the per-element product loop, in order to initialize a two-step running sum (`sHighPrev`, `sLowSum`) from the first two products before entering a loop over the remaining elements. When the input arrays have only a single element (`len == 1`), `prodHigh` has length 1 and the access to `prodHigh[1]` throws `ArrayIndexOutOfBoundsException`. The fix restructures the summation to seed `sHighPrev = prodHigh[0]` and `sLowSum = 0`, then loop `i = 1..len-1` accumulating each subsequent product via the same compensated-summation step. For `len == 1` the loop body never executes and the method returns `prodHigh[0] + prodLowSum`, which is exactly `a[0] * b[0]` plus its compensated low term \u2014 numerically equivalent to the original algorithm for `len >= 2` while correctly handling `len == 1`.\",\"stop_reason\":\"end_turn\",\"session_id\":\"157c4158-eeea-4eb7-a814-f8b4a7d747c3\",\"total_cost_usd\":0.34856975,\"usage\":{\"input_tokens\":14,\"cache_creation_input_tokens\":18741,\"cache_read_input_tokens\":333287,\"output_tokens\":2589,\"server_tool_use\":{\"web_search_requests\":0,\"web_fetch_requests\":0},\"service_tier\":\"standard\",\"cache_creation\":{\"ephemeral_1h_input_tokens\":18741,\"ephemeral_5m_input_tokens\":0},\"inference_geo\":\"\",\"iterations\":[{\"input_tokens\":1,\"output_tokens\":383,\"cache_read_input_tokens\":36991,\"cache_creation_input_tokens\":249,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":249},\"type\":\"message\"}],\"speed\":\"standard\"},\"modelUsage\":{\"claude-opus-4-7[1m]\":{\"inputTokens\":14,\"outputTokens\":2589,\"cacheReadInputTokens\":333287,\"cacheCreationInputTokens\":18741,\"webSearchRequests\":0,\"costUSD\":0.34856975,\"contextWindow\":1000000,\"maxOutputTokens\":64000}},\"permission_denials\":[],\"terminal_reason\":\"completed\",\"fast_mode_state\":\"off\",\"uuid\":\"8a9d1404-9ed8-45af-b74b-c42e192d1bc8\"}\n",
+  "agent_stderr": "",
+  "judge_reasoning": "The agent precisely identifies the root cause: the unconditional access to prodHigh[1] in MathArrays.linearCombination at lines 845-849 throws ArrayIndexOutOfBoundsException when len==1, matching the ground truth exactly. It also correctly explains the fix (seed sHighPrev=prodHigh[0], loop from i=1) and verifies numerical equivalence for len>=2.\n",
+  "verify_log": "Running ant (compile.tests)................................................ OK\nRunning ant (run.dev.tests)................................................ OK\nFailing tests: 1\n  - org.apache.commons.math3.util.MathArraysTest::testLinearCombinationWithSingleElementArray\n",
+  "baseline_failing_tests": [],
+  "compile_log": "Running ant (compile)...................................................... OK\nRunning ant (compile.tests)................................................ OK\n",
+  "agent_modified_files": [
+    "build.xml",
+    "src/main/java/org/apache/commons/math3/util/MathArrays.java"
+  ],
+  "canonical_modified_files": [
+    "src/main/java/org/apache/commons/math3/util/MathArrays.java"
+  ],
+  "agent_modified_prod_files": [
+    "src/main/java/org/apache/commons/math3/util/MathArrays.java"
+  ],
+  "file_overlap": [
+    "src/main/java/org/apache/commons/math3/util/MathArrays.java"
+  ],
+  "missed_canonical": [],
+  "extra_prod_files": [],
+  "fix_locality_score": 1.0,
+  "test_pass_strict": true
+}

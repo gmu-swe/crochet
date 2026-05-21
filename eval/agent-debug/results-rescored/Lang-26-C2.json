@@ -1,0 +1,58 @@
+{
+  "bug": "Lang-26",
+  "condition": "C2",
+  "started_at": "2026-05-21T01:50:54+00:00",
+  "duration_seconds": 51,
+  "tool_calls": 11,
+  "compile_fail": false,
+  "primary_pass": true,
+  "test_pass": true,
+  "baseline_failing_count": 17,
+  "agent_induced_regressions": [],
+  "regressed_tests": [],
+  "diagnosis_quality": 5,
+  "agent_exit_code": 0,
+  "bug_reproduced_pretest": true,
+  "agent_patch": "diff --git a/maven-build.xml b/maven-build.xml\nindex 5e4a29822..acccfb4cd 100644\n--- a/maven-build.xml\n+++ b/maven-build.xml\n@@ -69,10 +69,10 @@\n            debug=\"true\" \n            optimize=\"false\" \n            deprecation=\"true\" \n-           target=\"1.6\" \n+           target=\"1.8\" \n            verbose=\"false\" \n            fork=\"false\" \n-           source=\"1.6\">\n+           source=\"1.8\">\n       <src>\n         <pathelement location=\"${maven.build.srcDir.0}\"/>\n       </src>\n@@ -102,10 +102,10 @@\n            debug=\"true\" \n            optimize=\"false\" \n            deprecation=\"true\" \n-           target=\"1.6\" \n+           target=\"1.8\" \n            verbose=\"false\" \n            fork=\"false\" \n-           source=\"1.6\">\n+           source=\"1.8\">\n       <src>\n         <pathelement location=\"${maven.build.testDir.0}\"/>\n       </src>\n@@ -201,7 +201,7 @@\n              nonavbar=\"false\" \n              serialwarn=\"false\" \n              charset=\"ISO-8859-1\" \n-             source=\"1.6\" \n+             source=\"1.8\" \n              linksource=\"true\" \n              breakiterator=\"false\">\n       <link href=\"http://java.sun.com/javase/6/docs/api/\"/>\ndiff --git a/src/main/java/org/apache/commons/lang3/time/FastDateFormat.java b/src/main/java/org/apache/commons/lang3/time/FastDateFormat.java\nindex e30da2a56..ceb77aa5c 100644\n--- a/src/main/java/org/apache/commons/lang3/time/FastDateFormat.java\n+++ b/src/main/java/org/apache/commons/lang3/time/FastDateFormat.java\n@@ -817,7 +817,7 @@ public class FastDateFormat extends Format {\n      * @return the formatted string\n      */\n     public String format(Date date) {\n-        Calendar c = new GregorianCalendar(mTimeZone);\n+        Calendar c = new GregorianCalendar(mTimeZone, mLocale);\n         c.setTime(date);\n         return applyRules(c, new StringBuffer(mMaxLengthEstimate)).toString();\n     }\n@@ -854,7 +854,7 @@ public class FastDateFormat extends Format {\n      * @return the specified string buffer\n      */\n     public StringBuffer format(Date date, StringBuffer buf) {\n-        Calendar c = new GregorianCalendar(mTimeZone);\n+        Calendar c = new GregorianCalendar(mTimeZone, mLocale);\n         c.setTime(date);\n         return applyRules(c, buf);\n     }\n",
+  "agent_log": "{\"type\":\"result\",\"subtype\":\"success\",\"is_error\":false,\"api_error_status\":null,\"duration_ms\":49960,\"duration_api_ms\":47681,\"ttft_ms\":2742,\"num_turns\":11,\"result\":\"Test passes.\\n\\nDIAGNOSIS COMPLETE\\n\\nThe root cause was that `FastDateFormat.format(Date)` and `FastDateFormat.format(Date, StringBuffer)` (lines 820 and 857) instantiated their internal calendar with `new GregorianCalendar(mTimeZone)` \u2014 the single-argument timezone constructor \u2014 which causes the JVM to fall back to the default locale instead of the locale the `FastDateFormat` was created with. For locale-sensitive calendar fields like week-of-year, the rules differ by locale: `sv_SE` (Swedish) uses ISO 8601 numbering where Jan 1, 2010 falls in week 53 of the prior year, while the default (e.g. `en_US`) places it in week 1. Because the formatter passed the date to a locale-default calendar, the `ww` rule read the wrong week number and produced `\\\"fredag, week 01\\\"` instead of `\\\"fredag, week 53\\\"`. Passing `mLocale` to the `GregorianCalendar(TimeZone, Locale)` constructor restores the configured locale's calendar semantics and the test passes.\",\"stop_reason\":\"end_turn\",\"session_id\":\"b8e318d0-e111-4e20-bb22-58047ad92bc9\",\"total_cost_usd\":0.3597917500000001,\"usage\":{\"input_tokens\":15,\"cache_creation_input_tokens\":18451,\"cache_read_input_tokens\":365396,\"output_tokens\":2468,\"server_tool_use\":{\"web_search_requests\":0,\"web_fetch_requests\":0},\"service_tier\":\"standard\",\"cache_creation\":{\"ephemeral_1h_input_tokens\":18451,\"ephemeral_5m_input_tokens\":0},\"inference_geo\":\"\",\"iterations\":[{\"input_tokens\":1,\"output_tokens\":376,\"cache_read_input_tokens\":36695,\"cache_creation_input_tokens\":255,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":255},\"type\":\"message\"}],\"speed\":\"standard\"},\"modelUsage\":{\"claude-opus-4-7[1m]\":{\"inputTokens\":15,\"outputTokens\":2468,\"cacheReadInputTokens\":365396,\"cacheCreationInputTokens\":18451,\"webSearchRequests\":0,\"costUSD\":0.3597917500000001,\"contextWindow\":1000000,\"maxOutputTokens\":64000}},\"permission_denials\":[],\"terminal_reason\":\"completed\",\"fast_mode_state\":\"off\",\"uuid\":\"5ce91dea-86ee-4065-b171-39449917e202\"}\n",
+  "agent_stderr": "",
+  "judge_reasoning": "The agent precisely identified the root cause: `FastDateFormat.format` constructing `GregorianCalendar(mTimeZone)` without passing `mLocale`, causing locale-default calendar semantics. It cited the exact lines (820, 857), explained the sv_SE vs en_US week-numbering difference producing 'week 01' instead of 'week 53', and named the correct fix (use the `GregorianCalendar(TimeZone, Locale)` constructor with `mLocale`).\n",
+  "verify_log": "Running ant (compile.tests)................................................ OK\nRunning ant (run.dev.tests)................................................ OK\nFailing tests: 1\n  - org.apache.commons.lang3.time.FastDateFormatTest::testLang645\n",
+  "baseline_failing_tests": [
+    "org.apache.commons.lang3.builder.CompareToBuilderTest::testReflectionHierarchyCompare",
+    "org.apache.commons.lang3.builder.CompareToBuilderTest::testReflectionHierarchyCompareExcludeFields",
+    "org.apache.commons.lang3.builder.CompareToBuilderTest::testReflectionHierarchyCompareTransients",
+    "org.apache.commons.lang3.builder.HashCodeBuilderAndEqualsBuilderTest::testInteger",
+    "org.apache.commons.lang3.builder.HashCodeBuilderAndEqualsBuilderTest::testIntegerWithTransients",
+    "org.apache.commons.lang3.builder.ToStringBuilderTest::testObjectCycle",
+    "org.apache.commons.lang3.builder.ToStringBuilderTest::testReflectionArrayArrayCycle",
+    "org.apache.commons.lang3.builder.ToStringBuilderTest::testReflectionArrayCycle",
+    "org.apache.commons.lang3.builder.ToStringBuilderTest::testReflectionBoolean",
+    "org.apache.commons.lang3.builder.ToStringBuilderTest::testReflectionCharacter",
+    "org.apache.commons.lang3.builder.ToStringBuilderTest::testReflectionDoubleArrayArray",
+    "org.apache.commons.lang3.builder.ToStringBuilderTest::testReflectionFloatArray",
+    "org.apache.commons.lang3.builder.ToStringBuilderTest::testReflectionFloatArrayArray",
+    "org.apache.commons.lang3.builder.ToStringBuilderTest::testReflectionHierarchy",
+    "org.apache.commons.lang3.builder.ToStringBuilderTest::testReflectionInteger",
+    "org.apache.commons.lang3.builder.ToStringBuilderTest::testReflectionLongArrayArray",
+    "org.apache.commons.lang3.builder.ToStringBuilderTest::testSelfInstanceTwoVarsReflectionObjectCycle"
+  ],
+  "compile_log": "Running ant (compile)...................................................... OK\nRunning ant (compile.tests)................................................ OK\n",
+  "agent_modified_files": [
+    "maven-build.xml",
+    "src/main/java/org/apache/commons/lang3/time/FastDateFormat.java"
+  ],
+  "canonical_modified_files": [
+    "src/main/java/org/apache/commons/lang3/time/FastDateFormat.java"
+  ],
+  "agent_modified_prod_files": [
+    "src/main/java/org/apache/commons/lang3/time/FastDateFormat.java"
+  ],
+  "file_overlap": [
+    "src/main/java/org/apache/commons/lang3/time/FastDateFormat.java"
+  ],
+  "missed_canonical": [],
+  "extra_prod_files": [],
+  "fix_locality_score": 1.0,
+  "test_pass_strict": true
+}

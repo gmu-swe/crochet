@@ -1,0 +1,47 @@
+{
+  "bug": "Time-4",
+  "condition": "C2",
+  "started_at": "2026-05-21T01:53:19+00:00",
+  "duration_seconds": 111,
+  "tool_calls": 16,
+  "compile_fail": false,
+  "primary_pass": true,
+  "test_pass": true,
+  "baseline_failing_count": 6,
+  "agent_induced_regressions": [],
+  "regressed_tests": [],
+  "diagnosis_quality": 4,
+  "agent_exit_code": 0,
+  "bug_reproduced_pretest": true,
+  "agent_patch": "diff --git a/maven-build.xml b/maven-build.xml\nindex 1a5047be..0a289f6b 100644\n--- a/maven-build.xml\n+++ b/maven-build.xml\n@@ -71,10 +71,10 @@\n            debug=\"true\" \n            optimize=\"false\" \n            deprecation=\"true\" \n-           target=\"1.6\" \n+           target=\"1.8\" \n            verbose=\"false\" \n            fork=\"false\" \n-           source=\"1.6\">\n+           source=\"1.8\">\n       <src>\n         <pathelement location=\"${maven.build.srcDir.0}\"/>\n       </src>\n@@ -108,10 +108,10 @@\n            debug=\"true\" \n            optimize=\"false\" \n            deprecation=\"true\" \n-           target=\"1.6\" \n+           target=\"1.8\" \n            verbose=\"false\" \n            fork=\"false\" \n-           source=\"1.6\">\n+           source=\"1.8\">\n       <src>\n         <pathelement location=\"${maven.build.testDir.0}\"/>\n       </src>\ndiff --git a/src/main/java/org/joda/time/Partial.java b/src/main/java/org/joda/time/Partial.java\nindex 0d4edf47..8e8e6034 100644\n--- a/src/main/java/org/joda/time/Partial.java\n+++ b/src/main/java/org/joda/time/Partial.java\n@@ -461,7 +461,7 @@ public final class Partial\n             System.arraycopy(iValues, i, newValues, i + 1, newValues.length - i - 1);\n             // use public constructor to ensure full validation\n             // this isn't overly efficient, but is safe\n-            Partial newPartial = new Partial(iChronology, newTypes, newValues);\n+            Partial newPartial = new Partial(newTypes, newValues, iChronology);\n             iChronology.validate(newPartial, newValues);\n             return newPartial;\n         }\n",
+  "agent_log": "{\"type\":\"result\",\"subtype\":\"success\",\"is_error\":false,\"api_error_status\":null,\"duration_ms\":110061,\"duration_api_ms\":94666,\"ttft_ms\":2169,\"num_turns\":16,\"result\":\"Test passes.\\n\\nDIAGNOSIS COMPLETE\\n\\nThe root cause was a constructor-overload mismatch in `Partial.with(DateTimeFieldType, int)` at `src/main/java/org/joda/time/Partial.java:464`. The code's comment said \\\"use public constructor to ensure full validation,\\\" but the call `new Partial(iChronology, newTypes, newValues)` actually resolves to the package-private constructor at line 295 with signature `(Chronology, DateTimeFieldType[], int[])`, which performs no validation. The public constructor's signature is `(DateTimeFieldType[], int[], Chronology)` \u2014 chronology last \u2014 and is the one that contains the loop checking field ordering and rejecting duplicates (e.g., two fields like `hourOfDay` and `clockhourOfDay` that share the same duration unit and range). Because the wrong constructor was selected, inserting `clockhourOfDay` into a Partial that already had `hourOfDay` produced an invalid Partial instead of throwing `IllegalArgumentException`, so `testWith3` saw no exception and failed. The fix is to call the public constructor by swapping argument order to `new Partial(newTypes, newValues, iChronology)`.\",\"stop_reason\":\"end_turn\",\"session_id\":\"e4e36961-b887-42ba-9381-8d853998fbc0\",\"total_cost_usd\":0.5669285000000001,\"usage\":{\"input_tokens\":20,\"cache_creation_input_tokens\":25162,\"cache_read_input_tokens\":589682,\"output_tokens\":4589,\"server_tool_use\":{\"web_search_requests\":0,\"web_fetch_requests\":0},\"service_tier\":\"standard\",\"cache_creation\":{\"ephemeral_1h_input_tokens\":25162,\"ephemeral_5m_input_tokens\":0},\"inference_geo\":\"\",\"iterations\":[{\"input_tokens\":1,\"output_tokens\":409,\"cache_read_input_tokens\":43457,\"cache_creation_input_tokens\":204,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":204},\"type\":\"message\"}],\"speed\":\"standard\"},\"modelUsage\":{\"claude-opus-4-7[1m]\":{\"inputTokens\":20,\"outputTokens\":4589,\"cacheReadInputTokens\":589682,\"cacheCreationInputTokens\":25162,\"webSearchRequests\":0,\"costUSD\":0.5669285000000001,\"contextWindow\":1000000,\"maxOutputTokens\":64000}},\"permission_denials\":[],\"terminal_reason\":\"completed\",\"fast_mode_state\":\"off\",\"uuid\":\"903ea8fa-e642-4313-ab15-490a59e8023b\"}\n",
+  "agent_stderr": "",
+  "judge_reasoning": "The agent correctly identified the bug location in Partial.with(DateTimeFieldType, int) and pinpointed that the wrong constructor (package-private, no validation) was being called instead of the public validating one. However, the ground truth emphasizes that the bug is about allowing illegal field ordering (non-decreasing order violation), while the agent's example focused on duplicate duration units (hourOfDay/clockhourOfDay) \u2014 close but slightly different framing of the validation gap. The fix proposed (swap argument order) is correct and addresses the root cause.\n",
+  "verify_log": "Running ant (compile.tests)................................................ OK\nRunning ant (run.dev.tests)................................................ OK\nFailing tests: 1\n  - org.joda.time.TestPartial_Basics::testWith3\n",
+  "baseline_failing_tests": [
+    "org.joda.time.TestDateMidnight_Properties::testPropertyGetMonthOfYear",
+    "org.joda.time.TestDateTime_Properties::testPropertyGetMonthOfYear",
+    "org.joda.time.TestMonthDay_Properties::testPropertyGetMonthOfYear",
+    "org.joda.time.TestMutableDateTime_Properties::testPropertyGetMonthOfYear",
+    "org.joda.time.convert.TestCalendarConverter::testGetChronology_Object_Zone",
+    "org.joda.time.convert.TestCalendarConverter::testGetChronology_Object_nullChronology"
+  ],
+  "compile_log": "Running ant (compile)...................................................... OK\nRunning ant (compile.tests)................................................ OK\n",
+  "agent_modified_files": [
+    "maven-build.xml",
+    "src/main/java/org/joda/time/Partial.java"
+  ],
+  "canonical_modified_files": [
+    "src/main/java/org/joda/time/Partial.java"
+  ],
+  "agent_modified_prod_files": [
+    "src/main/java/org/joda/time/Partial.java"
+  ],
+  "file_overlap": [
+    "src/main/java/org/joda/time/Partial.java"
+  ],
+  "missed_canonical": [],
+  "extra_prod_files": [],
+  "fix_locality_score": 1.0,
+  "test_pass_strict": true
+}
