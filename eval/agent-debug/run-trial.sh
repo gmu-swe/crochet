@@ -442,7 +442,11 @@ print(json.dumps(regressions))
 fi
 
 # Strict test_pass: primary must pass AND no regressions introduced.
-REGRESSION_COUNT=$(python3 -c "import json,sys; print(len(json.loads('''$REGRESSED_TESTS''')))" 2>/dev/null || echo "0")
+# Write REGRESSED_TESTS to a temp file to avoid shell-quoting issues with
+# test names that may contain apostrophes or other special characters.
+REGRESSED_TESTS_FILE="$WORKDIR/regressed-tests.json"
+echo "$REGRESSED_TESTS" > "$REGRESSED_TESTS_FILE"
+REGRESSION_COUNT=$(python3 -c "import json; print(len(json.load(open('$REGRESSED_TESTS_FILE'))))" 2>/dev/null || echo "0")
 TEST_PASS=false
 if [[ "$PRIMARY_PASS" == "true" && "$REGRESSION_COUNT" == "0" ]]; then
     TEST_PASS=true

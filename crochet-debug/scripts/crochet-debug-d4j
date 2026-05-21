@@ -1,0 +1,565 @@
+#!/usr/bin/env python3
+"""
+crochet-debug-d4j — Defects4J ergonomic helper for the Crochet TTD debugger.
+
+Reduces C3 condition setup from ~10 tool calls to ~2 by automating:
+  1. annotate  — injects @TimeTravelBody on a target method and generates a
+                 RunUnderTtd.java wrapper that calls Ttd.sessionWithRepl(...)
+                 wrapping the JUnit test, avoiding any need to patch test sources.
+  2. run-test  — constructs the full JDWP + Crochet agent JVM command, launches
+                 the test under the instrumented JDK, and connects the unified
+                 crochet-debug CLI so an agent can immediately issue back-step /
+                 capture-stack / diff commands.
+
+Usage
+-----
+  crochet-debug-d4j annotate \\
+      --workdir /tmp/lang-26-buggy \\
+      --class org.apache.commons.lang3.time.FastDateFormat \\
+      --method format \\
+      [--auto-detect]           # pick method from first stack frame of failing test
+
+  crochet-debug-d4j run-test \\
+      --workdir /tmp/lang-26-buggy \\
+      --test org.apache.commons.lang3.time.FastDateFormatTest::testLang645 \\
+      [--port 5005]             # JDWP port (default 5005)
+      [--repl-port 5006]        # Crochet REPL port (default 5006)
+      [--inst-jdk /tmp/jdk-inst] \\
+      [--crochet-agent <path>] \\
+      [--debug-jar <path>]
+
+Environment overrides
+---------------------
+  INST_JDK          Instrumented JDK path  (default: /tmp/jdk-inst)
+  CROCHET_AGENT_JAR Path to crochet-agent jar
+  CROCHET_DEBUG_JAR Path to crochet-debug standalone jar
+  DEFECTS4J_HOME    Path to defects4j checkout  (default: ~/defects4j)
+  JAVA_HOME         JDK for running crochet-debug CLI  (default: same as system java)
+"""
+
+import argparse
+import glob
+import os
+import re
+import shlex
+import shutil
+import subprocess
+import sys
+import textwrap
+
+
+# ---------------------------------------------------------------------------
+# Defaults / environment
+# ---------------------------------------------------------------------------
+
+INST_JDK = os.environ.get("INST_JDK", "/tmp/jdk-inst")
+DEFECTS4J_HOME = os.environ.get("DEFECTS4J_HOME", os.path.expanduser("~/defects4j"))
+JAVA_HOME = os.environ.get("JAVA_HOME", "")  # empty → use whatever `java` is on PATH
+
+
+def _java_bin(inst: bool = False) -> str:
+    if inst:
+        return os.path.join(INST_JDK, "bin", "java")
+    if JAVA_HOME:
+        return os.path.join(JAVA_HOME, "bin", "java")
+    return "java"
+
+
+def _d4j_bin() -> str:
+    return os.path.join(DEFECTS4J_HOME, "framework", "bin", "defects4j")
+
+
+def _find_jar(pattern_list) -> str:
+    """Return first existing file matched by any glob in pattern_list."""
+    for pat in pattern_list:
+        matches = sorted(glob.glob(pat))
+        if matches:
+            return matches[-1]
+    return ""
+
+
+def _auto_detect_agent_jar() -> str:
+    # Look for crochet-agent jar relative to this script or via env
+    env = os.environ.get("CROCHET_AGENT_JAR", "")
+    if env and os.path.isfile(env):
+        return env
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    # script lives in crochet-debug/scripts/ → repo root is two levels up
+    repo_root = os.path.dirname(os.path.dirname(script_dir))
+    candidates = [
+        os.path.join(repo_root, "crochet-agent", "target", "*-SNAPSHOT.jar"),
+        os.path.join(repo_root, "crochet-agent", "target", "*.jar"),
+    ]
+    return _find_jar(candidates)
+
+
+def _auto_detect_debug_jar() -> str:
+    env = os.environ.get("CROCHET_DEBUG_JAR", "")
+    if env and os.path.isfile(env):
+        return env
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    repo_root = os.path.dirname(os.path.dirname(script_dir))
+    candidates = [
+        os.path.join(repo_root, "crochet-debug", "target", "*-standalone.jar"),
+        os.path.join(repo_root, "crochet-debug", "target", "crochet-debug-*.jar"),
+    ]
+    return _find_jar(candidates)
+
+
+# ---------------------------------------------------------------------------
+# Source manipulation helpers
+# ---------------------------------------------------------------------------
+
+def _find_source_file(workdir: str, fqcn: str) -> str | None:
+    """Locate the .java source file for a fully-qualified class name."""
+    rel = fqcn.replace(".", os.sep) + ".java"
+    # Check src/main/java, src, source
+    for base in ("src/main/java", "src", "source"):
+        candidate = os.path.join(workdir, base, rel)
+        if os.path.isfile(candidate):
+            return candidate
+    # Walk workdir looking for the file
+    filename = fqcn.split(".")[-1] + ".java"
+    for root, _, files in os.walk(workdir):
+        if filename in files:
+            full = os.path.join(root, filename)
+            if os.path.isfile(full):
+                return full
+    return None
+
+
+def _inject_annotation(source_path: str, method_name: str) -> bool:
+    """
+    Add `@TimeTravelBody` + required import to the named method in source_path.
+    Returns True if successful, False if method not found.
+    """
+    with open(source_path) as f:
+        text = f.read()
+
+    # Already annotated?
+    if "@TimeTravelBody" in text:
+        print(f"[annotate] @TimeTravelBody already present in {source_path}", flush=True)
+        return True
+
+    # Add import if missing
+    import_stmt = "import edu.neu.ccs.prl.crochet.ttd.TimeTravelBody;"
+    if import_stmt not in text:
+        # Insert after the last import or after the package declaration
+        import_re = re.compile(r'^(import\s+[^\n]+;\n)', re.MULTILINE)
+        last_import = None
+        for m in import_re.finditer(text):
+            last_import = m
+        if last_import:
+            insert_at = last_import.end()
+            text = text[:insert_at] + import_stmt + "\n" + text[insert_at:]
+        else:
+            # No imports — insert after package declaration
+            pkg_re = re.compile(r'^(package\s+[^\n]+;\n)', re.MULTILINE)
+            m = pkg_re.search(text)
+            if m:
+                insert_at = m.end()
+                text = text[:insert_at] + "\n" + import_stmt + "\n" + text[insert_at:]
+            else:
+                text = import_stmt + "\n" + text
+
+    # Find the method and inject @TimeTravelBody before it.
+    # We look for a line that contains the method name followed by ( and does
+    # not contain @TimeTravelBody on the preceding line.
+    # Pattern: optional annotations/modifiers before `<return_type> method_name(`
+    # Simple heuristic: find the first occurrence of `<word> method_name(` and
+    # insert the annotation on the line immediately before the method declaration.
+    method_re = re.compile(
+        r'([ \t]*)(\b(?:public|protected|private|static|final|synchronized|native|abstract|default|\w+)\b[^\n]*?\b'
+        + re.escape(method_name)
+        + r'\s*\([^\n]*)',
+        re.MULTILINE
+    )
+    m = method_re.search(text)
+    if not m:
+        print(f"[annotate] ERROR: method '{method_name}' not found in {source_path}", flush=True)
+        return False
+
+    # Insert annotation before this line
+    indent = m.group(1)
+    annotation_line = indent + "@TimeTravelBody\n"
+    insert_pos = m.start()
+    text = text[:insert_pos] + annotation_line + text[insert_pos:]
+
+    with open(source_path, "w") as f:
+        f.write(text)
+
+    print(f"[annotate] Injected @TimeTravelBody on {method_name} in {source_path}", flush=True)
+    return True
+
+
+# ---------------------------------------------------------------------------
+# RunUnderTtd.java generator
+# ---------------------------------------------------------------------------
+
+UNDER_TTD_TEMPLATE = """\
+package edu.neu.crs.prl.crochet.d4j;
+
+import edu.neu.ccs.prl.crochet.ttd.Ttd;
+import edu.neu.ccs.prl.crochet.ttd.SocketRepl;
+import org.junit.runner.JUnitCore;
+import org.junit.runner.Request;
+import org.junit.runner.Result;
+import org.junit.runner.notification.Failure;
+
+/**
+ * Generated by crochet-debug-d4j run-test.
+ *
+ * Wraps the target JUnit test inside Ttd.sessionWithRepl(...) so the Crochet
+ * TTD debugger can connect without modifying test or library source files.
+ */
+public class RunUnderTtd {{
+    // Shared result written by the lambda, read after session ends.
+    private static volatile boolean testPassed = false;
+
+    public static void main(String[] args) throws Exception {{
+        int replPort = args.length > 0 ? Integer.parseInt(args[0]) : 5006;
+
+        // The root object is the test class instance created by JUnit.
+        // We use the class object as a stable root for the Crochet snapshot;
+        // field-level state changes inside the test method are captured when
+        // Crochet instruments the heap transitively from the class.
+        Class<?> testClass = Class.forName("{test_class}");
+
+        // Bind REPL socket BEFORE entering session so the port is open early.
+        // crochet-debug-d4j run-test will connect after printing the port line.
+        SocketRepl repl = SocketRepl.onPort(replPort);
+        System.out.println("REPL listening on port " + replPort);
+        System.out.flush();
+
+        Ttd.sessionWithRepl(testClass, repl, () -> {{
+            Request req = Request.method(testClass, "{test_method}");
+            Result result = new JUnitCore().run(req);
+            testPassed = result.wasSuccessful();
+            if (!result.wasSuccessful()) {{
+                for (Failure f : result.getFailures()) {{
+                    System.err.println("[run-under-ttd] FAILURE: " + f.getMessage());
+                }}
+            }}
+        }});
+
+        System.exit(testPassed ? 0 : 1);
+    }}
+}}
+"""
+
+
+def _generate_run_under_ttd(workdir: str, test_class: str, test_method: str) -> str:
+    """Generate RunUnderTtd.java in <workdir>/crochet-ttd-harness/ and return its path."""
+    out_dir = os.path.join(workdir, "crochet-ttd-harness", "src", "edu", "neu", "crs", "prl", "crochet", "d4j")
+    os.makedirs(out_dir, exist_ok=True)
+    out_path = os.path.join(out_dir, "RunUnderTtd.java")
+
+    content = UNDER_TTD_TEMPLATE.format(
+        test_class=test_class,
+        test_method=test_method,
+    )
+    with open(out_path, "w") as f:
+        f.write(content)
+
+    print(f"[run-test] Generated {out_path}", flush=True)
+    return out_path
+
+
+# ---------------------------------------------------------------------------
+# Classpath discovery (Defects4J)
+# ---------------------------------------------------------------------------
+
+def _get_d4j_classpath(workdir: str) -> str:
+    """Return the test classpath for a Defects4J project working directory."""
+    d4j = _d4j_bin()
+    try:
+        # defects4j export -p cp.test prints the colon-separated classpath
+        result = subprocess.run(
+            [d4j, "export", "-p", "cp.test"],
+            cwd=workdir,
+            capture_output=True,
+            text=True,
+            timeout=60,
+        )
+        cp = result.stdout.strip().split("\n")[-1].strip()
+        if cp:
+            return cp
+    except Exception as e:
+        print(f"[run-test] WARNING: could not get classpath from defects4j export: {e}", flush=True)
+
+    # Fallback: look for build/classes or target/classes + test-classes
+    candidates = []
+    for pattern in ("build/classes", "target/classes", "build/tests", "target/test-classes"):
+        p = os.path.join(workdir, pattern)
+        if os.path.isdir(p):
+            candidates.append(p)
+    for jar_glob in ("lib/*.jar", "libs/*.jar", "*.jar"):
+        for j in glob.glob(os.path.join(workdir, jar_glob)):
+            candidates.append(j)
+    return ":".join(candidates) if candidates else "."
+
+
+# ---------------------------------------------------------------------------
+# Compile RunUnderTtd.java
+# ---------------------------------------------------------------------------
+
+def _compile_run_under_ttd(workdir: str, java_src: str, agent_jar: str, debug_jar: str) -> str:
+    """Compile RunUnderTtd.java and return the output classes directory."""
+    d4j_cp = _get_d4j_classpath(workdir)
+
+    classes_dir = os.path.join(workdir, "crochet-ttd-harness", "classes")
+    os.makedirs(classes_dir, exist_ok=True)
+
+    # Extra classpath: crochet-ttd jar (contains Ttd, SocketRepl, etc.)
+    # We use agent_jar as a proxy; the standalone debug_jar bundles ttd too.
+    extra_cp = ":".join(filter(None, [agent_jar, debug_jar]))
+
+    full_cp = ":".join(filter(None, [d4j_cp, extra_cp]))
+
+    javac_bin = "javac"
+    if JAVA_HOME:
+        javac_bin = os.path.join(JAVA_HOME, "bin", "javac")
+
+    cmd = [javac_bin, "-cp", full_cp, "-d", classes_dir, java_src]
+    print(f"[run-test] Compiling RunUnderTtd: {shlex.join(cmd)}", flush=True)
+    result = subprocess.run(cmd, capture_output=True, text=True)
+    if result.returncode != 0:
+        print(f"[run-test] ERROR: javac failed:\n{result.stderr}", flush=True)
+        sys.exit(1)
+
+    print(f"[run-test] Compiled to {classes_dir}", flush=True)
+    return classes_dir
+
+
+# ---------------------------------------------------------------------------
+# subcommand: annotate
+# ---------------------------------------------------------------------------
+
+def cmd_annotate(args) -> int:
+    workdir = args.workdir
+    target_class = args.cls
+    method_name = args.method
+
+    if args.auto_detect:
+        print("[annotate] --auto-detect: running failing test to capture first stack frame ...", flush=True)
+        d4j = _d4j_bin()
+        result = subprocess.run(
+            [d4j, "test", "-t", args.test or ""],
+            cwd=workdir,
+            capture_output=True,
+            text=True,
+            timeout=120,
+        )
+        output = result.stdout + result.stderr
+        # Find first "at <class>.<method>(" line that is not junit internals
+        stack_re = re.compile(r'^\s+at ([\w\.$]+)\.([\w$<>]+)\(')
+        for line in output.splitlines():
+            m = stack_re.match(line)
+            if not m:
+                continue
+            cls = m.group(1)
+            meth = m.group(2)
+            # Skip JUnit / reflection internals
+            if any(skip in cls for skip in ("junit", "reflect", "sun.reflect", "java.lang", "org.apache.tools")):
+                continue
+            print(f"[annotate] Auto-detected: class={cls} method={meth}", flush=True)
+            target_class = cls
+            method_name = meth
+            break
+        if not target_class or not method_name:
+            print("[annotate] ERROR: --auto-detect could not determine class/method from stack trace.", flush=True)
+            return 1
+
+    if not target_class or not method_name:
+        print("[annotate] ERROR: --class and --method are required (or --auto-detect).", flush=True)
+        return 1
+
+    source = _find_source_file(workdir, target_class)
+    if not source:
+        print(f"[annotate] ERROR: source file for class '{target_class}' not found under {workdir}", flush=True)
+        return 1
+
+    ok = _inject_annotation(source, method_name)
+    if not ok:
+        return 1
+
+    # Rebuild
+    d4j = _d4j_bin()
+    print("[annotate] Rebuilding with defects4j compile ...", flush=True)
+    result = subprocess.run(
+        [d4j, "compile"],
+        cwd=workdir,
+        capture_output=True,
+        text=True,
+        timeout=120,
+    )
+    if result.returncode != 0:
+        print(f"[annotate] ERROR: defects4j compile failed:\n{result.stdout}\n{result.stderr}", flush=True)
+        return 1
+
+    print("[annotate] Build successful. @TimeTravelBody injection complete.", flush=True)
+    return 0
+
+
+# ---------------------------------------------------------------------------
+# subcommand: run-test
+# ---------------------------------------------------------------------------
+
+def cmd_run_test(args) -> int:
+    workdir = args.workdir
+    test_spec = args.test  # "pkg.ClassName::methodName"
+    jdwp_port = args.port
+    repl_port = args.repl_port
+    inst_jdk = args.inst_jdk or INST_JDK
+
+    agent_jar = args.crochet_agent or _auto_detect_agent_jar()
+    debug_jar = args.debug_jar or _auto_detect_debug_jar()
+
+    if not agent_jar or not os.path.isfile(agent_jar):
+        print(f"[run-test] ERROR: crochet-agent jar not found. Pass --crochet-agent or set CROCHET_AGENT_JAR.", flush=True)
+        return 1
+    if not debug_jar or not os.path.isfile(debug_jar):
+        print(f"[run-test] ERROR: crochet-debug standalone jar not found. Pass --debug-jar or set CROCHET_DEBUG_JAR.", flush=True)
+        return 1
+
+    java_inst = os.path.join(inst_jdk, "bin", "java")
+    if not os.path.isfile(java_inst):
+        print(f"[run-test] ERROR: instrumented JDK not found at {inst_jdk}. Build it first.", flush=True)
+        return 1
+
+    # Parse test spec
+    if "::" in test_spec:
+        test_class, test_method = test_spec.split("::", 1)
+    else:
+        test_class = test_spec
+        test_method = ""
+
+    # Get D4J classpath
+    d4j_cp = _get_d4j_classpath(workdir)
+    print(f"[run-test] D4J classpath: {d4j_cp[:120]}...", flush=True)
+
+    # Generate + compile RunUnderTtd
+    java_src = _generate_run_under_ttd(workdir, test_class, test_method)
+    classes_dir = _compile_run_under_ttd(workdir, java_src, agent_jar, debug_jar)
+
+    # Build the target JVM command
+    full_cp = ":".join(filter(None, [classes_dir, d4j_cp, agent_jar, debug_jar]))
+
+    target_cmd = [
+        java_inst,
+        "--add-reads", "java.base=jdk.unsupported",
+        f"-agentlib:jdwp=transport=dt_socket,server=y,suspend=y,address=*:{jdwp_port}",
+        f"-javaagent:{agent_jar}",
+        "-cp", full_cp,
+        "edu.neu.crs.prl.crochet.d4j.RunUnderTtd",
+        str(repl_port),
+    ]
+
+    print(f"[run-test] Launching target JVM:", flush=True)
+    print(f"  {shlex.join(target_cmd)}", flush=True)
+
+    target_log_path = os.path.join(workdir, "crochet-target.log")
+    target_log = open(target_log_path, "w")
+
+    target_proc = subprocess.Popen(
+        target_cmd,
+        stdout=target_log,
+        stderr=target_log,
+    )
+
+    # Build the crochet-debug CLI command (for user convenience — we print it;
+    # we also launch it automatically if --connect is not set to false)
+    java_cli = _java_bin(inst=False)
+    cli_cmd = [
+        java_cli,
+        "--add-modules", "jdk.jdi",
+        "-jar", debug_jar,
+        "--attach",
+        f"--jdwp-port", str(jdwp_port),
+        f"--repl-port", str(repl_port),
+    ]
+
+    print(f"\n[run-test] Target JVM PID={target_proc.pid}", flush=True)
+    print(f"[run-test] Target log: {target_log_path}", flush=True)
+    print(f"\n[run-test] === READY ===", flush=True)
+    print(f"[run-test] JDWP port:  {jdwp_port}", flush=True)
+    print(f"[run-test] REPL port:  {repl_port}", flush=True)
+    print(f"\n[run-test] Connect the unified CLI (in another terminal):", flush=True)
+    print(f"  {shlex.join(cli_cmd)}", flush=True)
+    print(f"\n[run-test] Or pipe commands directly:", flush=True)
+    print(f"  echo 'back-step' | {shlex.join(cli_cmd)}", flush=True)
+
+    if not args.no_connect:
+        # Auto-connect: launch crochet-debug CLI attached to stdin/stdout of
+        # this process so the calling agent can drive it immediately.
+        print(f"\n[run-test] Auto-connecting crochet-debug CLI ...", flush=True)
+        try:
+            cli_proc = subprocess.run(
+                cli_cmd,
+                stdin=sys.stdin,
+                stdout=sys.stdout,
+                stderr=sys.stderr,
+            )
+        finally:
+            target_log.close()
+            if target_proc.poll() is None:
+                target_proc.terminate()
+                try:
+                    target_proc.wait(timeout=5)
+                except subprocess.TimeoutExpired:
+                    target_proc.kill()
+        return cli_proc.returncode if cli_proc else 0
+    else:
+        print(f"\n[run-test] --no-connect: not auto-connecting. Target is running.", flush=True)
+        print(f"[run-test] To stop the target: kill {target_proc.pid}", flush=True)
+        target_log.close()
+        return 0
+
+
+# ---------------------------------------------------------------------------
+# Main
+# ---------------------------------------------------------------------------
+
+def main():
+    parser = argparse.ArgumentParser(
+        prog="crochet-debug-d4j",
+        description="Defects4J ergonomic helper for the Crochet TTD debugger.",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog=__doc__,
+    )
+    sub = parser.add_subparsers(dest="subcmd", required=True)
+
+    # --- annotate ---
+    p_ann = sub.add_parser("annotate", help="Inject @TimeTravelBody and rebuild")
+    p_ann.add_argument("--workdir", required=True, help="Defects4J project working directory")
+    p_ann.add_argument("--class", dest="cls", default="", help="Fully-qualified class name")
+    p_ann.add_argument("--method", default="", help="Method name to annotate")
+    p_ann.add_argument("--test", default="", help="Failing test (for --auto-detect)")
+    p_ann.add_argument("--auto-detect", action="store_true",
+                       help="Run failing test, pick method from first stack frame")
+
+    # --- run-test ---
+    p_run = sub.add_parser("run-test", help="Launch test under Crochet + connect debugger")
+    p_run.add_argument("--workdir", required=True, help="Defects4J project working directory")
+    p_run.add_argument("--test", required=True, help="Test spec: pkg.ClassName::methodName")
+    p_run.add_argument("--port", type=int, default=5005, help="JDWP port (default 5005)")
+    p_run.add_argument("--repl-port", type=int, default=5006, help="Crochet REPL port (default 5006)")
+    p_run.add_argument("--inst-jdk", default="", help="Instrumented JDK path (default: $INST_JDK or /tmp/jdk-inst)")
+    p_run.add_argument("--crochet-agent", default="", help="crochet-agent jar path")
+    p_run.add_argument("--debug-jar", default="", help="crochet-debug standalone jar path")
+    p_run.add_argument("--no-connect", action="store_true",
+                       help="Launch target but do not auto-connect the CLI (print connect command instead)")
+
+    args = parser.parse_args()
+
+    if args.subcmd == "annotate":
+        sys.exit(cmd_annotate(args))
+    elif args.subcmd == "run-test":
+        sys.exit(cmd_run_test(args))
+    else:
+        parser.print_help()
+        sys.exit(1)
+
+
+if __name__ == "__main__":
+    main()

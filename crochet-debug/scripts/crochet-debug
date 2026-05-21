@@ -1,0 +1,43 @@
+#!/usr/bin/env bash
+# crochet-debug — wrapper that hides the --add-modules jdk.jdi incantation.
+#
+# Usage:
+#   crochet-debug [--jdwp-port N] [--repl-port N] [--attach] [--target <jar>]
+#
+# Environment:
+#   CROCHET_DEBUG_JAR   Path to crochet-debug standalone jar
+#                       (default: auto-detected from repo layout next to this script)
+#   JAVA_HOME           JDK to use (default: system java)
+#
+# Examples:
+#   crochet-debug --attach --jdwp-port 5005 --repl-port 5006
+#   crochet-debug --target myapp.jar --jdwp-port 5005 --repl-port 5006
+#   echo 'back-step' | crochet-debug --attach
+
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# Auto-detect crochet-debug jar from repo layout
+if [[ -n "${CROCHET_DEBUG_JAR:-}" && -f "$CROCHET_DEBUG_JAR" ]]; then
+    DEBUG_JAR="$CROCHET_DEBUG_JAR"
+else
+    # Script lives at crochet-debug/scripts/; jar is at crochet-debug/target/
+    CROCHET_DEBUG_DIR="$(dirname "$SCRIPT_DIR")"
+    DEBUG_JAR="$(ls "$CROCHET_DEBUG_DIR"/target/*-standalone.jar 2>/dev/null | tail -1 || true)"
+    if [[ -z "$DEBUG_JAR" ]]; then
+        DEBUG_JAR="$(ls "$CROCHET_DEBUG_DIR"/target/crochet-debug-*.jar 2>/dev/null | tail -1 || true)"
+    fi
+fi
+
+if [[ -z "$DEBUG_JAR" || ! -f "$DEBUG_JAR" ]]; then
+    echo "crochet-debug: ERROR: crochet-debug standalone jar not found." >&2
+    echo "  Build it with:  mvn package -pl crochet-debug -DskipTests" >&2
+    echo "  Or set:         CROCHET_DEBUG_JAR=/path/to/crochet-debug-*-standalone.jar" >&2
+    exit 1
+fi
+
+# Select java binary
+JAVA="${JAVA_HOME:+$JAVA_HOME/bin/}java"
+
+exec "$JAVA" --add-modules jdk.jdi -jar "$DEBUG_JAR" "$@"
