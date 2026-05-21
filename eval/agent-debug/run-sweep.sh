@@ -219,16 +219,25 @@ push_and_commit() {
     worktree_root="$(cd "$SCRIPT_DIR/../.." && pwd)"
     (
         cd "$worktree_root"
+        # Detect current branch dynamically so pushes land on the right branch.
+        local current_branch
+        current_branch=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "")
         # Force-add results (they are gitignored at the repo level but we have
         # a .gitignore override inside eval/agent-debug/results/)
         git add -f eval/agent-debug/results/ 2>/dev/null || true
         git add eval/agent-debug/results/ 2>/dev/null || true
+        # Also add model-specific results dirs (results-sonnet-4-6/, results-haiku-4-5/, etc.)
+        git add -f eval/agent-debug/results-*/ 2>/dev/null || true
+        git add eval/agent-debug/results-*/ 2>/dev/null || true
         local count
         count=$(git diff --cached --name-only | wc -l)
         if [[ "$count" -gt 0 ]]; then
-            git commit -m "feat(I.4): sweep results — incremental push ($(date '+%Y-%m-%d %H:%M'))" 2>/dev/null || true
-            git push origin unit/I.4-trial-sweep 2>/dev/null || true
-            log "  Incremental push: $count result file(s) committed"
+            local model_label="${MODEL:+${MODEL_SHORT}/}"
+            git commit -m "feat(III.3): ${model_label}sweep results — incremental push ($(date '+%Y-%m-%d %H:%M'))" 2>/dev/null || true
+            if [[ -n "$current_branch" ]]; then
+                git push origin "$current_branch" 2>/dev/null || true
+            fi
+            log "  Incremental push: $count result file(s) committed (branch=$current_branch)"
         fi
     ) 2>&1 | while IFS= read -r line; do echo "[sweep/push] $line" >&2; done || true
 }
