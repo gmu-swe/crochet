@@ -211,38 +211,48 @@ import org.junit.runner.notification.Failure;
  *
  * Wraps the target JUnit test inside Ttd.sessionWithRepl(...) so the Crochet
  * TTD debugger can connect without modifying test or library source files.
+ *
+ * The Crochet root object must be a user-class instance (not a JDK class or
+ * array) because Crochet uses klass-swap to track the object.  We use a simple
+ * wrapper (TestContext) so that Crochet can checkpoint it correctly.
  */
 public class RunUnderTtd {{
-    // Shared result written by the lambda, read after session ends.
-    private static volatile boolean testPassed = false;
+    /** Simple user-class instance used as the Crochet checkpoint root. */
+    static final class TestContext {{
+        volatile boolean passed = false;
+        String failureMessage = null;
+    }}
 
     public static void main(String[] args) throws Exception {{
         int replPort = args.length > 0 ? Integer.parseInt(args[0]) : 5006;
 
-        // The root object is the test class instance created by JUnit.
-        // We use the class object as a stable root for the Crochet snapshot;
-        // field-level state changes inside the test method are captured when
-        // Crochet instruments the heap transitively from the class.
-        Class<?> testClass = Class.forName("{test_class}");
+        TestContext ctx = new TestContext();
 
         // Bind REPL socket BEFORE entering session so the port is open early.
-        // crochet-debug-d4j run-test will connect after printing the port line.
+        // crochet-debug-d4j run-test connects after the target prints the port line.
         SocketRepl repl = SocketRepl.onPort(replPort);
         System.out.println("REPL listening on port " + replPort);
         System.out.flush();
 
-        Ttd.sessionWithRepl(testClass, repl, () -> {{
-            Request req = Request.method(testClass, "{test_method}");
-            Result result = new JUnitCore().run(req);
-            testPassed = result.wasSuccessful();
-            if (!result.wasSuccessful()) {{
-                for (Failure f : result.getFailures()) {{
-                    System.err.println("[run-under-ttd] FAILURE: " + f.getMessage());
+        Class<?> testClass = Class.forName("{test_class}");
+
+        Ttd.sessionWithRepl(ctx, repl, () -> {{
+            try {{
+                Request req = Request.method(testClass, "{test_method}");
+                Result result = new JUnitCore().run(req);
+                ctx.passed = result.wasSuccessful();
+                if (!result.wasSuccessful() && !result.getFailures().isEmpty()) {{
+                    ctx.failureMessage = result.getFailures().get(0).getMessage();
+                    System.err.println("[run-under-ttd] FAILURE: " + ctx.failureMessage);
                 }}
+            }} catch (Ttd.Quit q) {{
+                throw q;
+            }} catch (Exception e) {{
+                System.err.println("[run-under-ttd] EXCEPTION: " + e);
             }}
         }});
 
-        System.exit(testPassed ? 0 : 1);
+        System.exit(ctx.passed ? 0 : 1);
     }}
 }}
 """
@@ -297,6 +307,39 @@ def _get_d4j_classpath(workdir: str) -> str:
         for j in glob.glob(os.path.join(workdir, jar_glob)):
             candidates.append(j)
     return ":".join(candidates) if candidates else "."
+
+
+# ---------------------------------------------------------------------------
+# Maven system-dep injection for annotation compile classpath
+# ---------------------------------------------------------------------------
+
+def _inject_maven_system_dep(pom_path: str, jar_path: str) -> None:
+    """Inject a system-scope compile dependency for crochet-ttd into pom.xml.
+
+    Only injects once (idempotent check on groupId marker).
+    """
+    with open(pom_path) as f:
+        text = f.read()
+
+    marker = "crochet-ttd-annotation-system"
+    if marker in text:
+        return  # already injected
+
+    dep_xml = f"""
+        <!-- Injected by crochet-debug-d4j annotate for @TimeTravelBody compile -->
+        <dependency>
+            <groupId>edu.neu.crs.prl.crochet</groupId>
+            <artifactId>{marker}</artifactId>
+            <version>1.0</version>
+            <scope>system</scope>
+            <systemPath>{jar_path}</systemPath>
+        </dependency>"""
+
+    # Insert before </dependencies> (first occurrence)
+    text = text.replace("</dependencies>", dep_xml + "\n    </dependencies>", 1)
+    with open(pom_path, "w") as f:
+        f.write(text)
+    print(f"[annotate] Injected system-scope Maven dep for crochet-ttd in {pom_path}", flush=True)
 
 
 # ---------------------------------------------------------------------------
@@ -383,21 +426,78 @@ def cmd_annotate(args) -> int:
     if not ok:
         return 1
 
-    # Rebuild
+    # @TimeTravelBody is a compile-time annotation (RUNTIME retention) that requires
+    # crochet-ttd on the compile classpath.  D4J Ant/Maven builds do not know about
+    # crochet-ttd, so we:
+    #   1. Run `defects4j compile` first (the D4J classpath) to get existing classes.
+    #   2. Recompile only the annotated source file with our own javac that includes
+    #      the crochet-agent jar (which bundles TimeTravelBody) on the -cp.
+    #   3. Replace the compiled .class in the D4J output dir.
+    # This avoids patching D4J's build system at all.
+    agent_jar = args.crochet_agent if args.crochet_agent else _auto_detect_agent_jar()
+    debug_jar = args.debug_jar if args.debug_jar else _auto_detect_debug_jar()
+    # The standalone debug jar bundles crochet-ttd (including TimeTravelBody).
+    # Prefer it for the compile classpath; fall back to agent_jar.
+    ttd_jar = debug_jar or agent_jar
+
+    # Step 1: run defects4j compile to get baseline classes (ignore error — some
+    # projects may fail on the annotated file; we'll recompile it ourselves).
     d4j = _d4j_bin()
-    print("[annotate] Rebuilding with defects4j compile ...", flush=True)
+    print("[annotate] Running defects4j compile (baseline) ...", flush=True)
     result = subprocess.run(
         [d4j, "compile"],
         cwd=workdir,
         capture_output=True,
         text=True,
-        timeout=120,
+        timeout=180,
     )
     if result.returncode != 0:
-        print(f"[annotate] ERROR: defects4j compile failed:\n{result.stdout}\n{result.stderr}", flush=True)
-        return 1
+        print("[annotate] Note: baseline d4j compile reported errors (may be from annotated file); will recompile.", flush=True)
 
-    print("[annotate] Build successful. @TimeTravelBody injection complete.", flush=True)
+    # Step 2: recompile only the annotated source file with crochet-ttd on -cp
+    if ttd_jar and os.path.isfile(ttd_jar):
+        d4j_cp = _get_d4j_classpath(workdir)
+        # Also find the project classes dir to use as -cp for inter-class deps
+        classes_dirs = []
+        for subdir in ("target/classes", "build/classes"):
+            p = os.path.join(workdir, subdir)
+            if os.path.isdir(p):
+                classes_dirs.append(p)
+
+        extra_cp = ":".join(filter(None, [ttd_jar] + classes_dirs))
+        full_cp = ":".join(filter(None, [extra_cp, d4j_cp]))
+
+        javac_bin = os.path.join(JAVA_HOME, "bin", "javac") if JAVA_HOME else "javac"
+
+        # Determine the output directory for this file (mirror D4J layout)
+        out_dir = None
+        for subdir in ("target/classes", "build/classes"):
+            p = os.path.join(workdir, subdir)
+            if os.path.isdir(p):
+                out_dir = p
+                break
+        if not out_dir:
+            out_dir = os.path.join(workdir, "target", "classes")
+            os.makedirs(out_dir, exist_ok=True)
+
+        javac_cmd = [
+            javac_bin,
+            "-cp", full_cp,
+            "-d", out_dir,
+            "-source", "8", "-target", "8",
+            source,
+        ]
+        print(f"[annotate] Recompiling annotated file: {shlex.join(javac_cmd)}", flush=True)
+        recompile = subprocess.run(javac_cmd, capture_output=True, text=True)
+        if recompile.returncode != 0:
+            print(f"[annotate] ERROR: recompile failed:\n{recompile.stderr}", flush=True)
+            return 1
+        print("[annotate] Recompile OK.", flush=True)
+    else:
+        print("[annotate] WARNING: crochet-agent jar not found; skipping @TimeTravelBody recompile.", flush=True)
+        print("[annotate] Pass --crochet-agent <path> or set CROCHET_AGENT_JAR.", flush=True)
+
+    print("[annotate] @TimeTravelBody injection complete.", flush=True)
     return 0
 
 
@@ -537,6 +637,8 @@ def main():
     p_ann.add_argument("--test", default="", help="Failing test (for --auto-detect)")
     p_ann.add_argument("--auto-detect", action="store_true",
                        help="Run failing test, pick method from first stack frame")
+    p_ann.add_argument("--crochet-agent", default="", help="crochet-agent jar path (for compile classpath)")
+    p_ann.add_argument("--debug-jar", default="", help="crochet-debug standalone jar path (alternative to --crochet-agent)")
 
     # --- run-test ---
     p_run = sub.add_parser("run-test", help="Launch test under Crochet + connect debugger")
