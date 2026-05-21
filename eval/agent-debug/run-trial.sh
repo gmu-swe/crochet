@@ -402,15 +402,16 @@ CLAUDE_CMD=(
     --add-dir "$BUGGY_WORKDIR"
 )
 
-# Append seed if provided.  The claude CLI does not have a --seed flag but does
-# accept --session-id; we use that to force a fresh session per seed so parallel
-# prescreen runs with different seeds produce independent samples.
+# Append seed if provided.  The claude CLI accepts --session-id with a UUID;
+# we generate a deterministic UUID from the run parameters so each (bug, condition,
+# seed) triple produces a distinct, reproducible session that won't reuse cached
+# session state from prior runs.
 if [[ -n "$SEED" ]]; then
-    # Write seed into a temp file that the agent gets as additional context so
-    # it doesn't reuse any cached reasoning.  We also pass a unique session-id
-    # to prevent the CLI from reusing a previous session's state.
-    echo "Run seed: $SEED (run-id: ${BUG_ID}-${CONDITION}-seed${SEED})" > "$WORKDIR/seed.txt"
-    CLAUDE_CMD+=(--session-id "${BUG_ID}-${CONDITION}-seed${SEED}")
+    # Generate a UUID5-like hex string from bug+condition+seed using md5
+    SEED_UUID=$(printf '%s-%s-%s' "$BUG_ID" "$CONDITION" "$SEED" | md5sum | awk '{print $1}' | \
+        sed 's/^\(........\)\(....\)\(....\)\(....\)\(............\)$/\1-\2-\3-\4-\5/')
+    echo "Run seed: $SEED (session: $SEED_UUID)" > "$WORKDIR/seed.txt"
+    CLAUDE_CMD+=(--session-id "$SEED_UUID")
 fi
 
 log "  Running: ${CLAUDE_CMD[*]} < '$PROMPT_FILE'"
