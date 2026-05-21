@@ -177,8 +177,12 @@ apply_build_fix() {
     if [[ "$PROJECT" == "Math" ]]; then
         local buildxml="$workdir/build.xml"
         if [[ -f "$buildxml" ]]; then
+            # Handle attribute style: source="1.x"
             sed -i 's/source="1\.[56]"/source="1.8"/g' "$buildxml"
             sed -i 's/target="1\.[56]"/target="1.8"/g' "$buildxml"
+            # Handle property style: value="1.x" on compile.source / compile.target lines
+            sed -i '/compile\.source/s/value="1\.[56]"/value="1.8"/g' "$buildxml"
+            sed -i '/compile\.target/s/value="1\.[56]"/value="1.8"/g' "$buildxml"
         fi
         # Add nashorn + asm jars to defects4j ant lib if not present
         local antlib="$DEFECTS4J_HOME/major/lib/ant"
@@ -206,18 +210,31 @@ apply_build_fix() {
         fi
     fi
 
-    # Closure projects: bump source/target in build.xml
+    # Closure projects: bump source/target in build.xml and rhino props
     if [[ "$PROJECT" == "Closure" ]]; then
         local buildxml="$workdir/build.xml"
         if [[ -f "$buildxml" ]]; then
             sed -i 's/source="1\.[56]"/source="1.8"/g' "$buildxml"
             sed -i 's/target="1\.[56]"/target="1.8"/g' "$buildxml"
-            # Also patch lib/rhino/build.properties if exists
-            local rhinoprops="$workdir/lib/rhino/build.properties"
-            if [[ -f "$rhinoprops" ]]; then
-                sed -i 's/source-level=1\.[56]/source-level=1.8/g' "$rhinoprops"
-            fi
+            # Handle property style: value="1.x" on javac.source / javac.target lines
+            sed -i '/javac\.source/s/value="1\.[56]"/value="1.8"/g' "$buildxml"
+            sed -i '/javac\.target/s/value="1\.[56]"/value="1.8"/g' "$buildxml"
         fi
+        # Patch lib/rhino/build.properties — handles both = and space separators
+        local rhinoprops="$workdir/lib/rhino/build.properties"
+        if [[ -f "$rhinoprops" ]]; then
+            # "source-level=1.6" style
+            sed -i 's/source-level=1\.[56]/source-level=1.8/g' "$rhinoprops"
+            sed -i 's/target-jvm=1\.[56]/target-jvm=1.8/g' "$rhinoprops"
+            # "source-level 1.6" style (space separator)
+            sed -i 's/source-level 1\.[56]/source-level 1.8/g' "$rhinoprops"
+            sed -i 's/target-jvm 1\.[56]/target-jvm 1.8/g' "$rhinoprops"
+        fi
+        # Also patch all nested rhino build.xml files that have source/target attrs
+        find "$workdir/lib/rhino" -name "build.xml" 2>/dev/null | while read -r rxml; do
+            sed -i 's/source="1\.[56]"/source="1.8"/g' "$rxml"
+            sed -i 's/target="1\.[56]"/target="1.8"/g' "$rxml"
+        done
     fi
 }
 
@@ -280,8 +297,19 @@ PROMPT_TEMPLATE="$PROMPTS_DIR/condition-${CONDITION}.md"
 [[ -f "$PROMPT_TEMPLATE" ]] || die "Prompt template not found: $PROMPT_TEMPLATE"
 
 # Locate crochet artifacts (for C3)
-CROCHET_AGENT_JAR="$CROCHET_REPO/crochet-agent/target/crochet-agent-1.0.0-SNAPSHOT.jar"
-CROCHET_DEBUG_JAR="$CROCHET_REPO/crochet-debug/target/crochet-debug-1.0.0-SNAPSHOT-standalone.jar"
+# Find the actual built agent jar (supports 1.0.0-SNAPSHOT and 2.0.0-SNAPSHOT)
+_find_jar() {
+    local dir="$1" pattern="$2"
+    # Prefer 2.x over 1.x
+    local found
+    found=$(find "$dir" -maxdepth 1 -name "$pattern" 2>/dev/null | sort -rV | head -1)
+    echo "$found"
+}
+CROCHET_AGENT_JAR="$(_find_jar "$CROCHET_REPO/crochet-agent/target" "crochet-agent-*-SNAPSHOT.jar" | grep -v original || true)"
+CROCHET_DEBUG_JAR="$(_find_jar "$CROCHET_REPO/crochet-debug/target" "crochet-debug-*-SNAPSHOT-standalone.jar" || true)"
+# Fallback to hardcoded if find returned nothing
+[[ -z "$CROCHET_AGENT_JAR" ]] && CROCHET_AGENT_JAR="$CROCHET_REPO/crochet-agent/target/crochet-agent-2.0.0-SNAPSHOT.jar"
+[[ -z "$CROCHET_DEBUG_JAR" ]] && CROCHET_DEBUG_JAR="$CROCHET_REPO/crochet-debug/target/crochet-debug-2.0.0-SNAPSHOT-standalone.jar"
 
 PROMPT_FILE="$WORKDIR/prompt.md"
 sed \
