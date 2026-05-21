@@ -230,21 +230,25 @@ apply_build_fix() {
             sed -i 's/ant\.build\.javac\.source" value="1\.[56]"/ant.build.javac.source" value="1.8"/g' "$buildxml"
             sed -i 's/ant\.build\.javac\.target" value="1\.[56]"/ant.build.javac.target" value="1.8"/g' "$buildxml"
         fi
-        # Patch lib/rhino/build.properties — handles both = and space separators
-        local rhinoprops="$workdir/lib/rhino/build.properties"
-        if [[ -f "$rhinoprops" ]]; then
-            # "source-level=1.6" style
-            sed -i 's/source-level=1\.[56]/source-level=1.8/g' "$rhinoprops"
-            sed -i 's/target-jvm=1\.[56]/target-jvm=1.8/g' "$rhinoprops"
-            # "source-level 1.6" style (space separator)
-            sed -i 's/source-level 1\.[56]/source-level 1.8/g' "$rhinoprops"
-            sed -i 's/target-jvm 1\.[56]/target-jvm 1.8/g' "$rhinoprops"
+        # Patch all build.properties files under lib/rhino (any depth)
+        # Closure has two rhino layouts:
+        #   (a) lib/rhino/build.properties (older bugs)
+        #   (b) lib/rhino/src/mozilla/js/rhino/build.properties (newer bugs)
+        if [[ -d "$workdir/lib/rhino" ]]; then
+            find "$workdir/lib/rhino" -name "build.properties" 2>/dev/null | while read -r rhinoprops; do
+                sed -i 's/source-level=1\.[56]/source-level=1.8/g' "$rhinoprops"
+                sed -i 's/target-jvm=1\.[56]/target-jvm=1.8/g' "$rhinoprops"
+                sed -i 's/source-level 1\.[56]/source-level 1.8/g' "$rhinoprops"
+                sed -i 's/target-jvm 1\.[56]/target-jvm 1.8/g' "$rhinoprops"
+            done || true
         fi
         # Also patch all nested rhino build.xml files that have source/target attrs
-        find "$workdir/lib/rhino" -name "build.xml" 2>/dev/null | while read -r rxml; do
-            sed -i 's/source="1\.[56]"/source="1.8"/g' "$rxml"
-            sed -i 's/target="1\.[56]"/target="1.8"/g' "$rxml"
-        done
+        if [[ -d "$workdir/lib/rhino" ]]; then
+            find "$workdir/lib/rhino" -name "build.xml" 2>/dev/null | while read -r rxml; do
+                sed -i 's/source="1\.[56]"/source="1.8"/g' "$rxml"
+                sed -i 's/target="1\.[56]"/target="1.8"/g' "$rxml"
+            done || true
+        fi
     fi
 
     # JacksonDatabind projects: bump source/target in maven-build.xml
