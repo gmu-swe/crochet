@@ -1,0 +1,390 @@
+{
+  "phase": "II.1",
+  "selection_date": "2026-05-21",
+  "projects_considered": ["Closure", "JacksonDatabind", "Jsoup"],
+  "projects_excluded": {
+    "Chart": "Requires SVN which is not installed; D4J uses SVN repos for Chart",
+    "Mockito": "Uses Gradle 4.9 which fails with JDK 21 (ExceptionInInitializerError in Groovy DSL)",
+    "Lang": "Phase I showed ceiling effect — all bugs passed under C1; excluded per Phase II brief",
+    "Math": "Phase I showed ceiling effect — all bugs passed under C1; excluded per Phase II brief",
+    "Time": "Phase I showed ceiling effect — all bugs passed under C1; excluded per Phase II brief"
+  },
+  "selection_criteria": {
+    "multi_method_fix": "Prefer bugs whose D4J modified_classes list has ≥2 classes (multi-method fix required)",
+    "patch_complexity": "Prefer bugs with ≥6 changed lines in canonical patch (not single-line trivial fix)",
+    "symptom_type": "Prefer 'wrong output under condition X' over 'NPE at method Y' (non-obvious root cause)",
+    "jdk21_compat": "Verified all candidates compile and reproduce under JDK 21 Temurin (see build_fix notes)"
+  },
+  "jdk21_build_fixes": {
+    "Closure": [
+      "bump source/target from 1.6 to 1.8 in build.xml (source= and target= attributes)",
+      "bump ant.build.javac.source/ant.build.javac.target properties in build.xml from 1.6 to 1.8",
+      "bump source-level/target-jvm in lib/rhino/build.properties from 1.6 to 1.8",
+      "bump source/target in lib/rhino/src/build.xml and nested rhino build.xml files"
+    ],
+    "JacksonDatabind": [
+      "bump source/target from 1.6 to 1.8 in maven-build.xml (both compile and compile-tests targets)"
+    ],
+    "Jsoup": [
+      "bump source/target from 1.6/1.7 to 1.8 in maven-build.xml (both compile and compile-tests targets)"
+    ]
+  },
+  "candidates": [
+    {
+      "id": "Closure-30",
+      "project": "Closure",
+      "bug_number": 30,
+      "buggy_sha": "3f39c07c59e0ef0eefca61a8e49d5f81acf17e57",
+      "failing_test": "com.google.javascript.jscomp.FlowSensitiveInlineVariablesTest::testInlineAcrossSideEffect1",
+      "fix_summary": "FlowSensitiveInlineVariables uses traverseRoots instead of traverse, causing it to inline across side-effect boundaries when externs are processed; MustBeReachingVariableDef incorrectly marks unknown dependencies instead of checking isDeclared, leading to missed inlining guards",
+      "canonical_fix_files": [
+        "src/com/google/javascript/jscomp/FlowSensitiveInlineVariables.java",
+        "src/com/google/javascript/jscomp/MustBeReachingVariableDef.java"
+      ],
+      "difficulty_rationale": "Two-class fix across data-flow analysis and traversal logic; the symptom (wrong inlined expression) requires tracing through the traversal root selection and the reaching-definition lattice to find either cause",
+      "jdk21_build_fix": "bump source/target in build.xml and lib/rhino/build.properties; bump ant.build.javac.* properties in build.xml"
+    },
+    {
+      "id": "Closure-46",
+      "project": "Closure",
+      "bug_number": 46,
+      "buggy_sha": "LOOKUP_FROM_CSV",
+      "failing_test": "com.google.javascript.rhino.jstype.JSTypeTest::testRecordTypeLeastSuperType2",
+      "fix_summary": "JSType.getLeastSupertype incorrectly computes the least supertype of record types by not considering structural subtyping; the method returns a union type rather than an appropriate record supertype in certain configurations",
+      "canonical_fix_files": [
+        "src/com/google/javascript/rhino/jstype/RecordType.java"
+      ],
+      "difficulty_rationale": "Single class but 16 new lines added to implement structural subtyping logic; correct behavior requires understanding type-lattice semantics which are non-obvious without deep Closure type-system knowledge",
+      "jdk21_build_fix": "bump source/target in build.xml and lib/rhino/build.properties; bump ant.build.javac.* properties"
+    },
+    {
+      "id": "Closure-76",
+      "project": "Closure",
+      "bug_number": 76,
+      "buggy_sha": "LOOKUP_FROM_CSV",
+      "failing_test": "com.google.javascript.jscomp.DeadAssignmentsEliminationTest::testInExpression2",
+      "fix_summary": "DeadAssignmentsElimination incorrectly removes assignments that appear dead but are used in compound expressions; the liveness analysis fails to account for the expression evaluation order in certain control-flow patterns",
+      "canonical_fix_files": [
+        "src/com/google/javascript/jscomp/DeadAssignmentsElimination.java"
+      ],
+      "difficulty_rationale": "Single class, 37 lines removed (large structural refactoring of liveness check); the wrong-output symptom requires understanding how expression-level liveness differs from statement-level liveness in the dataflow lattice",
+      "jdk21_build_fix": "bump source/target in build.xml and lib/rhino/build.properties; bump ant.build.javac.* properties"
+    },
+    {
+      "id": "Closure-85",
+      "project": "Closure",
+      "bug_number": 85,
+      "buggy_sha": "LOOKUP_FROM_CSV",
+      "failing_test": "com.google.javascript.jscomp.UnreachableCodeEliminationTest::testCascadedRemovalOfUnlessUnconditonalJumps",
+      "fix_summary": "UnreachableCodeElimination prematurely removes code that becomes unreachable only after cascaded earlier removals; the pass does not re-examine predecessor blocks after a removal, missing a second round of unreachable code",
+      "canonical_fix_files": [
+        "src/com/google/javascript/jscomp/UnreachableCodeElimination.java"
+      ],
+      "difficulty_rationale": "Cascaded pass-interaction bug; wrong output only manifests when two removals are needed in sequence — understanding this requires reasoning about the fixed-point convergence of the pass over the CFG",
+      "jdk21_build_fix": "bump source/target in build.xml and lib/rhino/build.properties; bump ant.build.javac.* properties"
+    },
+    {
+      "id": "Closure-103",
+      "project": "Closure",
+      "bug_number": 103,
+      "buggy_sha": "LOOKUP_FROM_CSV",
+      "failing_test": "com.google.javascript.jscomp.CheckUnreachableCodeTest::testInstanceOfThrowsException",
+      "fix_summary": "CheckUnreachableCode incorrectly flags instanceof expressions that may throw as unreachable code, missing that the exception path makes the subsequent code reachable",
+      "canonical_fix_files": [
+        "src/com/google/javascript/jscomp/CheckUnreachableCode.java",
+        "src/com/google/javascript/jscomp/ControlFlowAnalysis.java"
+      ],
+      "difficulty_rationale": "Two-class fix across CFG analysis and checker; the bug involves the interaction between exception-flow edges in the CFG and the reachability checker's traversal",
+      "jdk21_build_fix": "bump source/target in build.xml and lib/rhino/build.properties; bump ant.build.javac.* properties"
+    },
+    {
+      "id": "Closure-110",
+      "project": "Closure",
+      "bug_number": 110,
+      "buggy_sha": "LOOKUP_FROM_CSV",
+      "failing_test": "com.google.javascript.jscomp.ScopedAliasesTest::testHoistedFunctionDeclaration",
+      "fix_summary": "ScopedAliases transformation fails to handle hoisted function declarations inside goog.scope blocks, producing a wrong-scope binding when function declarations are lifted above their alias context",
+      "canonical_fix_files": [
+        "src/com/google/javascript/jscomp/ScopedAliases.java",
+        "src/com/google/javascript/jscomp/NodeUtil.java"
+      ],
+      "difficulty_rationale": "Two-class fix; requires understanding how function declaration hoisting interacts with scope transformation — non-obvious because the bug only manifests for hoisted declarations, not function expressions",
+      "jdk21_build_fix": "bump source/target in build.xml and lib/rhino/build.properties; bump ant.build.javac.* properties"
+    },
+    {
+      "id": "Closure-137",
+      "project": "Closure",
+      "bug_number": 137,
+      "buggy_sha": "LOOKUP_FROM_CSV",
+      "failing_test": "com.google.javascript.jscomp.MakeDeclaredNamesUniqueTest::testOnlyInversion3",
+      "fix_summary": "MakeDeclaredNamesUnique ContextualRenameInverter extends the wrong callback interface (ScopedCallback instead of AbstractPostOrderCallback), causing it to be invoked at scope entry/exit in addition to node visits, which corrupts the rename-inversion state machine",
+      "canonical_fix_files": [
+        "src/com/google/javascript/jscomp/MakeDeclaredNamesUnique.java",
+        "src/com/google/javascript/jscomp/RenameVars.java",
+        "src/com/google/javascript/jscomp/NodeTraversal.java"
+      ],
+      "difficulty_rationale": "Three-class fix involving a subtle callback interface mismatch; the wrong interface causes state corruption in the traversal that only manifests under inversion, not during the forward pass",
+      "jdk21_build_fix": "bump source/target in build.xml and lib/rhino/build.properties; bump ant.build.javac.* properties"
+    },
+    {
+      "id": "Closure-148",
+      "project": "Closure",
+      "bug_number": 148,
+      "buggy_sha": "LOOKUP_FROM_CSV",
+      "failing_test": "com.google.javascript.jscomp.PeepholeFoldConstantsTest::testFoldTypeof",
+      "fix_summary": "PeepholeFoldConstants incorrectly folds typeof expressions involving names that might be undeclared; the fold is unsafe because typeof on an undeclared variable returns 'undefined' without throwing, but folding it treats the name as if it were declared",
+      "canonical_fix_files": [
+        "src/com/google/javascript/jscomp/PeepholeFoldConstants.java",
+        "src/com/google/javascript/jscomp/NodeUtil.java"
+      ],
+      "difficulty_rationale": "Two-class fix with 225 lines changed total (largest patch in corpus); the wrong-output involves understanding JavaScript typeof semantics with undeclared identifiers — a subtle semantic distinction that requires JS spec knowledge",
+      "jdk21_build_fix": "bump source/target in build.xml and lib/rhino/build.properties; bump ant.build.javac.* properties"
+    },
+    {
+      "id": "Closure-155",
+      "project": "Closure",
+      "bug_number": 155,
+      "buggy_sha": "LOOKUP_FROM_CSV",
+      "failing_test": "com.google.javascript.jscomp.InlineVariablesTest::testArgumentsModifiedInInnerFunction",
+      "fix_summary": "InlineVariables incorrectly inlines a variable across a closure boundary when the variable's value depends on the 'arguments' object, which is function-scoped and can be modified by an inner function",
+      "canonical_fix_files": [
+        "src/com/google/javascript/jscomp/InlineVariables.java",
+        "src/com/google/javascript/jscomp/ReferenceCollectingCallback.java",
+        "src/com/google/javascript/jscomp/FlowSensitiveInlineVariables.java"
+      ],
+      "difficulty_rationale": "Three-class fix; the incorrect inline only manifests when 'arguments' is used in an inner closure — requires understanding how the arguments object escapes closure boundaries and why alias analysis fails here",
+      "jdk21_build_fix": "bump source/target in build.xml and lib/rhino/build.properties; bump ant.build.javac.* properties"
+    },
+    {
+      "id": "Closure-163",
+      "project": "Closure",
+      "bug_number": 163,
+      "buggy_sha": "LOOKUP_FROM_CSV",
+      "failing_test": "com.google.javascript.jscomp.CrossModuleMethodMotionTest::testIssue600b",
+      "fix_summary": "CrossModuleMethodMotion incorrectly moves methods across module boundaries when method stubs and prototype assignments are involved, producing wrong module-load ordering that can cause runtime errors",
+      "canonical_fix_files": [
+        "src/com/google/javascript/jscomp/CrossModuleMethodMotion.java",
+        "src/com/google/javascript/jscomp/JSModuleGraph.java"
+      ],
+      "difficulty_rationale": "Two-class fix with 180 lines changed; module dependency graph reasoning is required to understand when method motion is unsafe — the test failure involves wrong output for a multi-module program",
+      "jdk21_build_fix": "bump source/target in build.xml and lib/rhino/build.properties; bump ant.build.javac.* properties"
+    },
+    {
+      "id": "JacksonDatabind-10",
+      "project": "JacksonDatabind",
+      "bug_number": 10,
+      "buggy_sha": "LOOKUP_FROM_CSV",
+      "failing_test": "com.fasterxml.jackson.databind.ser.TestAnyGetter::testIssue705",
+      "fix_summary": "ObjectMapper with @JsonAnyGetter produces wrong output when combining with a custom serializer override — the any-getter serialization conflicts with the custom serializer because the type resolution path doesn't account for the override during any-property serialization",
+      "canonical_fix_files": [
+        "src/main/java/com/fasterxml/jackson/databind/ser/BeanPropertyWriter.java",
+        "src/main/java/com/fasterxml/jackson/databind/ser/impl/AnyGetterWriter.java"
+      ],
+      "difficulty_rationale": "Two-class fix in the serialization pipeline; the wrong output only manifests for the any-getter path when a custom serializer is present — requires understanding the priority ordering in the serializer resolution chain",
+      "jdk21_build_fix": "bump source/target from 1.6 to 1.8 in maven-build.xml"
+    },
+    {
+      "id": "JacksonDatabind-22",
+      "project": "JacksonDatabind",
+      "bug_number": 22,
+      "buggy_sha": "LOOKUP_FROM_CSV",
+      "failing_test": "com.fasterxml.jackson.databind.ser.TestJsonValue::testJsonValueWithCustomOverride",
+      "fix_summary": "@JsonValue serializer ignores custom serializer overrides when the @JsonValue method's return type matches a registered module serializer; the wrong serializer is selected because type resolution does not check for custom overrides before falling back to @JsonValue",
+      "canonical_fix_files": [
+        "src/main/java/com/fasterxml/jackson/databind/ser/std/JsonValueSerializer.java",
+        "src/main/java/com/fasterxml/jackson/databind/ser/BasicSerializerFactory.java"
+      ],
+      "difficulty_rationale": "Two-class fix in the serializer factory; the wrong output only appears when @JsonValue and a custom serializer coexist — understanding the serializer priority/delegation chain requires reading multiple factory methods",
+      "jdk21_build_fix": "bump source/target from 1.6 to 1.8 in maven-build.xml"
+    },
+    {
+      "id": "JacksonDatabind-31",
+      "project": "JacksonDatabind",
+      "bug_number": 31,
+      "buggy_sha": "LOOKUP_FROM_CSV",
+      "failing_test": "com.fasterxml.jackson.databind.util.TestTokenBuffer::testOutputContext",
+      "fix_summary": "TokenBuffer does not maintain correct output context (field name / array state) when nested structures are written, causing the output context to desynchronize and report wrong state for deeply nested JSON",
+      "canonical_fix_files": [
+        "src/main/java/com/fasterxml/jackson/databind/util/TokenBuffer.java"
+      ],
+      "difficulty_rationale": "Single class but 62 lines changed; the context desynchronization is subtle — it only manifests under specific nesting patterns because the writeStartObject/writeStartArray methods share context-update logic that has an off-by-one in depth tracking",
+      "jdk21_build_fix": "bump source/target from 1.6 to 1.8 in maven-build.xml"
+    },
+    {
+      "id": "JacksonDatabind-44",
+      "project": "JacksonDatabind",
+      "bug_number": 44,
+      "buggy_sha": "LOOKUP_FROM_CSV",
+      "failing_test": "com.fasterxml.jackson.databind.jsontype.TestSubtypes::testIssue1125WithDefault",
+      "fix_summary": "Default typing combined with @JsonSubTypes annotations produces incorrect type-id when the default type info is present on the base class but the subtype overrides @JsonTypeName — the type resolver uses the wrong annotation-lookup path for the default type case",
+      "canonical_fix_files": [
+        "src/main/java/com/fasterxml/jackson/databind/jsontype/impl/StdTypeResolverBuilder.java"
+      ],
+      "difficulty_rationale": "Single class, 26 deleted lines; the bug involves the interaction between default typing config and per-class subtype annotations — the wrong-output only manifests for the specific combination of @JsonSubTypes + defaultTyping + custom @JsonTypeName",
+      "jdk21_build_fix": "bump source/target from 1.6 to 1.8 in maven-build.xml"
+    },
+    {
+      "id": "JacksonDatabind-53",
+      "project": "JacksonDatabind",
+      "bug_number": 53,
+      "buggy_sha": "LOOKUP_FROM_CSV",
+      "failing_test": "com.fasterxml.jackson.databind.jsontype.TypeRefinementForMap1215Test::testMapRefinement",
+      "fix_summary": "Type refinement for Map types does not correctly handle the case where a declared Map subtype is narrowed via @JsonDeserialize(as=), causing the refined type to be ignored and the wrong deserializer to be selected",
+      "canonical_fix_files": [
+        "src/main/java/com/fasterxml/jackson/databind/type/MapType.java",
+        "src/main/java/com/fasterxml/jackson/databind/ObjectMapper.java"
+      ],
+      "difficulty_rationale": "Two-class fix with 93 lines changed; requires understanding type refinement vs type coercion in the deserializer pipeline — the wrong type is silently used without error, making the bug hard to localize without understanding type resolution ordering",
+      "jdk21_build_fix": "bump source/target from 1.6 to 1.8 in maven-build.xml"
+    },
+    {
+      "id": "JacksonDatabind-60",
+      "project": "JacksonDatabind",
+      "bug_number": 60,
+      "buggy_sha": "LOOKUP_FROM_CSV",
+      "failing_test": "com.fasterxml.jackson.databind.jsontype.TestDefaultWithCreators::testWithCreatorAndJsonValue",
+      "fix_summary": "Default typing with @JsonCreator and @JsonValue produces incorrect round-trip serialization; the type id is embedded by the @JsonValue serializer but not consumed by the @JsonCreator deserializer because the type wrapper is not properly handled in the creator dispatch path",
+      "canonical_fix_files": [
+        "src/main/java/com/fasterxml/jackson/databind/deser/BeanDeserializerFactory.java"
+      ],
+      "difficulty_rationale": "Single class, 88 deleted lines (large refactoring); the round-trip failure requires understanding how type ids interact with @JsonCreator delegation — non-obvious because @JsonValue serialization and @JsonCreator deserialization are separate subsystems",
+      "jdk21_build_fix": "bump source/target from 1.6 to 1.8 in maven-build.xml"
+    },
+    {
+      "id": "JacksonDatabind-68",
+      "project": "JacksonDatabind",
+      "bug_number": 68,
+      "buggy_sha": "LOOKUP_FROM_CSV",
+      "failing_test": "com.fasterxml.jackson.databind.struct.SingleValueAsArrayTest::testSuccessfulDeserializationOfObjectWithChainedArrayCreators",
+      "fix_summary": "Deserialization of single-value-as-array format with chained array @JsonCreators fails because the unwrapping logic does not handle the case where the creator itself expects an array — the unwrap is applied one level too many",
+      "canonical_fix_files": [
+        "src/main/java/com/fasterxml/jackson/databind/deser/BeanDeserializer.java"
+      ],
+      "difficulty_rationale": "Single class, 66 lines changed; the wrong deserialization only manifests for chained array creators — requires understanding the interaction between single-value-as-array unwrapping and array-mode creators, which involves two independent feature flags",
+      "jdk21_build_fix": "bump source/target from 1.6 to 1.8 in maven-build.xml"
+    },
+    {
+      "id": "JacksonDatabind-79",
+      "project": "JacksonDatabind",
+      "bug_number": 79,
+      "buggy_sha": "LOOKUP_FROM_CSV",
+      "failing_test": "com.fasterxml.jackson.databind.objectid.AlwaysAsReferenceFirstTest::testIssue1607",
+      "fix_summary": "ObjectIdGenerator with ALWAYS_AS_REFERENCE_FIRST policy fails when the first reference comes before the definition in the JSON stream — the id resolver does not defer the reference lookup and instead throws UnresolvedForwardReference too early",
+      "canonical_fix_files": [
+        "src/main/java/com/fasterxml/jackson/databind/introspect/JacksonAnnotationIntrospector.java",
+        "src/main/java/com/fasterxml/jackson/databind/introspect/ObjectIdInfo.java",
+        "src/main/java/com/fasterxml/jackson/databind/ser/std/BeanSerializerBase.java"
+      ],
+      "difficulty_rationale": "Three-class fix in the object-id subsystem; the failure mode (UnresolvedForwardReference) looks like an ordering problem but the root cause is in the ALWAYS_AS_REFERENCE_FIRST annotation handling which changes how the first occurrence is written",
+      "jdk21_build_fix": "bump source/target from 1.6 to 1.8 in maven-build.xml"
+    },
+    {
+      "id": "Jsoup-22",
+      "project": "Jsoup",
+      "bug_number": 22,
+      "buggy_sha": "LOOKUP_FROM_CSV",
+      "failing_test": "org.jsoup.nodes.ElementTest::elementIsNotASiblingOfItself",
+      "fix_summary": "Element.siblingElements() includes the element itself in the returned sibling list; the sibling traversal incorrectly includes the element being queried because the self-exclusion check compares by position rather than identity",
+      "canonical_fix_files": [
+        "src/main/java/org/jsoup/nodes/Element.java",
+        "src/main/java/org/jsoup/nodes/Node.java",
+        "src/main/java/org/jsoup/select/Elements.java"
+      ],
+      "difficulty_rationale": "Three-class fix; the incorrect self-inclusion is non-obvious because position-based vs identity-based comparisons produce the same result in most cases — only fails when there are duplicate text nodes or when the index computation accounts for the element itself",
+      "jdk21_build_fix": "bump source/target from 1.7 to 1.8 in maven-build.xml"
+    },
+    {
+      "id": "Jsoup-28",
+      "project": "Jsoup",
+      "bug_number": 28,
+      "buggy_sha": "LOOKUP_FROM_CSV",
+      "failing_test": "org.jsoup.nodes.EntitiesTest::unescape",
+      "fix_summary": "HTML entity unescaping produces wrong output for certain numeric character references and named entities because the entity trie lookup has incorrect handling for the boundary between decimal and hexadecimal references",
+      "canonical_fix_files": [
+        "src/main/java/org/jsoup/nodes/Entities.java",
+        "src/main/java/org/jsoup/parser/Tokeniser.java",
+        "src/main/java/org/jsoup/parser/TokeniserState.java"
+      ],
+      "difficulty_rationale": "Three-class fix with 64 lines changed; the wrong unescaping only manifests for specific entity sequences at the boundary of the trie — requires understanding the HTML5 tokenization spec for character references, which is non-trivial",
+      "jdk21_build_fix": "bump source/target from 1.7 to 1.8 in maven-build.xml"
+    },
+    {
+      "id": "Jsoup-52",
+      "project": "Jsoup",
+      "bug_number": 52,
+      "buggy_sha": "LOOKUP_FROM_CSV",
+      "failing_test": "org.jsoup.nodes.DocumentTest::testMetaCharsetUpdateXmlNoCharset",
+      "fix_summary": "Document.updateMetaCharsetElement() for XML mode fails to correctly set the charset declaration when no charset attribute exists — the method finds the xml declaration node but uses the wrong update path, leaving the declaration unchanged",
+      "canonical_fix_files": [
+        "src/main/java/org/jsoup/nodes/Document.java",
+        "src/main/java/org/jsoup/nodes/XmlDeclaration.java",
+        "src/main/java/org/jsoup/nodes/Attribute.java"
+      ],
+      "difficulty_rationale": "Three-class fix; the failure (charset not updated) requires understanding how XML declaration nodes differ from HTML meta elements and which code path is taken for each — non-obvious because HTML and XML modes share the updateMetaCharset API",
+      "jdk21_build_fix": "bump source/target from 1.7 to 1.8 in maven-build.xml"
+    },
+    {
+      "id": "Jsoup-56",
+      "project": "Jsoup",
+      "bug_number": 56,
+      "buggy_sha": "LOOKUP_FROM_CSV",
+      "failing_test": "org.jsoup.nodes.DocumentTypeTest::testRoundTrip",
+      "fix_summary": "DocumentType node round-trips incorrectly because the output serializer omits the system identifier when the public identifier is present but the system identifier is empty string vs null; the distinction is not preserved through parse→serialize",
+      "canonical_fix_files": [
+        "src/main/java/org/jsoup/nodes/DocumentType.java",
+        "src/main/java/org/jsoup/parser/TreeBuilder.java",
+        "src/main/java/org/jsoup/parser/HtmlTreeBuilder.java",
+        "src/main/java/org/jsoup/parser/HtmlTreeBuilderState.java",
+        "src/main/java/org/jsoup/parser/Token.java"
+      ],
+      "difficulty_rationale": "Five-class fix spanning the parser (token, tree-builder state, html tree builder), the node representation, and the serializer; the round-trip failure requires understanding how DOCTYPE tokens are captured, stored, and rendered across all these layers",
+      "jdk21_build_fix": "bump source/target from 1.7 to 1.8 in maven-build.xml"
+    },
+    {
+      "id": "Jsoup-58",
+      "project": "Jsoup",
+      "bug_number": 58,
+      "buggy_sha": "LOOKUP_FROM_CSV",
+      "failing_test": "org.jsoup.safety.CleanerTest::testIsValidBodyHtml",
+      "fix_summary": "Cleaner.isValidBodyHtml produces wrong results for input that contains valid body HTML — the validation logic applies the whitelist check at the wrong structural level, flagging some valid elements as invalid",
+      "canonical_fix_files": [
+        "src/main/java/org/jsoup/safety/Cleaner.java",
+        "src/main/java/org/jsoup/safety/Whitelist.java",
+        "src/main/java/org/jsoup/parser/HtmlTreeBuilder.java"
+      ],
+      "difficulty_rationale": "Three-class fix; the false-positive invalid classification only manifests for specific nesting patterns because the structural level at which whitelist checking is applied is off-by-one relative to the parsed tree structure",
+      "jdk21_build_fix": "bump source/target from 1.7 to 1.8 in maven-build.xml"
+    },
+    {
+      "id": "Jsoup-71",
+      "project": "Jsoup",
+      "bug_number": 71,
+      "buggy_sha": "LOOKUP_FROM_CSV",
+      "failing_test": "org.jsoup.select.SelectorTest::splitOnBr",
+      "fix_summary": "CSS selector with :split-on-br pseudo-element does not correctly split text nodes on <br> boundaries because the pseudo-class evaluator does not account for the PseudoTextElement type introduced for inline text splitting",
+      "canonical_fix_files": [
+        "src/main/java/org/jsoup/nodes/PseudoTextElement.java",
+        "src/main/java/org/jsoup/select/Evaluator.java",
+        "src/main/java/org/jsoup/select/QueryParser.java"
+      ],
+      "difficulty_rationale": "Three-class fix introducing a new node type and updating selector evaluation; the wrong split result requires understanding how pseudo-elements interact with the selector evaluator's node type dispatch — the bug only appears because a new node type was added without updating existing evaluators",
+      "jdk21_build_fix": "bump source/target from 1.7 to 1.8 in maven-build.xml"
+    },
+    {
+      "id": "Jsoup-87",
+      "project": "Jsoup",
+      "bug_number": 87,
+      "buggy_sha": "LOOKUP_FROM_CSV",
+      "failing_test": "org.jsoup.parser.HtmlParserTest::preservedCaseLinksCantNest",
+      "fix_summary": "HTML parser in case-preserving mode incorrectly allows link elements to nest inside other link elements; the tree builder state for <a> elements does not apply the standard HTML5 adoption agency algorithm in case-preserving mode",
+      "canonical_fix_files": [
+        "src/main/java/org/jsoup/parser/HtmlTreeBuilder.java",
+        "src/main/java/org/jsoup/parser/HtmlTreeBuilderState.java",
+        "src/main/java/org/jsoup/parser/Parser.java",
+        "src/main/java/org/jsoup/parser/TreeBuilder.java"
+      ],
+      "difficulty_rationale": "Four-class fix with 119 lines changed; the incorrect nesting only manifests in case-preserving mode — requires understanding the HTML5 adoption agency algorithm and how the case-preservation flag bypasses it, which is a subtle parser invariant",
+      "jdk21_build_fix": "bump source/target from 1.7 to 1.8 in maven-build.xml"
+    }
+  ]
+}

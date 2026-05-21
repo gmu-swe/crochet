@@ -32,6 +32,7 @@ WORKDIR_OVERRIDE=""
 CONDITION=""
 BUG_ID=""
 OUT_PATH=""
+SEED=""
 
 # Auto-detect crochet repo root (script lives at eval/agent-debug/run-trial.sh)
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -47,6 +48,7 @@ while [[ $# -gt 0 ]]; do
         --workdir)     WORKDIR_OVERRIDE="$2"; shift 2 ;;
         --keep-workdir) KEEP_WORKDIR=true;   shift ;;
         --dry-run)     DRY_RUN=true;         shift ;;
+        --seed)        SEED="$2";            shift 2 ;;
         *) echo "Unknown option: $1" >&2; exit 1 ;;
     esac
 done
@@ -61,7 +63,8 @@ case "$CONDITION" in
 esac
 
 # ── Paths ─────────────────────────────────────────────────────────────────────
-CORPUS_JSON="$SCRIPT_DIR/corpus.json"
+# Allow caller to override corpus file (e.g. corpus-hard.json for Phase II)
+CORPUS_JSON="${CORPUS_JSON:-$SCRIPT_DIR/corpus.json}"
 PROMPTS_DIR="$SCRIPT_DIR/prompts"
 JUDGE_PROMPT="$SCRIPT_DIR/judge-prompt.md"
 D4J_BIN="$DEFECTS4J_HOME/framework/bin/defects4j"
@@ -79,30 +82,33 @@ require_cmd() {
 }
 
 json_field() {
-    # Extract a field from corpus.json for our bug
+    # Extract a field from corpus.json (or corpus-hard.json) for our bug.
+    # Both formats are supported: top-level 'bugs' array (Phase I) or
+    # top-level 'candidates' array (Phase II candidates/corpus-hard).
     # Usage: json_field .field_name
     python3 -c "
 import json, sys
 with open('$CORPUS_JSON') as f:
     corpus = json.load(f)
-bug = next((b for b in corpus['bugs'] if b['id'] == '$BUG_ID'), None)
-if bug is None:
-    print('', end='')
-    sys.exit(1)
-val = bug$(echo "$1" | sed "s/\./['/g" | sed "s/$/']/" | sed "s/\['/['/g")
-print(val if val is not None else '', end='')
-" 2>/dev/null || python3 -c "
-import json, sys
-with open('$CORPUS_JSON') as f:
-    corpus = json.load(f)
-bug = next((b for b in corpus['bugs'] if b['id'] == '$BUG_ID'), None)
+# Support both 'bugs' (Phase I) and 'candidates' (Phase II) top-level keys
+bug_list = corpus.get('bugs', corpus.get('candidates', []))
+bug = next((b for b in bug_list if b['id'] == '$BUG_ID'), None)
 if bug is None:
     sys.exit(1)
 keys = '$1'.lstrip('.').split('.')
 val = bug
 for k in keys:
-    val = val[k]
-print(val if val is not None else '', end='')
+    if isinstance(val, dict):
+        val = val.get(k)
+    else:
+        val = None
+    if val is None:
+        print('', end='')
+        sys.exit(0)
+if isinstance(val, list):
+    print(' '.join(str(v) for v in val), end='')
+else:
+    print(val if val is not None else '', end='')
 "
 }
 
@@ -219,6 +225,10 @@ apply_build_fix() {
             # Handle property style: value="1.x" on javac.source / javac.target lines
             sed -i '/javac\.source/s/value="1\.[56]"/value="1.8"/g' "$buildxml"
             sed -i '/javac\.target/s/value="1\.[56]"/value="1.8"/g' "$buildxml"
+            # Handle ant.build.javac.source / ant.build.javac.target global properties
+            # (present in some Closure bug versions as property elements with value= attribute)
+            sed -i 's/ant\.build\.javac\.source" value="1\.[56]"/ant.build.javac.source" value="1.8"/g' "$buildxml"
+            sed -i 's/ant\.build\.javac\.target" value="1\.[56]"/ant.build.javac.target" value="1.8"/g' "$buildxml"
         fi
         # Patch lib/rhino/build.properties — handles both = and space separators
         local rhinoprops="$workdir/lib/rhino/build.properties"
@@ -235,6 +245,33 @@ apply_build_fix() {
             sed -i 's/source="1\.[56]"/source="1.8"/g' "$rxml"
             sed -i 's/target="1\.[56]"/target="1.8"/g' "$rxml"
         done
+    fi
+
+    # JacksonDatabind projects: bump source/target in maven-build.xml
+    if [[ "$PROJECT" == "JacksonDatabind" ]]; then
+        local mvnbuild="$workdir/maven-build.xml"
+        if [[ -f "$mvnbuild" ]]; then
+            sed -i 's/source="1\.[5678]"/source="1.8"/g' "$mvnbuild"
+            sed -i 's/target="1\.[5678]"/target="1.8"/g' "$mvnbuild"
+        fi
+    fi
+
+    # Jsoup projects: bump source/target in maven-build.xml (may use 1.6 or 1.7)
+    if [[ "$PROJECT" == "Jsoup" ]]; then
+        local mvnbuild="$workdir/maven-build.xml"
+        if [[ -f "$mvnbuild" ]]; then
+            sed -i 's/source="1\.[5678]"/source="1.8"/g' "$mvnbuild"
+            sed -i 's/target="1\.[5678]"/target="1.8"/g' "$mvnbuild"
+        fi
+    fi
+
+    # Gson projects: bump source/target in gson/maven-build.xml
+    if [[ "$PROJECT" == "Gson" ]]; then
+        local mvnbuild="$workdir/gson/maven-build.xml"
+        if [[ -f "$mvnbuild" ]]; then
+            sed -i 's/source="1\.[5678]"/source="1.8"/g' "$mvnbuild"
+            sed -i 's/target="1\.[5678]"/target="1.8"/g' "$mvnbuild"
+        fi
     fi
 }
 
@@ -360,6 +397,17 @@ CLAUDE_CMD=(
     --no-session-persistence
     --add-dir "$BUGGY_WORKDIR"
 )
+
+# Append seed if provided.  The claude CLI does not have a --seed flag but does
+# accept --session-id; we use that to force a fresh session per seed so parallel
+# prescreen runs with different seeds produce independent samples.
+if [[ -n "$SEED" ]]; then
+    # Write seed into a temp file that the agent gets as additional context so
+    # it doesn't reuse any cached reasoning.  We also pass a unique session-id
+    # to prevent the CLI from reusing a previous session's state.
+    echo "Run seed: $SEED (run-id: ${BUG_ID}-${CONDITION}-seed${SEED})" > "$WORKDIR/seed.txt"
+    CLAUDE_CMD+=(--session-id "${BUG_ID}-${CONDITION}-seed${SEED}")
+fi
 
 log "  Running: ${CLAUDE_CMD[*]} < '$PROMPT_FILE'"
 
