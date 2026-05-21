@@ -9,6 +9,8 @@
 #   --condition <C>     C1 | C2 | C3
 #   --out <path>        Output JSON file path
 #   --max-tool-calls N  Cap agent tool calls (default: 80)
+#   --model <id>        Claude model ID (default: empty = claude CLI default = Opus 4.7).
+#                       Examples: claude-sonnet-4-6, claude-haiku-4-5, claude-opus-4-7
 #   --workdir <path>    Override trial workdir (default: /tmp/trial-<bug>-<condition>)
 #   --keep-workdir      Do not delete workdir on exit
 #   --dry-run           Set up worktree + verify bug reproduces, then exit (skip agent)
@@ -33,6 +35,7 @@ CONDITION=""
 BUG_ID=""
 OUT_PATH=""
 SEED=""
+MODEL=""
 
 # Auto-detect crochet repo root (script lives at eval/agent-debug/run-trial.sh)
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -45,6 +48,7 @@ while [[ $# -gt 0 ]]; do
         --condition)   CONDITION="$2";       shift 2 ;;
         --out)         OUT_PATH="$2";        shift 2 ;;
         --max-tool-calls) MAX_TOOL_CALLS="$2"; shift 2 ;;
+        --model)       MODEL="$2";           shift 2 ;;
         --workdir)     WORKDIR_OVERRIDE="$2"; shift 2 ;;
         --keep-workdir) KEEP_WORKDIR=true;   shift ;;
         --dry-run)     DRY_RUN=true;         shift ;;
@@ -402,6 +406,32 @@ CLAUDE_CMD=(
     --add-dir "$BUGGY_WORKDIR"
 )
 
+# If --model was specified, pass it through; otherwise probe the default model ID
+# so the output JSON accurately records which model was used.
+if [[ -n "$MODEL" ]]; then
+    CLAUDE_CMD+=(--model "$MODEL")
+    MODEL_DEFAULT_USED=false
+    EFFECTIVE_MODEL="$MODEL"
+else
+    MODEL_DEFAULT_USED=true
+    # Probe: ask claude what model it is using with --output-format json
+    EFFECTIVE_MODEL=$(claude --print --output-format json -p "model id" 2>/dev/null | \
+        python3 -c "
+import json, sys
+try:
+    obj = json.load(sys.stdin)
+    usage = obj.get('modelUsage', {})
+    if usage:
+        print(list(usage.keys())[0])
+    else:
+        print('claude-opus-4-7')
+except Exception:
+    print('claude-opus-4-7')
+" 2>/dev/null || echo "claude-opus-4-7")
+fi
+
+log "  Model: $EFFECTIVE_MODEL (default_used=$MODEL_DEFAULT_USED)"
+
 # Append seed if provided.  The claude CLI accepts --session-id with a UUID;
 # we generate a deterministic UUID from the run parameters so each (bug, condition,
 # seed) triple produces a distinct, reproducible session that won't reuse cached
@@ -680,6 +710,8 @@ def read_json_file(path, default):
 meta = {
     'bug': '$BUG_ID',
     'condition': '$CONDITION',
+    'model': '$EFFECTIVE_MODEL',
+    'model_default_used': $( [[ "$MODEL_DEFAULT_USED" == "true" ]] && echo "True" || echo "False" ),
     'started_at': datetime.datetime.fromtimestamp($AGENT_START_TS, tz=datetime.timezone.utc).isoformat(),
     'duration_seconds': $DURATION,
     'tool_calls': $TOOL_CALL_COUNT,
@@ -723,4 +755,4 @@ with open('$OUT_PATH', 'w') as f:
 print('[run-trial] Output written to $OUT_PATH')
 "
 
-log "Done. Trial complete: bug=$BUG_ID condition=$CONDITION test_pass=$TEST_PASS duration=${DURATION}s tool_calls=$TOOL_CALL_COUNT diagnosis_quality=$DIAGNOSIS_QUALITY/5"
+log "Done. Trial complete: bug=$BUG_ID condition=$CONDITION model=$EFFECTIVE_MODEL test_pass=$TEST_PASS duration=${DURATION}s tool_calls=$TOOL_CALL_COUNT diagnosis_quality=$DIAGNOSIS_QUALITY/5"

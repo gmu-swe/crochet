@@ -2,12 +2,16 @@
 # eval/agent-debug/run-sweep.sh — Run all 33 trials (11 bugs × 3 conditions)
 #
 # Usage:
-#   bash eval/agent-debug/run-sweep.sh [--dry-run] [--jobs N]
+#   bash eval/agent-debug/run-sweep.sh [--dry-run] [--jobs N] [--model <id>]
 #
 # Options:
-#   --dry-run    Pass --dry-run to each trial (verify setup only, no agent)
-#   --jobs N     Max concurrent jobs (default: 3)
-#   --timeout N  Per-trial timeout in seconds (default: 600)
+#   --dry-run      Pass --dry-run to each trial (verify setup only, no agent)
+#   --jobs N       Max concurrent jobs (default: 3)
+#   --timeout N    Per-trial timeout in seconds (default: 600)
+#   --model <id>   Claude model ID (default: empty = CLI default = Opus 4.7).
+#                  Examples: claude-sonnet-4-6, claude-haiku-4-5, claude-opus-4-7
+#                  Results are written to results-<short-id>/ (e.g. results-sonnet-4-6/).
+#                  Without --model, results go to results/ (backward-compat).
 #
 # Environment:
 #   JAVA_HOME    JDK path (default: /usr/lib/jvm/java-21-openjdk-amd64)
@@ -17,13 +21,14 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 CORPUS_JSON="$SCRIPT_DIR/corpus.json"
-RESULTS_DIR="$SCRIPT_DIR/results"
 TRIAL_SCRIPT="$SCRIPT_DIR/run-trial.sh"
 
 # Defaults
 MAX_JOBS=3
 TRIAL_TIMEOUT=600
 DRY_RUN_FLAG=""
+MODEL=""
+MODEL_FLAG=""
 
 export JAVA_HOME="${JAVA_HOME:-/usr/lib/jvm/java-21-openjdk-amd64}"
 export DEFECTS4J_HOME="${DEFECTS4J_HOME:-$HOME/defects4j}"
@@ -42,9 +47,20 @@ while [[ $# -gt 0 ]]; do
         --dry-run) DRY_RUN_FLAG="--dry-run"; shift ;;
         --jobs)    MAX_JOBS="$2"; shift 2 ;;
         --timeout) TRIAL_TIMEOUT="$2"; shift 2 ;;
+        --model)   MODEL="$2"; MODEL_FLAG="--model $2"; shift 2 ;;
         *) echo "Unknown option: $1" >&2; exit 1 ;;
     esac
 done
+
+# Derive results directory from model: results-sonnet-4-6/, results-haiku-4-5/, etc.
+# Without --model, keep the legacy results/ directory for backward-compat.
+if [[ -n "$MODEL" ]]; then
+    # Strip the "claude-" prefix for a shorter directory name (sonnet-4-6, haiku-4-5, etc.)
+    MODEL_SHORT="${MODEL#claude-}"
+    RESULTS_DIR="$SCRIPT_DIR/results-${MODEL_SHORT}"
+else
+    RESULTS_DIR="$SCRIPT_DIR/results"
+fi
 
 log() { echo "[run-sweep] $(date '+%H:%M:%S') $*" >&2; }
 
@@ -64,6 +80,7 @@ SWEEP_START=$(date +%s)
 
 log "Starting sweep: ${#BUG_IDS[@]} bugs × ${#CONDITIONS[@]} conditions = $(( ${#BUG_IDS[@]} * ${#CONDITIONS[@]} )) trials"
 log "Max concurrent: $MAX_JOBS | Per-trial timeout: ${TRIAL_TIMEOUT}s"
+log "Model: ${MODEL:-<default = claude-opus-4-7>}"
 log "Results dir: $RESULTS_DIR"
 log "Bugs: ${BUG_IDS[*]}"
 
@@ -107,6 +124,7 @@ except Exception:
         --condition "$condition" \
         --out "$out_file" \
         $DRY_RUN_FLAG \
+        $MODEL_FLAG \
         2>&1 | while IFS= read -r line; do
             echo "[sweep/$bug/$condition] $line" >&2
         done || exit_code=$?
@@ -177,7 +195,7 @@ print('[run-sweep] Harness-error JSON written: $out_file')
 }
 
 export -f run_trial log
-export RESULTS_DIR TRIAL_SCRIPT TRIAL_TIMEOUT DRY_RUN_FLAG
+export RESULTS_DIR TRIAL_SCRIPT TRIAL_TIMEOUT DRY_RUN_FLAG MODEL_FLAG
 
 # ── Generate all 33 (bug, condition) pairs ────────────────────────────────────
 declare -a TRIAL_PAIRS=()
