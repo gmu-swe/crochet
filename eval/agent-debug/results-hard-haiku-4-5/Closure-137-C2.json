@@ -1,0 +1,15 @@
+{
+  "bug": "Closure-137",
+  "condition": "C2",
+  "started_at": "2026-05-22T00:58:41.108990Z",
+  "duration_seconds": 0,
+  "tool_calls": 0,
+  "test_pass": false,
+  "regressed_tests": [],
+  "diagnosis_quality": 0,
+  "agent_patch": "",
+  "agent_log": "",
+  "judge_reasoning": "",
+  "setup_error": "Failing test passes on buggy version \u2014 bug does not reproduce. Check build_fix application.",
+  "verify_log": "Running ant (compile.tests)................................................ OK\nRunning ant (run.dev.tests)................................................ OK\nFailing tests: 0\n"
+}
