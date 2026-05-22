@@ -21,5 +21,26 @@
   "judge_reasoning": "The agent precisely identified both aspects of the root cause matching the ground-truth: (1) hoisted function declarations inside goog.scope blocks were not being placed correctly relative to references (the wrong-position/wrong-scope binding issue), and (2) the function declarations weren't being recorded as aliases so references weren't rewritten. The diagnosis names specific mechanisms (addChildBefore vs addChildToFront, aliases map, qualified-name replacement) and explains why the buggy behavior occurs, going beyond symptom description.\n",
   "verify_log": "Running ant (compile.tests)................................................ OK\nRunning ant (run.dev.tests)................................................ OK\nFailing tests: 1\n  - com.google.javascript.jscomp.ScopedAliasesTest::testHoistedFunctionDeclaration\n",
   "baseline_failing_tests": [],
-  "compile_log": "Running ant (compile)...................................................... OK\nRunning ant (compile.tests)................................................ OK\n"
+  "compile_log": "Running ant (compile)...................................................... OK\nRunning ant (compile.tests)................................................ OK\n",
+  "agent_modified_files": [
+    "build.xml",
+    "lib/rhino/build.properties",
+    "src/com/google/javascript/jscomp/ScopedAliases.java"
+  ],
+  "canonical_modified_files": [
+    "src/com/google/javascript/jscomp/ScopedAliases.java",
+    "src/com/google/javascript/rhino/Node.java"
+  ],
+  "agent_modified_prod_files": [
+    "src/com/google/javascript/jscomp/ScopedAliases.java"
+  ],
+  "file_overlap": [
+    "src/com/google/javascript/jscomp/ScopedAliases.java"
+  ],
+  "missed_canonical": [
+    "src/com/google/javascript/rhino/Node.java"
+  ],
+  "extra_prod_files": [],
+  "fix_locality_score": 0.5,
+  "test_pass_strict": true
 }

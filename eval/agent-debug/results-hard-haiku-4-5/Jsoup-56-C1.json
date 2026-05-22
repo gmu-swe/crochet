@@ -21,5 +21,33 @@
   "judge_reasoning": "The ground truth identifies the bug as a failure to preserve the distinction between empty-string and null system identifiers when a public identifier is present (system ID omitted in output). The agent instead diagnosed a different scenario: missing SYSTEM keyword when system ID is present but public ID is absent. This is in the right component (DOCTYPE serializer) but addresses a different code path/condition than the actual root cause.\n",
   "verify_log": "Running ant (compile.tests)................................................ OK\nRunning ant (run.dev.tests)................................................ OK\nFailing tests: 1\n  - org.jsoup.nodes.DocumentTypeTest::testRoundTrip\n",
   "baseline_failing_tests": [],
-  "compile_log": "Running ant (compile)...................................................... OK\nRunning ant (compile.tests)................................................ OK\n"
+  "compile_log": "Running ant (compile)...................................................... OK\nRunning ant (compile.tests)................................................ OK\n",
+  "agent_modified_files": [
+    "maven-build.xml",
+    "pom.xml",
+    "src/main/java/org/jsoup/nodes/DocumentType.java",
+    "src/test/java/org/jsoup/nodes/DocumentTypeTest.java"
+  ],
+  "canonical_modified_files": [
+    "src/main/java/org/jsoup/nodes/DocumentType.java",
+    "src/main/java/org/jsoup/parser/HtmlTreeBuilderState.java",
+    "src/main/java/org/jsoup/parser/Token.java",
+    "src/main/java/org/jsoup/parser/TokeniserState.java",
+    "src/main/java/org/jsoup/parser/XmlTreeBuilder.java"
+  ],
+  "agent_modified_prod_files": [
+    "src/main/java/org/jsoup/nodes/DocumentType.java"
+  ],
+  "file_overlap": [
+    "src/main/java/org/jsoup/nodes/DocumentType.java"
+  ],
+  "missed_canonical": [
+    "src/main/java/org/jsoup/parser/HtmlTreeBuilderState.java",
+    "src/main/java/org/jsoup/parser/Token.java",
+    "src/main/java/org/jsoup/parser/TokeniserState.java",
+    "src/main/java/org/jsoup/parser/XmlTreeBuilder.java"
+  ],
+  "extra_prod_files": [],
+  "fix_locality_score": 0.5,
+  "test_pass_strict": true
 }

@@ -21,5 +21,27 @@
   "judge_reasoning": "The agent correctly identified the right subsystem (CSS pseudo-selector support for text-node matching via PseudoTextElement) and described an implementation that enables selecting text split by <br>. However, the ground-truth fix is about updating the pseudo-class evaluator to account for the existing PseudoTextElement type (a bug fix in the evaluator), whereas the agent describes creating PseudoTextElement and :matchText from scratch as a new feature \u2014 missing the specific evaluator-level cause.\n",
   "verify_log": "Running ant (compile.tests)................................................ OK\nRunning ant (run.dev.tests)................................................ OK\nFailing tests: 1\n  - org.jsoup.select.SelectorTest::splitOnBr\n",
   "baseline_failing_tests": [],
-  "compile_log": "Running ant (compile)...................................................... OK\nRunning ant (compile.tests)................................................ OK\n"
+  "compile_log": "Running ant (compile)...................................................... OK\nRunning ant (compile.tests)................................................ OK\n",
+  "agent_modified_files": [
+    "maven-build.xml",
+    "pom.xml",
+    "src/main/java/org/jsoup/select/Evaluator.java",
+    "src/main/java/org/jsoup/select/QueryParser.java"
+  ],
+  "canonical_modified_files": [
+    "src/main/java/org/jsoup/select/Evaluator.java",
+    "src/main/java/org/jsoup/select/QueryParser.java"
+  ],
+  "agent_modified_prod_files": [
+    "src/main/java/org/jsoup/select/Evaluator.java",
+    "src/main/java/org/jsoup/select/QueryParser.java"
+  ],
+  "file_overlap": [
+    "src/main/java/org/jsoup/select/Evaluator.java",
+    "src/main/java/org/jsoup/select/QueryParser.java"
+  ],
+  "missed_canonical": [],
+  "extra_prod_files": [],
+  "fix_locality_score": 1.0,
+  "test_pass_strict": true
 }

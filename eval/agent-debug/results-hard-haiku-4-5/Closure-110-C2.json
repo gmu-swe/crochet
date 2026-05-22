@@ -21,5 +21,26 @@
   "judge_reasoning": "The agent correctly identified that ScopedAliases failed to handle function declarations inside goog.scope blocks (matching the ground-truth's 'hoisted function declarations' issue), pinpointed the specific method (findAliases), explained the exact mechanism (falling through to NON_ALIAS_LOCAL error), and noted the hoisting concern by placing the assignment at the beginning of the scope block rather than the textual position. This matches the ground-truth's emphasis on wrong-scope binding from lifted function declarations.\n",
   "verify_log": "Running ant (compile.tests)................................................ OK\nRunning ant (run.dev.tests)................................................ OK\nFailing tests: 1\n  - com.google.javascript.jscomp.ScopedAliasesTest::testHoistedFunctionDeclaration\n",
   "baseline_failing_tests": [],
-  "compile_log": "Running ant (compile)...................................................... OK\nRunning ant (compile.tests)................................................ OK\n"
+  "compile_log": "Running ant (compile)...................................................... OK\nRunning ant (compile.tests)................................................ OK\n",
+  "agent_modified_files": [
+    "build.xml",
+    "lib/rhino/build.properties",
+    "src/com/google/javascript/jscomp/ScopedAliases.java"
+  ],
+  "canonical_modified_files": [
+    "src/com/google/javascript/jscomp/ScopedAliases.java",
+    "src/com/google/javascript/rhino/Node.java"
+  ],
+  "agent_modified_prod_files": [
+    "src/com/google/javascript/jscomp/ScopedAliases.java"
+  ],
+  "file_overlap": [
+    "src/com/google/javascript/jscomp/ScopedAliases.java"
+  ],
+  "missed_canonical": [
+    "src/com/google/javascript/rhino/Node.java"
+  ],
+  "extra_prod_files": [],
+  "fix_locality_score": 0.5,
+  "test_pass_strict": true
 }
