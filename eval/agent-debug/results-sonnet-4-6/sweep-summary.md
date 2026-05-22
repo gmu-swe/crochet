@@ -3,18 +3,18 @@
 | Bug         |    C1    |    C2    |    C3    | Score |
 |-------------|----------|----------|----------|-------|
 | Lang-1      |   PASS   |   PASS   |   PASS   | 3/3   |
-| Lang-10     |   FAIL   |   FAIL   |   FAIL   | 0/3   |
-| Lang-26     |   FAIL   |   FAIL   |   FAIL   | 0/3   |
-| Time-4      |   FAIL   |   FAIL   |   FAIL   | 0/3   |
-| Time-11     |   FAIL   |   FAIL   |   FAIL   | 0/3   |
-| Math-5      |   ERR    |   FAIL   |   FAIL   | 0/3   |  [e]
-| Math-27     |   FAIL   |   FAIL   |   FAIL   | 0/3   |
+| Lang-10     |   TOUT   |   TOUT   |   TOUT   | 0/3   |  [ttt]
+| Lang-26     |   PASS   |   PASS   |   PASS   | 3/3   |
+| Time-4      |   PASS   |   PASS   |   PASS   | 3/3   |
+| Time-11     |   PASS   |   PASS   |   PASS   | 3/3   |
+| Math-5      |   PASS   |   PASS   |   PASS   | 3/3   |
+| Math-27     |   PASS   |   PASS   |   FAIL   | 2/3   |
 | Math-3      |   FAIL   |   FAIL   |   FAIL   | 0/3   |
 | Math-10     |   FAIL   |   FAIL   |   FAIL   | 0/3   |
 | Closure-1   |   FAIL   |   FAIL   |   FAIL   | 0/3   |
 | Closure-10  |   FAIL   |   FAIL   |   FAIL   | 0/3   |
 |-------------|----------|----------|----------|-------|
-| TOTAL       |   1/11   |   1/11   |   1/11   |       |
+| TOTAL       |   6/11   |   6/11   |   5/11   |       |
 
 **Wall-clock:** 0s (0m 0s)
 
@@ -30,3 +30,5 @@
 CFAIL = agent patch introduced a compilation error (distinct from test failing to pass).
 FAIL without CFAIL = code compiled, but target test still fails.
 
+## Anomalies
+Math-27: C1=PASS C3=FAIL -- Crochet TTD underperforms baseline
