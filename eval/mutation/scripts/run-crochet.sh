@@ -26,9 +26,10 @@ fi
 
 RUN_TAG="${1:-r1}"
 OUT="$RESULTS_DIR/crochet.${RUN_TAG}.json"
-TIME_FILE="$RESULTS_DIR/crochet.${RUN_TAG}.time.txt"
 
-/usr/bin/time -v -o "$TIME_FILE" \
+# Peak RSS is captured inside the runner via /proc/self/status VmHWM and
+# emitted in the summary JSON. /usr/bin/time is not present on this host
+# (busybox-style only); we trust /proc.
 "$JDK_INST/bin/java" \
     --add-reads java.base=jdk.unsupported \
     -Xss16m \
@@ -46,20 +47,18 @@ TIME_FILE="$RESULTS_DIR/crochet.${RUN_TAG}.time.txt"
     --out "$OUT" 2>&1 \
     | grep -vE "^WARNING|^\sat|UniqueIdTrack|NoSuchMethodError|getConfigurationParameters" || true
 
-PEAK_KB=$(grep "Maximum resident" "$TIME_FILE" 2>/dev/null | awk '{print $NF}')
-if [ -n "${PEAK_KB:-}" ]; then
-    python3 -c "
-import json, sys, pathlib
+# Tag with run id
+python3 -c "
+import json, pathlib
 p = pathlib.Path('$OUT')
-lines = p.read_text().splitlines()
-if lines:
-    j = json.loads(lines[-1])
-    j['peakRssKb'] = int($PEAK_KB)
-    j['run'] = '$RUN_TAG'
-    lines[-1] = json.dumps(j)
-    p.write_text('\n'.join(lines) + '\n')
+if p.exists():
+    lines = p.read_text().splitlines()
+    if lines:
+        j = json.loads(lines[-1])
+        j['run'] = '$RUN_TAG'
+        lines[-1] = json.dumps(j)
+        p.write_text('\n'.join(lines) + '\n')
 " || true
-fi
 
 echo "DONE crochet run=$RUN_TAG out=$OUT"
 tail -1 "$OUT"

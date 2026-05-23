@@ -28,8 +28,50 @@ TEST_GLOB="${TEST_CLASS}"
 # (defaults) as our custom runner.
 START_NS=$(date +%s%N)
 
+# PIT needs the junit5 companion plugin in its OWN classloader. We can't
+# inject that from the CLI, so for the fork baseline we ship a tiny
+# pit-pom.xml in $EVAL_ROOT and run PIT from there (with the target's
+# build classpath dropped in via -Dproject.build.outputDirectory).
+#
+# Simpler: drop a profile into the target's pom.xml that adds the junit5
+# plugin to pitest-maven's <dependencies>. We use an inline edit because
+# the target is a throwaway tree.
+PROFILE_MARK="IV1-MUTATION-PROFILE"
+if ! grep -q "$PROFILE_MARK" "$TARGET_DIR/pom.xml"; then
+    python3 <<PY
+import pathlib, re
+p = pathlib.Path("$TARGET_DIR/pom.xml")
+src = p.read_text()
+inject = '''    <!-- IV1-MUTATION-PROFILE -->
+    <profile>
+      <id>iv1-pit</id>
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>org.pitest</groupId>
+            <artifactId>pitest-maven</artifactId>
+            <version>1.15.8</version>
+            <dependencies>
+              <dependency>
+                <groupId>org.pitest</groupId>
+                <artifactId>pitest-junit5-plugin</artifactId>
+                <version>1.2.1</version>
+              </dependency>
+            </dependencies>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
+'''
+# Inject right after <profiles> opening tag (commons-lang already has one)
+new = re.sub(r"(<profiles>\s*)", lambda m: m.group(1) + inject, src, count=1)
+assert "IV1-MUTATION-PROFILE" in new, "injection failed"
+p.write_text(new)
+PY
+fi
+
 cd "$TARGET_DIR"
-JAVA_HOME="$JAVA_HOME" mvn -q org.pitest:pitest-maven:1.15.8:mutationCoverage \
+JAVA_HOME="$JAVA_HOME" mvn -q -P iv1-pit org.pitest:pitest-maven:1.15.8:mutationCoverage \
     -DtargetClasses="$TARGET_GLOB" \
     -DtargetTests="$TEST_GLOB" \
     -Dthreads=1 \
@@ -38,7 +80,7 @@ JAVA_HOME="$JAVA_HOME" mvn -q org.pitest:pitest-maven:1.15.8:mutationCoverage \
     -DverbosityLevel=NO_SPINNER \
     -DtimeoutConstant=10000 \
     -DjvmArgs="-Xss4m" \
-    2>&1 | tail -20
+    2>&1 | tail -30
 
 END_NS=$(date +%s%N)
 ELAPSED_NS=$((END_NS - START_NS))
@@ -50,12 +92,19 @@ if [ -z "$REPORT_DIR" ]; then
 fi
 MUT_XML=$(find "$REPORT_DIR" -name mutations.xml | head -1)
 
-KILLED=$(grep -c 'status="KILLED"' "$MUT_XML" 2>/dev/null || echo 0)
-SURVIVED=$(grep -c 'status="SURVIVED"' "$MUT_XML" 2>/dev/null || echo 0)
-NO_COV=$(grep -c 'status="NO_COVERAGE"' "$MUT_XML" 2>/dev/null || echo 0)
-TIMED_OUT=$(grep -c 'status="TIMED_OUT"' "$MUT_XML" 2>/dev/null || echo 0)
-MEMORY=$(grep -c 'status="MEMORY_ERROR"' "$MUT_XML" 2>/dev/null || echo 0)
-RUN_ERROR=$(grep -c 'status="RUN_ERROR"' "$MUT_XML" 2>/dev/null || echo 0)
+readarray -t COUNTS < <(python3 - "$MUT_XML" <<'PY'
+import sys, re, pathlib
+xml = pathlib.Path(sys.argv[1]).read_text()
+for status in ("KILLED","SURVIVED","NO_COVERAGE","TIMED_OUT","MEMORY_ERROR","RUN_ERROR"):
+    print(len(re.findall(rf"status=['\"]?{status}['\"]?", xml)))
+PY
+)
+KILLED=${COUNTS[0]:-0}
+SURVIVED=${COUNTS[1]:-0}
+NO_COV=${COUNTS[2]:-0}
+TIMED_OUT=${COUNTS[3]:-0}
+MEMORY=${COUNTS[4]:-0}
+RUN_ERROR=${COUNTS[5]:-0}
 TOTAL=$((KILLED + SURVIVED + NO_COV + TIMED_OUT + MEMORY + RUN_ERROR))
 
 # Peak RSS from /proc isn't available for a subprocess sweep; we record the
@@ -77,6 +126,7 @@ PARITY="$RESULTS_DIR/baseline-fork.${RUN_TAG}.mutants.txt"
 } > "$PARITY"
 
 echo "DONE baseline-fork run=$RUN_TAG mutants=$TOTAL killed=$KILLED survived=$SURVIVED noCov=$NO_COV"
-echo "  elapsed: $(echo "scale=2; $ELAPSED_NS / 1000000000" | bc)s"
+ELAPSED_S=$(python3 -c "print(f'{$ELAPSED_NS/1e9:.2f}')")
+echo "  elapsed: ${ELAPSED_S}s"
 echo "  summary: $OUT"
 echo "  report : $REPORT_DIR"

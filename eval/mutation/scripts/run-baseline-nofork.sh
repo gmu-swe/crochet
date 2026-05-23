@@ -15,10 +15,8 @@ source scripts/env.sh
 
 RUN_TAG="${1:-r1}"
 OUT="$RESULTS_DIR/baseline-nofork.${RUN_TAG}.json"
-# Use /usr/bin/time -v to capture peak RSS
-TIME_FILE="$RESULTS_DIR/baseline-nofork.${RUN_TAG}.time.txt"
 
-/usr/bin/time -v -o "$TIME_FILE" \
+# Peak RSS captured inside the runner via /proc/self/status VmHWM.
 "$JAVA_HOME/bin/java" \
     -Xss4m \
     -javaagent:"$RUNNER_JAR" \
@@ -33,22 +31,17 @@ TIME_FILE="$RESULTS_DIR/baseline-nofork.${RUN_TAG}.time.txt"
     --out "$OUT" 2>&1 \
     | grep -vE "^WARNING|^\sat|UniqueIdTrack|NoSuchMethodError|getConfigurationParameters" || true
 
-# Attach RSS from time
-PEAK_KB=$(grep "Maximum resident" "$TIME_FILE" 2>/dev/null | awk '{print $NF}')
-if [ -n "${PEAK_KB:-}" ]; then
-    # Inject peakRssKb into the summary line (last line of OUT)
-    python3 -c "
-import json, sys, pathlib
+python3 -c "
+import json, pathlib
 p = pathlib.Path('$OUT')
-lines = p.read_text().splitlines()
-if lines:
-    j = json.loads(lines[-1])
-    j['peakRssKb'] = int($PEAK_KB)
-    j['run'] = '$RUN_TAG'
-    lines[-1] = json.dumps(j)
-    p.write_text('\n'.join(lines) + '\n')
+if p.exists():
+    lines = p.read_text().splitlines()
+    if lines:
+        j = json.loads(lines[-1])
+        j['run'] = '$RUN_TAG'
+        lines[-1] = json.dumps(j)
+        p.write_text('\n'.join(lines) + '\n')
 " || true
-fi
 
 echo "DONE baseline-nofork run=$RUN_TAG out=$OUT"
 tail -1 "$OUT"

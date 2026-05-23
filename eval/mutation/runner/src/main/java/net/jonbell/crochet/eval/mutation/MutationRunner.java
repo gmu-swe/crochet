@@ -265,7 +265,61 @@ public final class MutationRunner {
         return sb.toString();
     }
 
+    /** Per-mutant timeout in milliseconds. Mutants that flip a guard inside
+     *  a recursive method ({@code Fraction.greatestCommonDivisor}, etc.) can
+     *  produce infinite loops; without this, the harness deadlocks on
+     *  redefineClasses' inability to interrupt arbitrary user code.
+     *
+     *  <p>We default to 1500ms — generous enough that warmup never exceeds
+     *  it for our chosen Lang3 targets, tight enough that the 12 PIT-detected
+     *  TIMED_OUT mutants in {@code Fraction.greatestCommonDivisor} don't
+     *  inflate the sweep by 8s × 12 = 96s under a long timeout. Override via
+     *  {@code -Dcrochet.mutation.timeoutMs=N}. */
+    private static final long TEST_TIMEOUT_MS =
+        Long.getLong("crochet.mutation.timeoutMs", 1_500L);
+
     private static TestResult runJUnit(List<Class<?>> testClasses) {
+        // Fresh daemon thread per call: a runaway test stays parked using CPU
+        // until the JVM exits, but won't block the next mutant. We rely on
+        // {@link Thread#stop} as a last resort. JUnit's @Timeout machinery
+        // can also catch many of these, but it doesn't help pure tight loops.
+        final java.util.concurrent.atomic.AtomicReference<TestResult> result =
+            new java.util.concurrent.atomic.AtomicReference<>();
+        Thread t = new Thread(() -> {
+            try {
+                result.set(runJUnitInline(testClasses));
+            } catch (Throwable th) {
+                TestResult r = new TestResult();
+                r.failed = 1;
+                r.failures.add("WORKER_ERROR: " + th);
+                result.set(r);
+            }
+        }, "mutation-test-runner");
+        t.setDaemon(true);
+        t.start();
+        try {
+            t.join(TEST_TIMEOUT_MS);
+        } catch (InterruptedException ie) {
+            Thread.currentThread().interrupt();
+        }
+        if (t.isAlive()) {
+            // Interrupt and fall back to leaving the thread parked.
+            t.interrupt();
+            TestResult r = new TestResult();
+            r.failed = 1;
+            r.failures.add("TIMEOUT after " + TEST_TIMEOUT_MS + "ms");
+            return r;
+        }
+        TestResult r = result.get();
+        if (r == null) {
+            r = new TestResult();
+            r.failed = 1;
+            r.failures.add("NO_RESULT");
+        }
+        return r;
+    }
+
+    private static TestResult runJUnitInline(List<Class<?>> testClasses) {
         Launcher launcher = LauncherFactory.create();
         SummaryGeneratingListener listener = new SummaryGeneratingListener();
         launcher.registerTestExecutionListeners(listener);
@@ -280,8 +334,8 @@ public final class MutationRunner {
         r.passed = (int) s.getTestsSucceededCount();
         r.failed = (int) s.getTestsFailedCount();
         r.errored = 0; // platform folds errors into failed
-        for (TestExecutionSummary.Failure f : s.getFailures()) {
-            r.failures.add(f.getTestIdentifier().getDisplayName() + ": " + f.getException());
+        for (TestExecutionSummary.Failure ff : s.getFailures()) {
+            r.failures.add(ff.getTestIdentifier().getDisplayName() + ": " + ff.getException());
         }
         return r;
     }
