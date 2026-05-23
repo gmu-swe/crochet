@@ -1,3 +1,6 @@
 build/
-results/smoke/
 *.class
+
+# eval/*/results/ is ignored repo-wide; explicitly track the IV.3 campaigns
+!results/
+results/smoke/

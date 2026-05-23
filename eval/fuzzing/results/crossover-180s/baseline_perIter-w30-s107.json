@@ -1,0 +1,20 @@
+{
+  "mode": "baseline_perIter",
+  "seed": 107,
+  "budgetSec": 180,
+  "iterations": 2952,
+  "distinctEdges": 303,
+  "corpusSize": 226,
+  "totalMs": 180029,
+  "branchesPerSec": 1.6831,
+  "itersPerSec": 16.3974,
+  "meanIterUs": 60615.5072,
+  "setupTotalMs": 165750,
+  "teardownTotalMs": 226,
+  "checkpointTotalMs": 0,
+  "rollbackTotalMs": 0,
+  "timeToNBranchesMs": 1054,
+  "nBranchesLandmark": 91,
+  "lastChecksumMode1": -7066613047076425582,
+  "lastChecksumMode3": 0
+}
