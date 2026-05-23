@@ -3,8 +3,6 @@ package eval.fuzzing;
 import net.jonbell.crochet.runtime.CheckpointRollbackAgent;
 
 import java.io.BufferedWriter;
-import java.io.IOException;
-import java.io.PrintStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
