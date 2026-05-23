@@ -92,16 +92,30 @@ public final class PoolFleet {
      * Borrow op. Edge probes: 0x0100 (entry), 0x0101 (success), 0x0102 (failure).
      */
     public void opBorrow(int poolIdx) {
-        Coverage.hit(0x0100);
+        Coverage.hit(0x0100 | (poolIdx & 0xF));
         int idx = Math.floorMod(poolIdx, FLEET_SIZE);
+        // Saturation-band probe: emits a different edge depending on the
+        // pool's current active-count band. This makes coverage state-dependent
+        // so the fuzzer can keep discovering edges as it explores deeper
+        // pool configurations.
+        int active = pools[idx].getNumActive();
+        if (active == 0) Coverage.hit(0x0110 | idx);
+        else if (active < 4) Coverage.hit(0x0120 | idx);
+        else if (active < 16) Coverage.hit(0x0130 | idx);
+        else Coverage.hit(0x0140 | idx);
         try {
             Widget w = pools[idx].borrowObject();
             if (w != null) {
-                Coverage.hit(0x0101);
+                Coverage.hit(0x0150 | idx);
                 lastBorrowed.get(idx).add(w);
+                // After-borrow band probe.
+                int idle = pools[idx].getNumIdle();
+                if (idle == 0) Coverage.hit(0x0160 | idx);
+                else if (idle < 4) Coverage.hit(0x0170 | idx);
+                else Coverage.hit(0x0180 | idx);
             }
         } catch (Exception e) {
-            Coverage.hit(0x0102);
+            Coverage.hit(0x0190 | idx);
         }
     }
 
@@ -111,19 +125,24 @@ public final class PoolFleet {
      * 0x0200 (entry), 0x0201 (success), 0x0202 (no-borrow case).
      */
     public void opReturn(int poolIdx) {
-        Coverage.hit(0x0200);
+        Coverage.hit(0x0200 | (poolIdx & 0xF));
         int idx = Math.floorMod(poolIdx, FLEET_SIZE);
         List<Widget> bs = lastBorrowed.get(idx);
         if (bs.isEmpty()) {
-            Coverage.hit(0x0202);
+            Coverage.hit(0x0210 | idx);
             return;
         }
         Widget w = bs.remove(bs.size() - 1);
+        // Coverage on the depth of the borrowed-stack at return time.
+        int depth = bs.size();
+        if (depth == 0) Coverage.hit(0x0220 | idx);
+        else if (depth < 4) Coverage.hit(0x0230 | idx);
+        else Coverage.hit(0x0240 | idx);
         try {
             pools[idx].returnObject(w);
-            Coverage.hit(0x0201);
+            Coverage.hit(0x0250 | idx);
         } catch (Exception e) {
-            Coverage.hit(0x0203);
+            Coverage.hit(0x0260 | idx);
         }
     }
 
@@ -171,11 +190,19 @@ public final class PoolFleet {
     }
 
     public void opSetMaxTotal(int poolIdx, int value) {
-        Coverage.hit(0x0600);
+        Coverage.hit(0x0600 | (poolIdx & 0xF));
         int idx = Math.floorMod(poolIdx, FLEET_SIZE);
         int v = Math.max(1, Math.min(value & 0x7F, 128));
+        int before = pools[idx].getMaxTotal();
         pools[idx].setMaxTotal(v);
-        if (v > 32) Coverage.hit(0x0601); else Coverage.hit(0x0602);
+        // Band-cross probes: did we widen or narrow the cap?
+        if (v > before) Coverage.hit(0x0610 | idx);
+        else if (v < before) Coverage.hit(0x0620 | idx);
+        else Coverage.hit(0x0630 | idx);
+        if (v > 64) Coverage.hit(0x0640 | idx);
+        else if (v > 32) Coverage.hit(0x0650 | idx);
+        else if (v > 8) Coverage.hit(0x0660 | idx);
+        else Coverage.hit(0x0670 | idx);
     }
 
     public void opSetMaxIdle(int poolIdx, int value) {
@@ -296,6 +323,25 @@ public final class PoolFleet {
             acc = acc * 31 + factories[i].destroyedCount();
         }
         return acc;
+    }
+
+    /** Per-component state breakdown for parity-debug. */
+    public String stateBreakdown() {
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < FLEET_SIZE; i++) {
+            if (pools[i] == null) continue;
+            sb.append("[p").append(i).append(" act=").append(pools[i].getNumActive())
+                    .append(" idle=").append(pools[i].getNumIdle())
+                    .append(" mt=").append(pools[i].getMaxTotal())
+                    .append(" mi=").append(pools[i].getMaxIdle())
+                    .append(" mn=").append(pools[i].getMinIdle())
+                    .append(" bwe=").append(pools[i].getBlockWhenExhausted() ? 1 : 0)
+                    .append(" tob=").append(pools[i].getTestOnBorrow() ? 1 : 0)
+                    .append(" made=").append(factories[i].madeCount())
+                    .append(" dst=").append(factories[i].destroyedCount())
+                    .append("]");
+        }
+        return sb.toString();
     }
 
     // --- Widget + factory ---

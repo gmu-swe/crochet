@@ -91,8 +91,10 @@ public final class FuzzHarness {
             sharedTarget.setup();
             setupTotalNs += System.nanoTime() - s;
             if ("crochet_rollback".equals(mode) || "crochet_scoped".equals(mode)) {
-                // Quiesce JIT a little
+                // Quiesce JIT a little, and force class-level touch so
+                // TOUCHED_CLASSES is populated before we snapshot.
                 Coverage.resetForIteration();
+                sharedTarget.stateChecksum();
                 long c = System.nanoTime();
                 if ("crochet_scoped".equals(mode)) {
                     crochetSnapVersion = CheckpointRollbackAgent.checkpoint(sharedTarget);
@@ -168,8 +170,12 @@ public final class FuzzHarness {
                 try {
                     if ("crochet_scoped".equals(mode)) {
                         CheckpointRollbackAgent.rollback(sharedTarget, crochetSnapVersion);
+                        // Re-checkpoint per the §3.1 flat-nested semantics:
+                        // each rollback consumes its snapshot.
+                        crochetSnapVersion = CheckpointRollbackAgent.checkpoint(sharedTarget);
                     } else {
                         CheckpointRollbackAgent.rollbackAll(crochetSnapVersion);
+                        crochetSnapVersion = CheckpointRollbackAgent.checkpointAll();
                     }
                 } catch (Throwable t) {
                     // If rollback fails, fall back to full reset so we don't

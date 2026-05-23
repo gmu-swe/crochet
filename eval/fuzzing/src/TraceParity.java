@@ -40,6 +40,7 @@ public final class TraceParity {
         // Mode 1: full setup/teardown each input.
         long[] checksumsMode1 = new long[n];
         long[] covHashMode1 = new long[n];
+        String[] breakdownMode1 = new String[n];
         for (int i = 0; i < n; i++) {
             Coverage.resetForIteration();
             PoolFleet t = new PoolFleet();
@@ -47,23 +48,40 @@ public final class TraceParity {
             inputs.get(i).execute(t);
             checksumsMode1[i] = t.stateChecksum();
             covHashMode1[i] = hashBitmap(Coverage.snapshot());
+            if (i < 3) breakdownMode1[i] = t.stateBreakdown();
             t.teardown();
         }
 
         // Mode 3: setup once, checkpoint, rollback between inputs.
         long[] checksumsMode3 = new long[n];
         long[] covHashMode3 = new long[n];
+        String[] breakdownMode3 = new String[n];
         PoolFleet sharedT = new PoolFleet();
         sharedT.setup();
-        int snap = CheckpointRollbackAgent.checkpointAll();
+        // Use scoped checkpoint on the PoolFleet root — its propagateRollback
+        // walks the {@code factories[]} array and recursively touches each
+        // factory's instance fields. checkpointAll alone leaves instances
+        // dirty (lazy fastAccess restore only fires on next touch); see
+        // CASE_STUDY-FUZZING.md §"Correctness".
+        sharedT.stateChecksum();
+        int snap = CheckpointRollbackAgent.checkpoint(sharedT);
         for (int i = 0; i < n; i++) {
             Coverage.resetForIteration();
             inputs.get(i).execute(sharedT);
             checksumsMode3[i] = sharedT.stateChecksum();
             covHashMode3[i] = hashBitmap(Coverage.snapshot());
-            CheckpointRollbackAgent.rollbackAll(snap);
+            if (i < 3) breakdownMode3[i] = sharedT.stateBreakdown();
+            CheckpointRollbackAgent.rollback(sharedT, snap);
+            snap = CheckpointRollbackAgent.checkpoint(sharedT);
         }
         sharedT.teardown();
+
+        // Print first-N breakdowns side-by-side to stderr for debug.
+        for (int i = 0; i < Math.min(3, n); i++) {
+            System.err.println("--- i=" + i + " ---");
+            System.err.println(" M1: " + breakdownMode1[i]);
+            System.err.println(" M3: " + breakdownMode3[i]);
+        }
 
         // Compare.
         int divergeCount = 0;
