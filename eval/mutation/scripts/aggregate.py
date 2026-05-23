@@ -35,6 +35,8 @@ def main() -> int:
         except Exception as e:  # noqa: BLE001
             print(f"WARN: failed to parse {p}: {e}", file=sys.stderr)
 
+    # Keep only the full-sweep runs (tag matches r1/r2/r3, not smokeNN).
+    summaries = [s for s in summaries if str(s.get("run", "")).startswith("r")]
     by_mode: dict[str, list[dict]] = {}
     for s in summaries:
         by_mode.setdefault(s["mode"], []).append(s)

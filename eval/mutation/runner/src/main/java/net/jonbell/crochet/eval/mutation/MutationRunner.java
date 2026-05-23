@@ -75,18 +75,26 @@ public final class MutationRunner {
         ClassByteArraySource cbas = new ClassByteArraySource() {
             @Override public Optional<byte[]> getBytes(String name) {
                 String n = name.replace('.', '/');
+                String resource = n + ".class";
+                // Target dir first (so we get the original, unmutated bytes
+                // for the class under test).
                 try {
-                    Path p = a.targetClassesDir.resolve(n + ".class");
+                    Path p = a.targetClassesDir.resolve(resource);
                     if (Files.isRegularFile(p)) return Optional.of(Files.readAllBytes(p));
                 } catch (IOException e) { /* fall through */ }
-                // Fallback to system loader
-                try {
-                    Class<?> c = Class.forName(name);
-                    String resource = c.getName().replace('.', '/') + ".class";
-                    java.io.InputStream in = c.getClassLoader().getResourceAsStream(resource);
-                    if (in == null) return Optional.empty();
-                    return Optional.of(in.readAllBytes());
-                } catch (Throwable t) { return Optional.empty(); }
+                // Then any classloader resource — covers JDK platform classes
+                // (which Class.forName cannot necessarily resolve from our
+                // package-private getResourceAsStream).
+                for (ClassLoader cl : new ClassLoader[]{
+                        Thread.currentThread().getContextClassLoader(),
+                        ClassLoader.getSystemClassLoader(),
+                        ClassLoader.getPlatformClassLoader()}) {
+                    if (cl == null) continue;
+                    try (java.io.InputStream in = cl.getResourceAsStream(resource)) {
+                        if (in != null) return Optional.of(in.readAllBytes());
+                    } catch (Throwable t) { /* try next */ }
+                }
+                return Optional.empty();
             }
         };
 
