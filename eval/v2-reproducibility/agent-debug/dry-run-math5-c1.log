@@ -1,0 +1,26 @@
+[run-trial] Loading corpus entry for Math-5 ...
+[run-trial] Bug: Math-5 | Project: Math | Test: org.apache.commons.math3.complex.ComplexTest::testReciprocalZero
+[run-trial] Step 1: Checking out buggy version of Math-5 ...
+[run-trial]   d4j: Checking out 724795b5 to /tmp/trial-Math-5-C1/buggy........................ OK
+[run-trial]   d4j: Init local repository...................................................... OK
+[run-trial]   d4j: Tag post-fix revision...................................................... OK
+[run-trial]   d4j: Run post-checkout hook..................................................... OK
+[run-trial]   d4j: Excluding broken/flaky tests............................................... OK
+[run-trial]   d4j: Excluding broken/flaky tests............................................... OK
+[run-trial]   d4j: Excluding broken/flaky tests............................................... OK
+[run-trial]   d4j: Initialize fixed program version........................................... OK
+[run-trial]   d4j: Apply patch................................................................ OK
+[run-trial]   d4j: Initialize buggy program version........................................... OK
+[run-trial]   d4j: Diff 724795b5:8c2199df..................................................... OK
+[run-trial]   d4j: Apply patch................................................................ OK
+[run-trial]   d4j: Tag pre-fix revision....................................................... OK
+[run-trial]   d4j: Check out program version: Math-5b......................................... OK
+[run-trial] Applying build fixes: bump source/target from 1.5/1.6 to 1.8 in build.xml; add nashorn-core-15.4.jar to defects4j/major/lib/ant/
+[run-trial]   nashorn-core-15.4.jar missing from /home/jon/defects4j/major/lib/ant — Math mutation may fail (not required for test-only runs)
+[run-trial] Step 2: Compiling Math-5 ...
+[run-trial]   d4j: Running ant (compile)...................................................... OK
+[run-trial]   d4j: Running ant (compile.tests)................................................ OK
+[run-trial] Step 3: Verifying bug reproduces (failing test must fail) ...
+[run-trial]   Bug confirmed: test fails as expected.
+[run-trial] Dry run complete. Worktree: /tmp/trial-Math-5-C1/buggy
+[run-trial] Cleaning up workdir: /tmp/trial-Math-5-C1
