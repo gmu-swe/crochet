@@ -39,7 +39,51 @@ public final class ClassMeta {
     };
 
     public static ClassMeta of(Class<?> userClass) {
-        return CACHE.get(userClass);
+        ClassValue<ClassMeta> cache = CACHE;
+        if (cache == null) {
+            // ClassMeta.<clinit> still in flight — see {@link #warmup()} for
+            // why this should not normally happen, and callers (noteDirty,
+            // fastAccess) for the null-tolerant fallback.
+            return null;
+        }
+        return cache.get(userClass);
+    }
+
+    /**
+     * Force {@link #CACHE}'s assignment to complete by triggering this class's
+     * {@code <clinit>} now, while {@code RuntimeReady.VERSION_GATE == 0}. This
+     * is invoked from {@link net.jonbell.crochet.agent.CrochetAgent#premain}
+     * to prevent the following cycle observed under the instrumented JDK
+     * after the first {@code Crochet.checkpoint()} call lifts VERSION_GATE:
+     *
+     * <pre>
+     *   instrumented-JDK PUTFIELD
+     *     → noteDirty(obj)
+     *       → ClassMeta.of(obj.getClass())     // first reference: triggers <clinit>
+     *         → ClassMeta.<clinit> runs
+     *           → new ClassValue&lt;&gt;() { ... }   // constructs anonymous subclass
+     *             → ClassValue.&lt;init&gt; PUTFIELDs (instrumented under Gap 7)
+     *               → noteDirty(thisClassValue)
+     *                 → ClassMeta.of(...)        // CACHE still null → NPE
+     * </pre>
+     *
+     * <p>{@link FastProxySupport#NOTE_DIRTY_GUARD} stops re-entry through
+     * {@code noteDirty}, but the prehook also calls {@code $$crochetAccess}
+     * which can reach {@link #of} via {@link FastProxySupport#fastAccess}
+     * without going through that guard. The cheapest, broadest fix is to
+     * pre-resolve {@code CACHE} during {@code premain} (when {@code
+     * VERSION_GATE == 0}, so the inner PUTFIELDs short-circuit before
+     * reaching {@code noteDirty} at all) — same idiom as
+     * {@link ArrayRegistry#warmup()} for the same class of bug.
+     */
+    public static void warmup() {
+        // Touching CACHE forces ClassMeta's <clinit> to complete. The
+        // get() call exercises the full path so the ClassValue's own
+        // <clinit> + the first computeValue's <clinit>-of-its-impl-class
+        // also resolve here. After return, CACHE is non-null and any
+        // subsequent ClassMeta.of() lookup from a noteDirty / fastAccess
+        // path on a hot stack will hit the cache directly.
+        CACHE.get(Object.class);
     }
 
     /**

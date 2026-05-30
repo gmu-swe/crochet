@@ -319,6 +319,23 @@ final class FastProxySupport {
         if (inst == null) {
             return;
         }
+        // Skip non-instrumented receivers up front. {@link CRIJInstrumented} is
+        // the marker interface emitted by {@link
+        // net.jonbell.crochet.transform.FieldAdder} on every transformed
+        // class. Classes in the skip-list — notably our own runtime classes
+        // under {@code net/jonbell/crochet/runtime/} like {@code
+        // ArrayRegistry$IdKey} — do NOT carry this interface. Their parent
+        // JDK class ({@link java.lang.ref.Reference}) IS instrumented under
+        // Gap 7, so when {@code Reference.<init>} fires its instrumented
+        // PUTFIELD on {@code this} where {@code this} happens to be an
+        // {@code IdKey}, {@code noteDirty(IdKey)} is invoked with a receiver
+        // whose class lacks {@code $$crochetLookup}. Without this guard,
+        // {@link ClassMeta#versionHandles} unwinds with an
+        // {@link IllegalStateException} that propagates through
+        // {@code Reference.<init>}, breaking every instrumented-JDK demo.
+        if (!(inst instanceof CRIJInstrumented)) {
+            return;
+        }
         int slot = (int) (Thread.currentThread().threadId() & 0x1FFL);
         if (NOTE_DIRTY_GUARD[slot]) {
             // Re-entrant: a JDK-internal PUTFIELD (e.g. ClassValue$Version)
@@ -337,7 +354,31 @@ final class FastProxySupport {
             if (c == null) {
                 return;
             }
-            ClassMeta.VersionHandles handles = ClassMeta.of(c).versionHandles();
+            // Skip when the class itself was skip-listed by the transformer
+            // (notably our own internal runtime classes under
+            // {@code net.jonbell.crochet.*} and shaded ASM). Such classes
+            // inherit {@link CRIJInstrumented} from an instrumented parent
+            // ({@link java.lang.ref.Reference} for {@code ArrayRegistry$IdKey})
+            // but lack their own {@code $$crochetLookup}, so
+            // {@link ClassMeta#versionHandles} would throw
+            // {@link IllegalStateException} on every call. The transformer's
+            // {@code shouldSkip} reads these prefixes; we mirror them here so
+            // a JDK parent class's instrumented PUTFIELD on a skip-listed
+            // subclass receiver short-circuits cleanly.
+            String name = c.getName();
+            if (name.startsWith("net.jonbell.crochet.")
+                    || name.startsWith("edu.neu.ccs.prl.crochet.")) {
+                return;
+            }
+            ClassMeta meta = ClassMeta.of(c);
+            if (meta == null) {
+                // ClassMeta.<clinit> still in flight (see ClassMeta.warmup() for
+                // why this is rare). The dirty bit can't be set yet; the next
+                // PUTFIELD on this instance will retry, and fastAccess treats a
+                // missing dirty handle as always-dirty (safe fallback).
+                return;
+            }
+            ClassMeta.VersionHandles handles = meta.versionHandles();
             if (handles.dirty == null) {
                 // Pre-F.1 class or failed VarHandle resolution: no dirty field.
                 // Safe to skip — fastAccess treats missing dirty handle as always-dirty.
