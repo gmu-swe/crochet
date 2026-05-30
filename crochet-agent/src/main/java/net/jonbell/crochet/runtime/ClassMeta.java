@@ -211,6 +211,16 @@ public final class ClassMeta {
         if (l != null) {
             return l;
         }
+        // Side-table publication (from user-class clinit) is the preferred
+        // source — its Lookup was captured inside the user class's own frame
+        // and has the correct lookupClass(). The reflective fallback below
+        // is only reached on classes whose clinit didn't run our emit (JDK
+        // internals reached during very early boot before agent install).
+        l = CheckpointRollbackAgent.publishedLookup(userClass);
+        if (l != null) {
+            lookup = l;
+            return l;
+        }
         try {
             // Resolve via a MethodHandle rather than {@link
             // java.lang.reflect.Method#invoke}. {@code MethodHandles.lookup()}

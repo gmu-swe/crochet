@@ -58,7 +58,19 @@ if [ "$USE_INSTRUMENTED" = "1" ]; then
     # The packed CheckpointRollbackAgent still references sun.misc.Unsafe
     # (jdk.unsupported); java.base cannot declare `requires jdk.unsupported`
     # so the runtime reads must be granted externally.
-    EXTRA_ARGS="--add-reads java.base=jdk.unsupported"
+    # java.base needs:
+    #   - jdk.unsupported (for sun.misc.Unsafe, used throughout the runtime)
+    #   - java.logging (for ExternalStateRegistry's Logger usage on the
+    #     checkpointAll path; without this, IllegalAccessError fires from
+    #     ExternalStateRegistry.<clinit> when the runtime is in java.base
+    #     and java.util.logging.Logger lives in module java.logging)
+    # -Dcrochet.checkpointAll.skipSystem=true:
+    #     checkpointAll's system-classloader walk would otherwise recurse
+    #     into Class.getDeclaredMethod → resolveLookup → instrumented
+    #     PUTFIELDs on Class$ReflectionData (StackOverflowError on the
+    #     packed JDK). The flag is documented in CLAUDE.md as the opt-out
+    #     for test frameworks; the demos are exactly that kind of caller.
+    EXTRA_ARGS="--add-reads java.base=jdk.unsupported --add-reads java.base=java.logging -Dcrochet.checkpointAll.skipSystem=true"
     MODE="instrumented ($INST_JDK)"
 fi
 
@@ -74,14 +86,30 @@ for dir in scenarios/*/; do
     printf '=== %-40s ' "$scenario"
 
     # Build compile-time and runtime classpaths.
-    # TTD jar is appended when present so TTD-annotated scenarios compile.
+    #
+    # TTD jar is appended on the compile classpath for ALL scenarios so
+    # TTD-annotated scenarios compile. But at runtime we ONLY attach the
+    # TTD agent for scenarios that actually use it — scenarios 22-25. The
+    # TTD agent's NondetTransformer rewrites \`System.currentTimeMillis\` /
+    # \`System.identityHashCode\` etc. to \`NondetRecorder.X()\`. When the
+    # crochet runtime is packed into java.base (instrumented JDK), those
+    # rewritten callsites fire from bootstrap-loaded classes; the
+    # NondetRecorder class lives in crochet-ttd which is not on the
+    # bootstrap classpath, so the call resolves to NoClassDefFoundError
+    # and tears down rollback semantics for every basic scenario. Keeping
+    # TTD off for the basic scenarios sidesteps that path while leaving
+    # the TTD scenarios themselves with the agent they require.
     COMPILE_CP="$AGENT_JAR"
     RUN_CP=".:$AGENT_JAR"
     TTD_AGENTS=""
     if [ -n "${TTD_JAR:-}" ] && [ -f "$TTD_JAR" ]; then
         COMPILE_CP="$AGENT_JAR:$TTD_JAR"
-        RUN_CP=".:$AGENT_JAR:$TTD_JAR"
-        TTD_AGENTS="-javaagent:$TTD_JAR"
+        case "$scenario" in
+            22-*|23-*|24-*|25-*)
+                RUN_CP=".:$AGENT_JAR:$TTD_JAR"
+                TTD_AGENTS="-javaagent:$TTD_JAR"
+                ;;
+        esac
     fi
 
     (cd "$dir" && rm -f *.class && $JAVAC_CMD -cp "$COMPILE_CP" *.java) >/tmp/compile.log 2>&1
