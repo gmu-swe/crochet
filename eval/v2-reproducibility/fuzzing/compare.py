@@ -15,7 +15,7 @@ COMMITTED = HERE.parents[1] / "fuzzing" / "results" / "primary-w50-3rep-5min"
 
 
 def load(d: Path):
-    rows: list[dict] = []
+    rows = []
     for p in sorted(d.glob("*.json")):
         try:
             s = json.loads(p.read_text())
@@ -28,7 +28,7 @@ def load(d: Path):
 
 
 def by_mode(rows):
-    out: dict[str, list[dict]] = {}
+    out = {}
     for r in rows:
         out.setdefault(r["mode"], []).append(r)
     return out
@@ -48,7 +48,7 @@ def main():
     modes = ["baseline_perIter", "baseline_shared", "crochet_scoped", "crochet_rollback"]
 
     print("| Mode | V.2 iter/s (mean ± sd) | V.2 branches (mean ± sd) | V.2 N | Committed iter/s | Committed branches | Δ% iter/s |")
-    print("|---|---|---|---:|---:|---:|---:|")
+    print("|---|---:|---:|---:|---:|---:|---:|")
     for m in modes:
         v2 = v2_rows.get(m, [])
         cm = cm_rows.get(m, [])
@@ -67,9 +67,25 @@ def main():
         else:
             d = f"{100.0 * (v2_ips_m - cm_ips_m) / cm_ips_m:+.1f}%"
 
-        print(f"| {m} | {v2_ips_m:.2f} ± {v2_ips_s:.2f} | "
-              f"{v2_br_m:.1f} ± {v2_br_s:.1f} | {len(v2)} | "
-              f"{cm_ips_m:.2f} | {cm_br_m:.1f} | {d} |")
+        v2_ips_str = f"{v2_ips_m:.2f} ± {v2_ips_s:.2f}" if not math.isnan(v2_ips_m) else "—"
+        v2_br_str = f"{v2_br_m:.1f} ± {v2_br_s:.1f}" if not math.isnan(v2_br_m) else "—"
+        cm_ips_str = f"{cm_ips_m:.2f}" if not math.isnan(cm_ips_m) else "—"
+        cm_br_str = f"{cm_br_m:.1f}" if not math.isnan(cm_br_m) else "—"
+
+        print(f"| `{m}` | {v2_ips_str} | {v2_br_str} | {len(v2)} | {cm_ips_str} | {cm_br_str} | {d} |")
+
+    # V.2 speedup ratios
+    print()
+    print("### V.2 speedup ratios (mean iter/s)")
+    try:
+        ips = {m: statistics.mean(r.get("itersPerSec", 0) for r in v2_rows.get(m, [])) for m in modes}
+        base = ips.get("baseline_perIter", 0)
+        if base:
+            for m in ("baseline_shared", "crochet_scoped", "crochet_rollback"):
+                if ips.get(m):
+                    print(f"- {m} / baseline_perIter = {ips[m] / base:.2f}× iter/s")
+    except (KeyError, statistics.StatisticsError):
+        print("(insufficient data)")
 
 
 if __name__ == "__main__":

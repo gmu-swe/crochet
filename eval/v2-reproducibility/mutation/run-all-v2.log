@@ -1,0 +1,3469 @@
+=== rep 1 / 3 ===
+>> Generated 2 Killed 2 (100%)
+> KILLED 2 SURVIVED 0 TIMED_OUT 0 NON_VIABLE 0 
+> MEMORY_ERROR 0 NOT_STARTED 0 STARTED 0 RUN_ERROR 0 
+> NO_COVERAGE 0 
+--------------------------------------------------------------------------------
+> org.pitest.mutationtest.engine.gregor.mutators.NegateConditionalsMutator
+>> Generated 92 Killed 89 (97%)
+> KILLED 86 SURVIVED 1 TIMED_OUT 3 NON_VIABLE 0 
+> MEMORY_ERROR 0 NOT_STARTED 0 STARTED 0 RUN_ERROR 0 
+> NO_COVERAGE 2 
+--------------------------------------------------------------------------------
+================================================================================
+- Timings
+================================================================================
+> pre-scan for mutations : < 1 second
+> scan classpath : < 1 second
+> coverage and dependency analysis : < 1 second
+> build mutation tests : < 1 second
+> run mutation analysis : 1 minutes and 59 seconds
+--------------------------------------------------------------------------------
+> Total  : 2 minutes and 0 seconds
+--------------------------------------------------------------------------------
+================================================================================
+- Statistics
+================================================================================
+>> Line Coverage (for mutated classes only): 254/259 (98%)
+>> Generated 267 mutations Killed 225 (84%)
+>> Mutations with no coverage 5. Test strength 86%
+>> Ran 365 tests (1.37 tests per mutation)
+Enhanced functionality available at https://www.arcmutate.com/
+DONE baseline-fork run=r1 mutants=267 killed=215 survived=37 noCov=5
+  elapsed: 123.43s
+  summary: /home/jon/crochet/.claude/worktrees/agent-a808156e0bdbe0014/eval/v2-reproducibility/mutation/baseline-fork.r1.json
+  report : /home/jon/crochet/.claude/worktrees/agent-a808156e0bdbe0014/eval/v2-reproducibility/mutation/pit-report-fork-r1
+May 30, 2026 5:39:32 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+warmup: 0.351s, passed=25 failed=0
+May 30, 2026 5:39:32 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:39:33 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:39:33 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:39:33 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:39:33 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:39:33 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:39:33 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:39:33 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:39:33 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:39:33 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:39:34 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:39:34 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:39:34 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:39:34 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:39:34 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:39:34 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:39:34 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:39:34 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:39:34 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:39:35 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:39:35 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:39:35 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:39:35 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:39:35 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:39:35 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+[baseline-nofork] 25/272 killed=22 survived=3 err=0  elapsed=2.8s
+May 30, 2026 5:39:35 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:39:35 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:39:35 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:39:35 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:39:36 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:39:36 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:39:36 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:39:36 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:39:36 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:39:36 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:39:36 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:39:36 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:39:36 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:39:36 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:39:37 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:39:37 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:39:37 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:39:37 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:39:37 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:39:37 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:39:37 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:39:37 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:39:37 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:39:37 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:39:37 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+[baseline-nofork] 50/272 killed=43 survived=7 err=0  elapsed=4.8s
+May 30, 2026 5:39:37 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:39:37 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:39:37 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:39:37 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:39:37 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:39:37 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:39:37 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:39:38 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:39:38 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:39:38 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:39:38 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:39:38 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:39:38 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:39:38 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:39:38 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:39:38 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:39:38 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:39:38 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:39:38 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:39:38 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:39:39 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:39:39 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:39:39 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:39:39 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:39:39 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+[baseline-nofork] 75/272 killed=61 survived=14 err=0  elapsed=6.7s
+May 30, 2026 5:39:39 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:39:39 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:39:39 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:39:39 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:39:40 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:39:40 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:39:40 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:39:40 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:39:40 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:39:40 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:39:40 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:39:40 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:39:41 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:39:41 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:39:41 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:39:41 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:39:41 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:39:41 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:39:41 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:39:41 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:39:41 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:39:42 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:39:42 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:39:42 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:39:42 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+[baseline-nofork] 100/272 killed=82 survived=18 err=0  elapsed=9.7s
+May 30, 2026 5:39:42 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:39:42 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:39:42 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:39:42 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:39:43 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:39:43 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:39:43 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:39:43 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:39:43 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:39:43 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:39:43 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:39:43 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:39:44 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:39:44 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:39:44 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:39:44 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:39:44 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:39:44 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:39:44 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:39:45 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:39:45 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:39:45 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:39:45 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:39:45 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:39:45 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+[baseline-nofork] 125/272 killed=105 survived=20 err=0  elapsed=12.9s
+May 30, 2026 5:39:45 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:39:45 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:39:46 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:39:46 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:39:46 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:39:46 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:39:46 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:39:46 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:39:46 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:39:46 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:39:47 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:39:47 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:39:47 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:39:47 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:39:47 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:39:47 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:39:47 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:39:47 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:39:48 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:39:48 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:39:48 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:39:48 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:39:48 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:39:48 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:39:48 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+[baseline-nofork] 150/272 killed=123 survived=27 err=0  elapsed=15.9s
+May 30, 2026 5:39:48 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:39:50 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:39:50 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:39:52 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:39:53 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:39:53 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:39:55 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:39:55 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:39:56 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:39:57 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:39:57 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:39:57 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:39:57 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:39:58 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:39:58 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:39:59 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:39:59 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:00 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:00 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:00 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:00 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:01 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:02 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:04 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:05 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+[baseline-nofork] 175/272 killed=143 survived=32 err=0  elapsed=32.9s
+May 30, 2026 5:40:05 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:07 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:08 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:10 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:12 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:12 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:12 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:12 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:12 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:12 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:12 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:12 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:12 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:13 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:13 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:13 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:13 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:13 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:13 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:13 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:14 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:14 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:14 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:14 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:14 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+[baseline-nofork] 200/272 killed=166 survived=34 err=0  elapsed=41.8s
+May 30, 2026 5:40:14 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:14 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:15 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:15 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:15 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:15 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:15 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:15 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:15 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:15 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:16 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:16 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:16 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:16 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:16 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:16 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:16 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:17 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:17 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:17 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:17 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:17 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:17 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:18 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:18 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+[baseline-nofork] 225/272 killed=189 survived=36 err=0  elapsed=45.4s
+May 30, 2026 5:40:18 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:18 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:18 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:18 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:18 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:19 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:19 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:19 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:19 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:19 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:19 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:19 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:20 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:20 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:20 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:20 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:20 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:20 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:20 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:21 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:21 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:21 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:21 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:21 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:21 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+[baseline-nofork] 250/272 killed=210 survived=40 err=0  elapsed=49.0s
+May 30, 2026 5:40:21 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:22 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:22 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:22 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:22 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:22 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:22 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:23 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:23 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:23 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:23 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:23 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:23 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:23 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:24 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:24 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:24 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:24 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:24 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:24 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:25 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:25 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+DONE mode=baseline-nofork mutants=272 killed=226 survived=46 errored=0 total=52.50s avg=0.193s/mut peakRss=1480MB
+DONE baseline-nofork run=r1 out=/home/jon/crochet/.claude/worktrees/agent-a808156e0bdbe0014/eval/v2-reproducibility/mutation/baseline-nofork.r1.json
+{"summary": true, "mode": "baseline-nofork", "target": "org.apache.commons.lang3.math.Fraction", "mutants": 272, "killed": 226, "survived": 46, "errored": 0, "sweepNs": 52504031956, "warmupNs": 350615003, "peakRssKb": 1516048, "run": "r1"}
+May 30, 2026 5:40:26 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+warmup: 0.572s, passed=25 failed=0
+checkpointAll: 0.180s, version=1
+May 30, 2026 5:40:26 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:27 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:27 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:27 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:27 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:27 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:27 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:28 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:28 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:28 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:28 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:28 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:28 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:28 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:29 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:29 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:29 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:29 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:29 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:29 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:30 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:30 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:30 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:30 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:30 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+[crochet] 25/272 killed=22 survived=3 err=0  elapsed=3.9s
+May 30, 2026 5:40:30 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:30 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:30 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:31 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:31 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:31 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:31 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:31 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:31 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:31 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:32 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:32 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:32 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:32 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:32 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:32 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:32 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:32 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:33 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:33 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:33 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:33 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:33 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:33 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:33 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+[crochet] 50/272 killed=43 survived=7 err=0  elapsed=6.9s
+May 30, 2026 5:40:33 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:33 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:34 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:34 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:34 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:34 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:34 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:34 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:34 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:34 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:34 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:35 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:35 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:35 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:35 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:35 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:35 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:35 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:35 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:36 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:36 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:36 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:36 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:36 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:36 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+[crochet] 75/272 killed=61 survived=14 err=0  elapsed=10.0s
+May 30, 2026 5:40:36 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:37 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:37 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:37 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:37 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:37 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:37 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:38 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:38 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:38 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:38 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:38 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:38 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:38 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:39 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:39 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:39 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:39 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:39 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:39 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:40 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:40 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:40 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:40 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:40 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+[crochet] 100/272 killed=82 survived=18 err=0  elapsed=14.1s
+May 30, 2026 5:40:40 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:41 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:41 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:41 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:41 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:41 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:41 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:42 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:42 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:42 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:42 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:42 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:42 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:43 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:43 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:43 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:43 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:43 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:43 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:44 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:44 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:44 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:44 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:44 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:44 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+[crochet] 125/272 killed=105 survived=20 err=0  elapsed=18.2s
+May 30, 2026 5:40:45 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:45 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:45 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:45 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:45 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:46 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:46 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:46 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:46 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:46 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:46 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:47 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:47 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:47 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:47 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:47 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:48 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:48 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:48 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:48 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:48 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:48 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:48 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:49 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:49 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+[crochet] 150/272 killed=123 survived=27 err=0  elapsed=22.4s
+May 30, 2026 5:40:49 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:50 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:51 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:52 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:54 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:54 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:56 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:56 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:57 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:57 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:58 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:58 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:58 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:40:59 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:41:00 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:41:00 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:41:00 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:41:01 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:41:01 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:41:02 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:41:02 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:41:02 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:41:03 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:41:05 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:41:07 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+[crochet] 175/272 killed=143 survived=32 err=0  elapsed=40.3s
+May 30, 2026 5:41:07 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:41:08 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:41:10 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:41:12 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:41:13 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:41:13 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:41:13 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:41:14 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:41:14 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:41:14 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:41:14 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:41:14 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:41:14 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:41:15 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:41:15 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:41:15 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:41:15 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:41:15 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:41:16 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:41:16 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:41:16 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:41:16 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:41:16 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:41:16 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:41:17 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+[crochet] 200/272 killed=166 survived=34 err=0  elapsed=50.4s
+May 30, 2026 5:41:17 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:41:17 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:41:17 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:41:17 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:41:18 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:41:18 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:41:18 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:41:18 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:41:18 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:41:19 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:41:19 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:41:19 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:41:19 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:41:19 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:41:20 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:41:20 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:41:20 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:41:20 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:41:20 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:41:21 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:41:21 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:41:21 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:41:21 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:41:21 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:41:22 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+[crochet] 225/272 killed=189 survived=36 err=0  elapsed=55.3s
+May 30, 2026 5:41:22 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:41:22 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:41:22 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:41:22 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:41:23 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:41:23 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:41:23 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:41:23 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:41:23 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:41:24 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:41:24 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:41:24 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:41:24 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:41:24 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:41:25 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:41:25 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:41:25 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:41:25 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:41:25 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:41:26 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:41:26 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:41:26 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:41:26 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:41:27 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:41:27 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+[crochet] 250/272 killed=210 survived=40 err=0  elapsed=60.6s
+May 30, 2026 5:41:27 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:41:27 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:41:27 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:41:28 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:41:28 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:41:28 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:41:28 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:41:29 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:41:29 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:41:29 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:41:29 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:41:29 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:41:30 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:41:30 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:41:30 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:41:30 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:41:30 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:41:31 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:41:31 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:41:31 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:41:31 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:41:31 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+DONE mode=crochet mutants=272 killed=226 survived=46 errored=0 total=65.25s avg=0.240s/mut peakRss=1544MB
+DONE crochet run=r1 out=/home/jon/crochet/.claude/worktrees/agent-a808156e0bdbe0014/eval/v2-reproducibility/mutation/crochet.r1.json
+{"summary": true, "mode": "crochet", "target": "org.apache.commons.lang3.math.Fraction", "mutants": 272, "killed": 226, "survived": 46, "errored": 0, "sweepNs": 65247739747, "warmupNs": 572089997, "peakRssKb": 1582060, "run": "r1"}
+=== rep 2 / 3 ===
+>> Generated 2 Killed 2 (100%)
+> KILLED 2 SURVIVED 0 TIMED_OUT 0 NON_VIABLE 0 
+> MEMORY_ERROR 0 NOT_STARTED 0 STARTED 0 RUN_ERROR 0 
+> NO_COVERAGE 0 
+--------------------------------------------------------------------------------
+> org.pitest.mutationtest.engine.gregor.mutators.NegateConditionalsMutator
+>> Generated 92 Killed 89 (97%)
+> KILLED 86 SURVIVED 1 TIMED_OUT 3 NON_VIABLE 0 
+> MEMORY_ERROR 0 NOT_STARTED 0 STARTED 0 RUN_ERROR 0 
+> NO_COVERAGE 2 
+--------------------------------------------------------------------------------
+================================================================================
+- Timings
+================================================================================
+> pre-scan for mutations : < 1 second
+> scan classpath : < 1 second
+> coverage and dependency analysis : < 1 second
+> build mutation tests : < 1 second
+> run mutation analysis : 1 minutes and 59 seconds
+--------------------------------------------------------------------------------
+> Total  : 2 minutes and 0 seconds
+--------------------------------------------------------------------------------
+================================================================================
+- Statistics
+================================================================================
+>> Line Coverage (for mutated classes only): 254/259 (98%)
+>> Generated 267 mutations Killed 225 (84%)
+>> Mutations with no coverage 5. Test strength 86%
+>> Ran 364 tests (1.36 tests per mutation)
+Enhanced functionality available at https://www.arcmutate.com/
+DONE baseline-fork run=r2 mutants=267 killed=215 survived=37 noCov=5
+  elapsed: 123.23s
+  summary: /home/jon/crochet/.claude/worktrees/agent-a808156e0bdbe0014/eval/v2-reproducibility/mutation/baseline-fork.r2.json
+  report : /home/jon/crochet/.claude/worktrees/agent-a808156e0bdbe0014/eval/v2-reproducibility/mutation/pit-report-fork-r2
+May 30, 2026 5:43:36 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+warmup: 0.354s, passed=25 failed=0
+May 30, 2026 5:43:36 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:43:36 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:43:36 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:43:36 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:43:36 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:43:36 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:43:36 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:43:37 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:43:37 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:43:37 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:43:37 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:43:37 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:43:37 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:43:37 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:43:37 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:43:37 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:43:38 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:43:38 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:43:38 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:43:38 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:43:38 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:43:38 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:43:38 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:43:38 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:43:38 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+[baseline-nofork] 25/272 killed=22 survived=3 err=0  elapsed=2.7s
+May 30, 2026 5:43:39 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:43:39 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:43:39 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:43:39 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:43:39 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:43:39 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:43:39 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:43:39 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:43:39 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:43:39 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:43:40 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:43:40 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:43:40 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:43:40 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:43:40 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:43:40 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:43:40 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:43:40 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:43:40 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:43:40 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:43:40 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:43:40 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:43:40 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:43:41 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:43:41 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+[baseline-nofork] 50/272 killed=43 survived=7 err=0  elapsed=4.9s
+May 30, 2026 5:43:41 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:43:41 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:43:41 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:43:41 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:43:41 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:43:41 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:43:41 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:43:41 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:43:41 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:43:41 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:43:41 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:43:41 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:43:42 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:43:42 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:43:42 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:43:42 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:43:42 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:43:42 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:43:42 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:43:42 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:43:42 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:43:42 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:43:42 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:43:42 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:43:43 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+[baseline-nofork] 75/272 killed=61 survived=14 err=0  elapsed=7.0s
+May 30, 2026 5:43:43 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:43:43 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:43:43 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:43:43 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:43:43 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:43:43 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:43:43 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:43:44 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:43:44 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:43:44 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:43:44 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:43:44 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:43:44 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:43:44 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:43:44 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:43:44 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:43:45 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:43:45 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:43:45 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:43:45 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:43:45 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:43:45 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:43:45 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:43:45 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:43:46 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+[baseline-nofork] 100/272 killed=82 survived=18 err=0  elapsed=10.0s
+May 30, 2026 5:43:46 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:43:46 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:43:46 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:43:46 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:43:46 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:43:46 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:43:47 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:43:47 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:43:47 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:43:47 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:43:47 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:43:47 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:43:47 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:43:47 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:43:48 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:43:48 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:43:48 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:43:48 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:43:48 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:43:48 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:43:48 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:43:48 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:43:49 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:43:49 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:43:49 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+[baseline-nofork] 125/272 killed=105 survived=20 err=0  elapsed=13.2s
+May 30, 2026 5:43:49 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:43:49 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:43:49 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:43:49 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:43:50 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:43:50 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:43:50 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:43:50 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:43:50 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:43:50 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:43:50 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:43:51 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:43:51 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:43:51 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:43:51 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:43:51 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:43:51 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:43:51 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:43:51 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:43:51 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:43:52 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:43:52 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:43:52 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:43:52 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:43:52 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+[baseline-nofork] 150/272 killed=123 survived=27 err=0  elapsed=16.2s
+May 30, 2026 5:43:52 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:43:54 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:43:54 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:43:55 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:43:57 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:43:57 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:43:59 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:43:59 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:00 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:00 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:00 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:00 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:01 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:02 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:02 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:02 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:02 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:04 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:04 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:04 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:04 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:04 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:06 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:07 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:09 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+[baseline-nofork] 175/272 killed=143 survived=32 err=0  elapsed=33.3s
+May 30, 2026 5:44:09 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:11 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:12 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:14 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:15 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:15 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:15 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:16 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:16 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:16 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:16 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:16 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:16 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:16 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:16 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:17 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:17 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:17 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:17 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:17 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:17 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:17 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:18 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:18 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:18 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+[baseline-nofork] 200/272 killed=166 survived=34 err=0  elapsed=42.2s
+May 30, 2026 5:44:18 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:18 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:18 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:18 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:19 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:19 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:19 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:19 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:19 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:19 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:19 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:19 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:20 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:20 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:20 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:20 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:20 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:20 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:21 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:21 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:21 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:21 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:21 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:21 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:21 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+[baseline-nofork] 225/272 killed=189 survived=36 err=0  elapsed=45.7s
+May 30, 2026 5:44:22 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:22 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:22 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:22 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:22 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:22 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:22 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:23 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:23 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:23 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:23 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:23 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:23 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:23 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:24 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:24 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:24 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:24 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:24 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:24 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:24 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:25 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:25 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:25 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:25 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+[baseline-nofork] 250/272 killed=210 survived=40 err=0  elapsed=49.4s
+May 30, 2026 5:44:25 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:25 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:26 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:26 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:26 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:26 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:26 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:26 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:27 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:27 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:27 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:27 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:27 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:27 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:27 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:28 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:28 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:28 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:28 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:28 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:28 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:29 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+DONE mode=baseline-nofork mutants=272 killed=226 survived=46 errored=0 total=52.92s avg=0.195s/mut peakRss=1486MB
+DONE baseline-nofork run=r2 out=/home/jon/crochet/.claude/worktrees/agent-a808156e0bdbe0014/eval/v2-reproducibility/mutation/baseline-nofork.r2.json
+{"summary": true, "mode": "baseline-nofork", "target": "org.apache.commons.lang3.math.Fraction", "mutants": 272, "killed": 226, "survived": 46, "errored": 0, "sweepNs": 52922192598, "warmupNs": 353508482, "peakRssKb": 1522608, "run": "r2"}
+May 30, 2026 5:44:30 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+warmup: 0.563s, passed=25 failed=0
+checkpointAll: 0.184s, version=1
+May 30, 2026 5:44:30 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:30 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:31 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:31 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:31 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:31 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:31 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:31 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:31 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:32 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:32 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:32 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:32 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:32 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:32 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:33 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:33 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:33 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:33 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:33 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:33 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:33 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:34 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:34 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:34 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+[crochet] 25/272 killed=22 survived=3 err=0  elapsed=3.8s
+May 30, 2026 5:44:34 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:34 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:34 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:34 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:34 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:35 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:35 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:35 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:35 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:35 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:35 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:35 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:36 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:36 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:36 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:36 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:36 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:36 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:36 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:36 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:37 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:37 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:37 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:37 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:37 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+[crochet] 50/272 killed=43 survived=7 err=0  elapsed=6.8s
+May 30, 2026 5:44:37 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:37 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:37 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:37 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:37 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:37 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:38 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:38 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:38 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:38 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:38 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:38 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:38 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:38 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:39 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:39 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:39 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:39 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:39 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:39 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:39 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:39 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:40 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:40 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:40 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+[crochet] 75/272 killed=61 survived=14 err=0  elapsed=9.8s
+May 30, 2026 5:44:40 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:40 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:40 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:41 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:41 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:41 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:41 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:41 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:41 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:41 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:42 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:42 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:42 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:42 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:42 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:42 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:42 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:43 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:43 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:43 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:43 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:43 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:43 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:44 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:44 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+[crochet] 100/272 killed=82 survived=18 err=0  elapsed=13.8s
+May 30, 2026 5:44:44 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:44 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:44 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:45 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:45 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:45 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:45 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:45 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:45 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:46 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:46 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:46 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:46 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:46 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:46 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:47 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:47 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:47 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:47 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:47 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:47 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:48 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:48 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:48 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:48 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+[crochet] 125/272 killed=105 survived=20 err=0  elapsed=18.0s
+May 30, 2026 5:44:48 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:48 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:49 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:49 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:49 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:49 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:49 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:49 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:50 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:50 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:50 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:50 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:50 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:51 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:51 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:51 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:51 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:51 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:51 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:52 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:52 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:52 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:52 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:52 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:52 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+[crochet] 150/272 killed=123 survived=27 err=0  elapsed=22.2s
+May 30, 2026 5:44:52 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:54 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:54 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:56 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:57 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:58 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:59 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:44:59 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:45:01 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:45:01 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:45:01 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:45:01 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:45:01 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:45:03 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:45:03 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:45:03 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:45:03 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:45:05 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:45:05 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:45:05 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:45:05 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:45:05 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:45:07 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:45:08 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:45:10 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+[crochet] 175/272 killed=143 survived=32 err=0  elapsed=40.0s
+May 30, 2026 5:45:10 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:45:12 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:45:13 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:45:15 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:45:17 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:45:17 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:45:17 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:45:17 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:45:17 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:45:17 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:45:17 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:45:18 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:45:18 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:45:18 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:45:18 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:45:18 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:45:19 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:45:19 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:45:19 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:45:19 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:45:19 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:45:20 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:45:20 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:45:20 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:45:20 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+[crochet] 200/272 killed=166 survived=34 err=0  elapsed=50.0s
+May 30, 2026 5:45:20 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:45:20 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:45:21 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:45:21 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:45:21 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:45:21 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:45:21 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:45:22 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:45:22 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:45:22 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:45:22 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:45:22 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:45:23 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:45:23 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:45:23 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:45:23 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:45:23 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:45:24 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:45:24 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:45:24 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:45:24 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:45:24 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:45:24 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:45:25 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:45:25 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+[crochet] 225/272 killed=189 survived=36 err=0  elapsed=54.7s
+May 30, 2026 5:45:25 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:45:25 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:45:25 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:45:26 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:45:26 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:45:26 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:45:26 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:45:26 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:45:26 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:45:27 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:45:27 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:45:27 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:45:27 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:45:27 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:45:28 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:45:28 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:45:28 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:45:28 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:45:29 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:45:29 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:45:29 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:45:29 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:45:29 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:45:30 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:45:30 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+[crochet] 250/272 killed=210 survived=40 err=0  elapsed=59.8s
+May 30, 2026 5:45:30 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:45:30 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:45:30 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:45:31 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:45:31 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:45:31 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:45:31 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:45:32 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:45:32 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:45:32 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:45:32 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:45:32 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:45:33 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:45:33 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:45:33 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:45:33 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:45:33 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:45:34 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:45:34 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:45:34 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:45:34 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:45:34 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+DONE mode=crochet mutants=272 killed=226 survived=46 errored=0 total=64.37s avg=0.237s/mut peakRss=1552MB
+DONE crochet run=r2 out=/home/jon/crochet/.claude/worktrees/agent-a808156e0bdbe0014/eval/v2-reproducibility/mutation/crochet.r2.json
+{"summary": true, "mode": "crochet", "target": "org.apache.commons.lang3.math.Fraction", "mutants": 272, "killed": 226, "survived": 46, "errored": 0, "sweepNs": 64370111107, "warmupNs": 562579412, "peakRssKb": 1589852, "run": "r2"}
+=== rep 3 / 3 ===
+>> Generated 2 Killed 2 (100%)
+> KILLED 2 SURVIVED 0 TIMED_OUT 0 NON_VIABLE 0 
+> MEMORY_ERROR 0 NOT_STARTED 0 STARTED 0 RUN_ERROR 0 
+> NO_COVERAGE 0 
+--------------------------------------------------------------------------------
+> org.pitest.mutationtest.engine.gregor.mutators.NegateConditionalsMutator
+>> Generated 92 Killed 89 (97%)
+> KILLED 86 SURVIVED 1 TIMED_OUT 3 NON_VIABLE 0 
+> MEMORY_ERROR 0 NOT_STARTED 0 STARTED 0 RUN_ERROR 0 
+> NO_COVERAGE 2 
+--------------------------------------------------------------------------------
+================================================================================
+- Timings
+================================================================================
+> pre-scan for mutations : < 1 second
+> scan classpath : < 1 second
+> coverage and dependency analysis : < 1 second
+> build mutation tests : < 1 second
+> run mutation analysis : 2 minutes and 0 seconds
+--------------------------------------------------------------------------------
+> Total  : 2 minutes and 1 seconds
+--------------------------------------------------------------------------------
+================================================================================
+- Statistics
+================================================================================
+>> Line Coverage (for mutated classes only): 254/259 (98%)
+>> Generated 267 mutations Killed 225 (84%)
+>> Mutations with no coverage 5. Test strength 86%
+>> Ran 367 tests (1.37 tests per mutation)
+Enhanced functionality available at https://www.arcmutate.com/
+DONE baseline-fork run=r3 mutants=267 killed=215 survived=37 noCov=5
+  elapsed: 123.80s
+  summary: /home/jon/crochet/.claude/worktrees/agent-a808156e0bdbe0014/eval/v2-reproducibility/mutation/baseline-fork.r3.json
+  report : /home/jon/crochet/.claude/worktrees/agent-a808156e0bdbe0014/eval/v2-reproducibility/mutation/pit-report-fork-r3
+May 30, 2026 5:47:39 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+warmup: 0.367s, passed=25 failed=0
+May 30, 2026 5:47:39 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:47:39 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:47:39 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:47:40 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:47:40 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:47:40 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:47:40 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:47:40 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:47:40 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:47:40 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:47:40 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:47:41 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:47:41 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:47:41 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:47:41 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:47:41 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:47:41 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:47:41 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:47:41 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:47:41 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:47:42 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:47:42 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:47:42 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:47:42 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:47:42 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+[baseline-nofork] 25/272 killed=22 survived=3 err=0  elapsed=2.9s
+May 30, 2026 5:47:42 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:47:42 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:47:42 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:47:42 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:47:42 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:47:43 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:47:43 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:47:43 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:47:43 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:47:43 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:47:43 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:47:43 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:47:43 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:47:43 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:47:43 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:47:43 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:47:43 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:47:44 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:47:44 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:47:44 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:47:44 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:47:44 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:47:44 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:47:44 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:47:44 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+[baseline-nofork] 50/272 killed=43 survived=7 err=0  elapsed=4.8s
+May 30, 2026 5:47:44 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:47:44 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:47:44 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:47:44 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:47:44 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:47:44 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:47:44 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:47:44 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:47:45 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:47:45 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:47:45 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:47:45 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:47:45 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:47:45 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:47:45 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:47:45 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:47:45 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:47:45 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:47:45 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:47:45 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:47:45 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:47:46 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:47:46 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:47:46 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:47:46 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+[baseline-nofork] 75/272 killed=61 survived=14 err=0  elapsed=6.7s
+May 30, 2026 5:47:46 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:47:46 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:47:46 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:47:46 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:47:46 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:47:47 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:47:47 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:47:47 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:47:47 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:47:47 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:47:47 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:47:47 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:47:47 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:47:47 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:47:48 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:47:48 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:47:48 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:47:48 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:47:48 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:47:48 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:47:48 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:47:48 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:47:48 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:47:49 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:47:49 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+[baseline-nofork] 100/272 killed=82 survived=18 err=0  elapsed=9.6s
+May 30, 2026 5:47:49 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:47:49 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:47:49 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:47:49 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:47:49 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:47:50 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:47:50 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:47:50 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:47:50 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:47:50 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:47:50 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:47:50 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:47:50 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:47:51 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:47:51 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:47:51 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:47:51 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:47:51 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:47:51 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:47:51 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:47:51 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:47:51 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:47:52 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:47:52 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:47:52 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+[baseline-nofork] 125/272 killed=105 survived=20 err=0  elapsed=12.8s
+May 30, 2026 5:47:52 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:47:52 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:47:52 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:47:52 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:47:53 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:47:53 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:47:53 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:47:53 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:47:53 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:47:53 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:47:53 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:47:54 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:47:54 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:47:54 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:47:54 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:47:54 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:47:54 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:47:54 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:47:54 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:47:54 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:47:55 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:47:55 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:47:55 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:47:55 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:47:55 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+[baseline-nofork] 150/272 killed=123 survived=27 err=0  elapsed=15.8s
+May 30, 2026 5:47:55 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:47:57 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:47:57 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:47:58 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:00 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:00 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:02 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:02 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:03 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:03 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:03 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:03 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:04 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:05 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:05 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:05 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:05 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:07 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:07 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:07 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:07 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:07 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:09 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:10 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:12 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+[baseline-nofork] 175/272 killed=143 survived=32 err=0  elapsed=32.9s
+May 30, 2026 5:48:12 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:14 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:15 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:17 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:18 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:18 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:19 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:19 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:19 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:19 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:19 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:19 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:19 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:19 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:20 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:20 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:20 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:20 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:20 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:20 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:20 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:20 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:21 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:21 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:21 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+[baseline-nofork] 200/272 killed=166 survived=34 err=0  elapsed=41.8s
+May 30, 2026 5:48:21 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:21 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:21 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:21 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:22 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:22 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:22 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:22 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:22 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:22 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:23 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:23 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:23 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:23 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:23 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:23 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:23 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:24 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:24 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:24 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:24 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:24 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:24 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:24 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:25 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+[baseline-nofork] 225/272 killed=189 survived=36 err=0  elapsed=45.4s
+May 30, 2026 5:48:25 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:25 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:25 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:25 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:25 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:25 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:26 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:26 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:26 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:26 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:26 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:26 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:27 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:27 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:27 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:27 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:27 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:27 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:27 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:28 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:28 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:28 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:28 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:28 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:28 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+[baseline-nofork] 250/272 killed=210 survived=40 err=0  elapsed=49.3s
+May 30, 2026 5:48:29 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:29 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:29 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:29 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:29 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:29 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:29 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:30 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:30 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:30 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:30 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:30 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:30 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:31 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:31 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:31 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:31 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:31 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:31 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:32 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:32 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:32 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+DONE mode=baseline-nofork mutants=272 killed=226 survived=46 errored=0 total=52.74s avg=0.194s/mut peakRss=1522MB
+DONE baseline-nofork run=r3 out=/home/jon/crochet/.claude/worktrees/agent-a808156e0bdbe0014/eval/v2-reproducibility/mutation/baseline-nofork.r3.json
+{"summary": true, "mode": "baseline-nofork", "target": "org.apache.commons.lang3.math.Fraction", "mutants": 272, "killed": 226, "survived": 46, "errored": 0, "sweepNs": 52735589751, "warmupNs": 367456131, "peakRssKb": 1558688, "run": "r3"}
+May 30, 2026 5:48:33 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+warmup: 0.552s, passed=25 failed=0
+checkpointAll: 0.180s, version=1
+May 30, 2026 5:48:33 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:34 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:34 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:34 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:34 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:34 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:34 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:35 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:35 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:35 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:35 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:35 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:35 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:35 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:36 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:36 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:36 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:36 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:36 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:36 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:37 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:37 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:37 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:37 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:37 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+[crochet] 25/272 killed=22 survived=3 err=0  elapsed=3.8s
+May 30, 2026 5:48:37 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:37 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:37 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:37 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:38 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:38 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:38 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:38 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:38 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:38 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:38 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:39 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:39 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:39 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:39 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:39 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:39 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:39 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:39 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:40 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:40 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:40 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:40 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:40 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:40 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+[crochet] 50/272 killed=43 survived=7 err=0  elapsed=6.7s
+May 30, 2026 5:48:40 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:40 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:40 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:40 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:41 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:41 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:41 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:41 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:41 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:41 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:41 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:41 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:41 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:42 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:42 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:42 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:42 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:42 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:42 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:42 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:42 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:42 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:43 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:43 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:43 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+[crochet] 75/272 killed=61 survived=14 err=0  elapsed=9.7s
+May 30, 2026 5:48:43 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:43 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:43 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:44 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:44 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:44 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:44 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:44 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:44 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:45 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:45 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:45 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:45 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:45 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:45 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:45 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:46 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:46 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:46 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:46 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:46 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:46 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:47 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:47 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:47 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+[crochet] 100/272 killed=82 survived=18 err=0  elapsed=13.7s
+May 30, 2026 5:48:47 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:47 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:47 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:48 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:48 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:48 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:48 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:48 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:48 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:49 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:49 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:49 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:49 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:49 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:50 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:50 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:50 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:50 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:50 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:50 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:51 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:51 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:51 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:51 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:51 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+[crochet] 125/272 killed=105 survived=20 err=0  elapsed=18.0s
+May 30, 2026 5:48:51 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:52 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:52 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:52 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:52 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:52 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:52 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:53 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:53 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:53 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:53 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:53 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:54 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:54 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:54 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:54 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:54 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:54 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:54 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:55 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:55 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:55 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:55 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:55 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:55 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+[crochet] 150/272 killed=123 survived=27 err=0  elapsed=22.1s
+May 30, 2026 5:48:56 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:57 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:57 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:48:59 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:49:00 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:49:01 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:49:02 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:49:02 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:49:04 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:49:04 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:49:04 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:49:04 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:49:04 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:49:06 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:49:06 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:49:06 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:49:06 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:49:08 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:49:08 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:49:08 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:49:08 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:49:08 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:49:10 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:49:12 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:49:13 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+[crochet] 175/272 killed=143 survived=32 err=0  elapsed=40.0s
+May 30, 2026 5:49:13 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:49:15 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:49:17 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:49:18 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:49:20 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:49:20 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:49:20 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:49:20 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:49:20 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:49:21 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:49:21 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:49:21 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:49:21 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:49:21 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:49:21 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:49:22 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:49:22 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:49:22 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:49:22 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:49:22 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:49:23 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:49:23 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:49:23 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:49:23 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:49:23 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+[crochet] 200/272 killed=166 survived=34 err=0  elapsed=50.0s
+May 30, 2026 5:49:23 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:49:24 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:49:24 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:49:24 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:49:24 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:49:24 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:49:25 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:49:25 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:49:25 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:49:25 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:49:25 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:49:26 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:49:26 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:49:26 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:49:26 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:49:26 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:49:27 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:49:27 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:49:27 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:49:27 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:49:27 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:49:28 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:49:28 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:49:28 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:49:28 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+[crochet] 225/272 killed=189 survived=36 err=0  elapsed=54.9s
+May 30, 2026 5:49:28 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:49:29 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:49:29 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:49:29 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:49:29 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:49:29 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:49:30 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:49:30 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:49:30 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:49:30 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:49:30 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:49:31 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:49:31 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:49:31 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:49:31 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:49:31 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:49:32 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:49:32 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:49:32 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:49:32 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:49:32 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:49:33 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:49:33 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:49:33 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:49:33 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+[crochet] 250/272 killed=210 survived=40 err=0  elapsed=60.1s
+May 30, 2026 5:49:34 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:49:34 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:49:34 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:49:34 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:49:34 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:49:35 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:49:35 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:49:35 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:49:35 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:49:36 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:49:36 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:49:36 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:49:36 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:49:36 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:49:37 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:49:37 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:49:37 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:49:37 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:49:38 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:49:38 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:49:38 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+May 30, 2026 5:49:38 PM org.junit.platform.launcher.core.TestExecutionListenerRegistry lambda$notifyEach$1
+
+DONE mode=crochet mutants=272 killed=226 survived=46 errored=0 total=64.91s avg=0.239s/mut peakRss=1577MB
+DONE crochet run=r3 out=/home/jon/crochet/.claude/worktrees/agent-a808156e0bdbe0014/eval/v2-reproducibility/mutation/crochet.r3.json
+{"summary": true, "mode": "crochet", "target": "org.apache.commons.lang3.math.Fraction", "mutants": 272, "killed": 226, "survived": 46, "errored": 0, "sweepNs": 64905934377, "warmupNs": 551513927, "peakRssKb": 1615760, "run": "r3"}
+=== done at 17:49:38 ===
