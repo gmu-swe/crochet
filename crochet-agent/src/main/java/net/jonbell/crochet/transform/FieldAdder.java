@@ -452,14 +452,35 @@ public final class FieldAdder extends ClassVisitor {
      * it) to emit any required stack-map frames for the catch landing pad.
      */
     static void emitRegisterCall(MethodVisitor mv, String ownerInternal) {
+        // Body emits:
+        //   try {
+        //       Lookup l = ThisClass.$$crochetLookup();      // captured in ThisClass frame
+        //       CheckpointRollbackAgent.registerInitializedClass(ThisClass.class, l);
+        //   } catch (Throwable t) {
+        //       // swallow; runtime not yet ready
+        //   }
+        //
+        // Calling $$crochetLookup before registerInitializedClass keeps the
+        // @CallerSensitive resolution of MethodHandles.lookup() inside the
+        // user-class frame, so the Lookup's lookupClass is ThisClass rather
+        // than DirectMethodHandleAccessor. This matters when the runtime is
+        // packed into java.base: a reflective lookup from ClassMeta would
+        // otherwise yield a Lookup whose lookupClass is the reflection
+        // accessor, and any subsequent findVarHandle would fail with
+        // "symbolic reference class is not accessible".
         Label tryStart = new Label();
         Label tryEnd = new Label();
         Label handler = new Label();
         Label after = new Label();
         mv.visitLabel(tryStart);
         mv.visitLdcInsn(Type.getObjectType(ownerInternal));
+        // Stack: [thisClass]
+        mv.visitMethodInsn(Opcodes.INVOKESTATIC, ownerInternal,
+                "$$crochetLookup",
+                "()Ljava/lang/invoke/MethodHandles$Lookup;", false);
+        // Stack: [thisClass, lookup]
         mv.visitMethodInsn(Opcodes.INVOKESTATIC, AGENT, "registerInitializedClass",
-                "(Ljava/lang/Class;)V", false);
+                "(Ljava/lang/Class;Ljava/lang/invoke/MethodHandles$Lookup;)V", false);
         mv.visitLabel(tryEnd);
         mv.visitJumpInsn(Opcodes.GOTO, after);
         mv.visitLabel(handler);

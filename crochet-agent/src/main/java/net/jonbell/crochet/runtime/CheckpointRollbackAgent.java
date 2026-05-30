@@ -221,6 +221,38 @@ public final class CheckpointRollbackAgent {
     }
 
     /**
+     * Variant called from user-class {@code <clinit>} after the class's own
+     * {@code $$crochetLookup} has been invoked. Publishing the Lookup here
+     * — captured inside the user class's clinit frame, where
+     * {@code MethodHandles.lookup().lookupClass() == thisClass} — avoids
+     * the {@code @CallerSensitive} hazard of obtaining the Lookup via
+     * {@link java.lang.reflect.Method#invoke} or
+     * {@link java.lang.invoke.MethodHandle#invoke}: when CROCHET runtime
+     * classes are packed into {@code java.base}, reflective invocation
+     * of the {@code @CallerSensitive} {@code MethodHandles.lookup()}
+     * yields a Lookup whose {@code lookupClass()} is
+     * {@code jdk.internal.reflect.DirectMethodHandleAccessor} (not the
+     * user class), and any subsequent {@code findVarHandle} fails with
+     * "symbolic reference class is not accessible".
+     */
+    public static void registerInitializedClass(Class<?> c,
+                                                java.lang.invoke.MethodHandles.Lookup lookup) {
+        if (c == null) {
+            return;
+        }
+        try {
+            INITIALIZED_CLASSES.add(c);
+            if (lookup != null) {
+                ClassMeta meta = ClassMeta.of(c);
+                if (meta != null) {
+                    meta.publishLookup(lookup);
+                }
+            }
+        } catch (Throwable ignored) {
+        }
+    }
+
+    /**
      * Opt-out for users whose test frameworks or hosting containers assume
      * the system classloader / thread list are stable. When {@code true},
      * {@link #checkpointAll} / {@link #rollbackAll} skip those two roots and

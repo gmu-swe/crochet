@@ -346,48 +346,52 @@ final class FastProxySupport {
         }
         NOTE_DIRTY_GUARD[slot] = true;
         try {
-            Class<?> c = inst.getClass();
-            // Walk past any Fast proxy layer to the real user class.
-            while (c != null && CRIJFast.class.isAssignableFrom(c)) {
-                c = c.getSuperclass();
-            }
-            if (c == null) {
-                return;
-            }
-            // Skip when the class itself was skip-listed by the transformer
-            // (notably our own internal runtime classes under
-            // {@code net.jonbell.crochet.*} and shaded ASM). Such classes
-            // inherit {@link CRIJInstrumented} from an instrumented parent
-            // ({@link java.lang.ref.Reference} for {@code ArrayRegistry$IdKey})
-            // but lack their own {@code $$crochetLookup}, so
-            // {@link ClassMeta#versionHandles} would throw
-            // {@link IllegalStateException} on every call. The transformer's
-            // {@code shouldSkip} reads these prefixes; we mirror them here so
-            // a JDK parent class's instrumented PUTFIELD on a skip-listed
-            // subclass receiver short-circuits cleanly.
-            String name = c.getName();
-            if (name.startsWith("net.jonbell.crochet.")
-                    || name.startsWith("edu.neu.ccs.prl.crochet.")) {
-                return;
-            }
-            ClassMeta meta = ClassMeta.of(c);
-            if (meta == null) {
-                // ClassMeta.<clinit> still in flight (see ClassMeta.warmup() for
-                // why this is rare). The dirty bit can't be set yet; the next
-                // PUTFIELD on this instance will retry, and fastAccess treats a
-                // missing dirty handle as always-dirty (safe fallback).
-                return;
-            }
-            ClassMeta.VersionHandles handles = meta.versionHandles();
-            if (handles.dirty == null) {
-                // Pre-F.1 class or failed VarHandle resolution: no dirty field.
-                // Safe to skip — fastAccess treats missing dirty handle as always-dirty.
-                return;
-            }
-            handles.dirty.set(inst, 1);
+            noteDirtyImpl(inst);
+        } catch (Throwable ignored) {
+            // F.1 dirty-bit is an optimization: when it can't be set (the
+            // class's $$crochet* surface isn't fully resolvable, e.g. JDK
+            // internal classes reached during reflection bootstrap where the
+            // injected $$crochetLookup was emitted but the resolution path
+            // requires reflection through DirectMethodHandleAccessor which
+            // ITSELF triggers a noteDirty that we cannot satisfy), fastAccess
+            // treats a missing dirty handle as "always dirty" — the only
+            // cost is one extra shadow allocation per affected instance per
+            // checkpoint. Swallow and move on; the user observes no
+            // semantic difference.
         } finally {
             NOTE_DIRTY_GUARD[slot] = false;
         }
+    }
+
+    private static void noteDirtyImpl(Object inst) {
+        Class<?> c = inst.getClass();
+        // Walk past any Fast proxy layer to the real user class.
+        while (c != null && CRIJFast.class.isAssignableFrom(c)) {
+            c = c.getSuperclass();
+        }
+        if (c == null) {
+            return;
+        }
+        // Skip when the class itself was skip-listed by the transformer
+        // (notably our own internal runtime classes under
+        // {@code net.jonbell.crochet.*} and shaded ASM). Such classes
+        // inherit {@link CRIJInstrumented} from an instrumented parent
+        // ({@link java.lang.ref.Reference} for {@code ArrayRegistry$IdKey})
+        // but lack their own {@code $$crochetLookup}.
+        String name = c.getName();
+        if (name.startsWith("net.jonbell.crochet.")
+                || name.startsWith("edu.neu.ccs.prl.crochet.")) {
+            return;
+        }
+        ClassMeta meta = ClassMeta.of(c);
+        if (meta == null) {
+            return;
+        }
+        ClassMeta.VersionHandles handles = meta.versionHandles();
+        if (handles.dirty == null) {
+            return;
+        }
+        handles.dirty.set(inst, 1);
     }
 
     /* ---------- fastAccess race-winner ---------- */

@@ -1,5 +1,6 @@
 package net.jonbell.crochet.runtime;
 
+import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.VarHandle;
 import java.lang.reflect.Field;
@@ -158,7 +159,16 @@ public final class ClassMeta {
     private volatile FieldOffsets fieldOffsets;
     private volatile VersionHandles versionHandles;
 
-    /** Cached bytecode-emitting {@link MethodHandles.Lookup} for this class. */
+    /** Cached bytecode-emitting {@link MethodHandles.Lookup} for this class.
+     *
+     *  <p>Populated by {@link #publishLookup(MethodHandles.Lookup)} from the
+     *  user class's {@code <clinit>} (via {@code
+     *  CheckpointRollbackAgent.registerInitializedClass(Class, Lookup)}), so
+     *  the Lookup is captured inside the user class's own frame and has
+     *  {@code lookupClass() == userClass}. The reflective fallback in
+     *  {@link #resolveLookup()} would otherwise return a Lookup whose
+     *  {@code lookupClass()} is {@code DirectMethodHandleAccessor} due to
+     *  {@code @CallerSensitive} resolution through {@code Method.invoke}. */
     volatile MethodHandles.Lookup lookup;
 
     /* ---- Gap 3 (bytecode): static-field helper fields ---- */
@@ -185,24 +195,54 @@ public final class ClassMeta {
         this.userClass = userClass;
     }
 
+    /**
+     * Cache a Lookup captured inside the user class's own {@code <clinit>}
+     * frame. First write wins (the ClinitRegistrar emit is exactly once per
+     * class; subsequent reflective lookups would have to match anyway).
+     */
+    public void publishLookup(MethodHandles.Lookup l) {
+        if (l != null && lookup == null) {
+            lookup = l;
+        }
+    }
+
     public MethodHandles.Lookup resolveLookup() {
         MethodHandles.Lookup l = lookup;
         if (l != null) {
             return l;
         }
         try {
+            // Resolve via a MethodHandle rather than {@link
+            // java.lang.reflect.Method#invoke}. {@code MethodHandles.lookup()}
+            // inside the user class's {@code $$crochetLookup} body is
+            // {@code @CallerSensitive}: when reached through
+            // {@code Method.invoke}, the JVM's caller-class resolution
+            // identifies {@code jdk.internal.reflect.DirectMethodHandleAccessor}
+            // (the reflection accessor introduced in JDK 18) as the caller,
+            // not the user class — so the returned Lookup has
+            // {@code lookupClass() == DirectMethodHandleAccessor}. Any
+            // subsequent {@code findVarHandle} then fails with
+            // "symbolic reference class is not accessible: class
+            // DirectMethodHandleAccessor, from class
+            // net.jonbell.crochet.runtime.ClassMeta (module java.base)"
+            // because that accessor is qualified-exported only to a
+            // hardcoded set of modules. Invoking through
+            // {@link MethodHandle} preserves the user-class frame, so
+            // {@code lookupClass() == userClass} as intended. The agent
+            // jar's {@link MethodHandles#lookup} call below is fine: it
+            // gives ClassMeta the right to {@link MethodHandles.Lookup#unreflect}
+            // any setAccessible-cleared {@link Method}.
             Method m = userClass.getDeclaredMethod("$$crochetLookup");
-            // Package-private classes (e.g. org.apache.commons.cli.Util) still
-            // reject reflective invocation of their public members from outside
-            // the package without setAccessible. The injected $$crochetLookup is
-            // ACC_PUBLIC ACC_STATIC but the enclosing class access controls
-            // whether callers can actually reach it.
             m.setAccessible(true);
-            Object result = m.invoke(null);
+            MethodHandle handle = MethodHandles.lookup().unreflect(m);
+            Object result = handle.invoke();
             l = (MethodHandles.Lookup) result;
             lookup = l;
             return l;
-        } catch (ReflectiveOperationException e) {
+        } catch (Throwable e) {
+            if (e instanceof Error err) {
+                throw err;
+            }
             throw new IllegalStateException(
                     "User class " + userClass.getName()
                             + " was not instrumented with $$crochetLookup; was the Java agent attached?",
