@@ -1,0 +1,133 @@
+# mode: instrumented (/tmp/jdk-inst)
+
+=== 01-basic                                 FAIL (exit=1)
+    before checkpoint : value=1 label=original
+    
+    Exception: java.lang.NoClassDefFoundError thrown from the UncaughtExceptionHandler in thread "main"
+=== 02-nested                                FAIL (exit=1)
+    before: parent.name=root child.value=7
+    
+    Exception: java.lang.NoClassDefFoundError thrown from the UncaughtExceptionHandler in thread "main"
+=== 03-cyclic                                FAIL (exit=1)
+    before: a.partner.name=B b.partner.name=A
+    
+    Exception: java.lang.NoClassDefFoundError thrown from the UncaughtExceptionHandler in thread "main"
+=== 04-multi-checkpoint                      FAIL (exit=1)
+    initial: w.counter=1
+    
+    Exception: java.lang.NoClassDefFoundError thrown from the UncaughtExceptionHandler in thread "main"
+=== 05-rollback-then-checkpoint              FAIL (exit=1)
+    
+    Exception: java.lang.NoClassDefFoundError thrown from the UncaughtExceptionHandler in thread "main"
+=== 06-wide-fields                           FAIL (exit=1)
+    before checkpoint : Scalar{i=1, l=100, d=3.14, o=origin-obj, s=origin}
+    
+    Exception: java.lang.IllegalStateException thrown from the UncaughtExceptionHandler in thread "main"
+=== 07-concurrent-reads                      FAIL (exit=1)
+    
+    Exception: java.lang.NoClassDefFoundError thrown from the UncaughtExceptionHandler in thread "main"
+=== 08-static-fields                         FAIL (exit=1)
+    
+    Exception: java.lang.IllegalStateException thrown from the UncaughtExceptionHandler in thread "main"
+=== 09-arrays                                FAIL (exit=1)
+    
+    Exception: java.lang.IllegalStateException thrown from the UncaughtExceptionHandler in thread "main"
+=== 10-concurrent-checkpoint                 FAIL (exit=1)
+    
+    Exception: java.lang.NoClassDefFoundError thrown from the UncaughtExceptionHandler in thread "main"
+=== 11-concurrent-rollback                   FAIL (exit=1)
+    
+    Exception: java.lang.NoClassDefFoundError thrown from the UncaughtExceptionHandler in thread "main"
+=== 12-checkpoint-then-concurrent-access     FAIL (exit=1)
+    
+    Exception: java.lang.NoClassDefFoundError thrown from the UncaughtExceptionHandler in thread "main"
+=== 13-static-fields-auto                    FAIL (exit=1)
+    
+    Exception: java.lang.IllegalStateException thrown from the UncaughtExceptionHandler in thread "main"
+=== 14-array-auto                            FAIL (exit=1)
+    
+    Exception: java.lang.NoClassDefFoundError thrown from the UncaughtExceptionHandler in thread "main"
+=== 15-hashmap-instrumented                  FAIL (exit=1)
+    
+    Exception: java.lang.ClassCircularityError thrown from the UncaughtExceptionHandler in thread "main"
+=== 16-chaotic-stress                        FAIL (exit=1)
+    
+    Exception: java.lang.NoClassDefFoundError thrown from the UncaughtExceptionHandler in thread "stress-11"
+    
+    Exception: java.lang.NoClassDefFoundError thrown from the UncaughtExceptionHandler in thread "stress-10"
+    
+    Exception: java.lang.NoClassDefFoundError thrown from the UncaughtExceptionHandler in thread "stress-2"
+    
+    Exception: java.lang.NoClassDefFoundError thrown from the UncaughtExceptionHandler in thread "stress-7"
+    
+    Exception: java.lang.NoClassDefFoundError thrown from the UncaughtExceptionHandler in thread "stress-6"
+    
+    Exception: java.lang.NoClassDefFoundError thrown from the UncaughtExceptionHandler in thread "stress-8"
+    
+    Exception: java.lang.NoClassDefFoundError thrown from the UncaughtExceptionHandler in thread "stress-9"
+    
+    Exception: java.lang.NoClassDefFoundError thrown from the UncaughtExceptionHandler in thread "main"
+=== 17-arraycopy                             FAIL (exit=1)
+    
+    Exception: java.lang.NoClassDefFoundError thrown from the UncaughtExceptionHandler in thread "main"
+=== 18-checkpointAll                         FAIL (exit=1)
+    
+    Exception: java.lang.IllegalStateException thrown from the UncaughtExceptionHandler in thread "main"
+=== 19-coverage-roots                        FAIL (exit=1)
+    before checkpointAll: CONFIG=initial
+    
+    Exception: java.lang.IllegalStateException thrown from the UncaughtExceptionHandler in thread "main"
+=== 20-eager-checkpoint                      FAIL (exit=1)
+    before checkpoint : x=1 class=Bean
+    
+    Exception: java.lang.NoClassDefFoundError thrown from the UncaughtExceptionHandler in thread "main"
+=== 21-stack-roots                           FAIL (exit=1)
+    stack-roots-engaged: false
+    
+    Exception: java.lang.IllegalStateException thrown from the UncaughtExceptionHandler in thread "main"
+=== 22-cross-method-backstep                 FAIL (exit=1)
+    
+    Exception: java.lang.NoClassDefFoundError thrown from the UncaughtExceptionHandler in thread "main"
+=== 23-backstep-lambda                       FAIL (exit=1)
+    WARN [Crochet TTD]: @TimeTravelBody method Main.body(LLambdaState;)V has 7 callsite(s) skipped from save-point set (args not reconstructible from locals); back-step from those callsites is not supported
+    
+    Exception: java.lang.NoClassDefFoundError thrown from the UncaughtExceptionHandler in thread "main"
+=== 24-backstep-try-catch                    FAIL (exit=1)
+    
+    Exception: java.lang.NoClassDefFoundError thrown from the UncaughtExceptionHandler in thread "main"
+=== 25-backstep-crochet-skip                 FAIL (exit=1)
+    
+    Exception: java.lang.NoClassDefFoundError thrown from the UncaughtExceptionHandler in thread "main"
+
+==========================================
+results: 0 passed, 25 failed
+failed:
+  - 01-basic
+  - 02-nested
+  - 03-cyclic
+  - 04-multi-checkpoint
+  - 05-rollback-then-checkpoint
+  - 06-wide-fields
+  - 07-concurrent-reads
+  - 08-static-fields
+  - 09-arrays
+  - 10-concurrent-checkpoint
+  - 11-concurrent-rollback
+  - 12-checkpoint-then-concurrent-access
+  - 13-static-fields-auto
+  - 14-array-auto
+  - 15-hashmap-instrumented
+  - 16-chaotic-stress
+  - 17-arraycopy
+  - 18-checkpointAll
+  - 19-coverage-roots
+  - 20-eager-checkpoint
+  - 21-stack-roots
+  - 22-cross-method-backstep
+  - 23-backstep-lambda
+  - 24-backstep-try-catch
+  - 25-backstep-crochet-skip
+
+real	0m31.723s
+user	1m19.749s
+sys	0m9.249s

@@ -1,0 +1,31 @@
+May 30, 2026 5:04:26 PM net.jonbell.crochet.runtime.ExternalStateRegistry register
+WARNING: ExternalStateRegistry: replacing existing hook "dup"
+[crochet-heap] WARNING: native agent not loaded; falling back to checkpointAll. STW guarantees do not apply. Load libcrochet-jvmti.so via -agentpath for the full soundness guarantee. (This warning will not repeat.)
+[CrochetCompositionTest] active-config=crochet-only class=net.jonbell.crochet.compose.CrochetCompositionTestPositiveTest
+[CrochetCompositionTest] TrackedBean instrumented: true
+[nondet-overhead] cold path: baseline=45.9 ns/call, instrumented=40.7 ns/call, overhead=-11.3%
+[ttd-nondet] DIVERGENCE siteId=22 desc=edu/neu/crs/prl/crochet/ttd/nondet/NondetOverheadTest/replaying_overhead_reported()V/40 cause=SITE_ABSENT recorded=-9223372036854775808 actual=1372783467180517 kind=1
+[ttd-nondet] DIVERGENCE siteId=23 desc=edu/neu/crs/prl/crochet/ttd/nondet/NondetOverheadTest/replaying_overhead_reported()V/55 cause=SITE_ABSENT recorded=-9223372036854775808 actual=1372783516405916 kind=1
+[nondet-overhead] replaying: baseline=89.9 ns/call (warmup iters), replaying=98.5 ns/call, overhead=9.6%
+[nondet-overhead] recording: baseline=47.2 ns/call, recording=73.3 ns/call, overhead=55.4%, events=500002
+[nondet-overhead] recording overhead is informational only; the hard gate (≤5%) applies to the cold path only.
+WARN [Crochet TTD]: @TimeTravelBody method edu/neu/ccs/prl/crochet/ttd/CpsBackstepTest.intraMethodBody(Ledu/neu/ccs/prl/crochet/ttd/CpsBackstepTest$Heap;)V has 3 callsite(s) skipped from save-point set (args not reconstructible from locals); back-step from those callsites is not supported
+WARN [Crochet TTD]: @TimeTravelBody method edu/neu/ccs/prl/crochet/ttd/CpsBackstepTest.outerBody(Ledu/neu/ccs/prl/crochet/ttd/CpsBackstepTest$Heap;)V has 2 callsite(s) skipped from save-point set (args not reconstructible from locals); back-step from those callsites is not supported
+WARN [Crochet TTD]: @TimeTravelBody method edu/neu/ccs/prl/crochet/ttd/CpsBackstepTest.helperA(Ledu/neu/ccs/prl/crochet/ttd/CpsBackstepTest$Heap;)V has 2 callsite(s) skipped from save-point set (args not reconstructible from locals); back-step from those callsites is not supported
+WARN [Crochet TTD]: @TimeTravelBody method edu/neu/ccs/prl/crochet/ttd/CpsBackstepTest.helperB(Ledu/neu/ccs/prl/crochet/ttd/CpsBackstepTest$Heap;)V has 2 callsite(s) skipped from save-point set (args not reconstructible from locals); back-step from those callsites is not supported
+WARN [Crochet TTD]: @TimeTravelBody method edu/neu/ccs/prl/crochet/ttd/CpsBackstepTest.helperC(Ledu/neu/ccs/prl/crochet/ttd/CpsBackstepTest$Heap;)V has 2 callsite(s) skipped from save-point set (args not reconstructible from locals); back-step from those callsites is not supported
+WARN [Crochet TTD]: @TimeTravelBody method edu/neu/ccs/prl/crochet/ttd/CpsDispatchRoundtripTest.threeStepMethod()V has 3 callsite(s) skipped from save-point set (args not reconstructible from locals); back-step from those callsites is not supported
+WARN [Crochet TTD]: @TimeTravelBody method edu/neu/ccs/prl/crochet/ttd/CpsDispatchRoundtripTest.callsiteMethod(Ledu/neu/ccs/prl/crochet/ttd/CpsDispatchRoundtripTest$ArgHolder;)V has 2 callsite(s) skipped from save-point set (args not reconstructible from locals); back-step from those callsites is not supported
+WARN [Crochet TTD]: @TimeTravelBody method edu/neu/ccs/prl/crochet/ttd/CpsDispatchRoundtripTest.outerMethod()V has 2 callsite(s) skipped from save-point set (args not reconstructible from locals); back-step from those callsites is not supported
+WARN [Crochet TTD]: @TimeTravelBody method edu/neu/ccs/prl/crochet/ttd/CpsDispatchRoundtripTest.innerMethod()V has 2 callsite(s) skipped from save-point set (args not reconstructible from locals); back-step from those callsites is not supported
+WARN [Crochet TTD]: @TimeTravelBody method com/example/Foo.body()V has 1 callsite(s) skipped from save-point set (args not reconstructible from locals); back-step from those callsites is not supported
+WARN [Crochet TTD]: @TimeTravelBody method com/example/Foo.body(Ljava/lang/Object;)I has 1 callsite(s) skipped from save-point set (args not reconstructible from locals); back-step from those callsites is not supported
+WARN [Crochet TTD]: @TimeTravelBody method edu/neu/ccs/prl/crochet/ttd/TtdLineMarkerTest.instrumentedBody(Ledu/neu/ccs/prl/crochet/ttd/TtdLineMarkerTest$State;)V has 6 callsite(s) skipped from save-point set (args not reconstructible from locals); back-step from those callsites is not supported
+WARN [Crochet TTD]: @TimeTravelBody method edu/neu/ccs/prl/crochet/ttd/CpsCallsiteIntegrationTest$BodyWithCallsites.helperB(Ledu/neu/ccs/prl/crochet/ttd/CpsCallsiteIntegrationTest$State;)V has 1 callsite(s) skipped from save-point set (args not reconstructible from locals); back-step from those callsites is not supported
+WARN [Crochet TTD]: @TimeTravelBody method com/example/TryCatchFixture.bodyWithTryCatch(I)I has 1 callsite(s) skipped from save-point set (args not reconstructible from locals); back-step from those callsites is not supported
+[B.1 corpus] SHA-256 hash (first 16 chars): cd17554cb5595739
+[B.1 corpus] Full SHA-256: cd17554cb5595739b08352bd7778fe0dd5cd5aecc331fe565752b422e25828c3
+
+real	1m19.832s
+user	3m4.212s
+sys	0m15.134s

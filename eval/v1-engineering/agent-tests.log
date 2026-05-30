@@ -1,0 +1,40 @@
+[INFO] Running net.jonbell.crochet.transform.CheckpointWrapperTest
+[INFO] Tests run: 12, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.045 s -- in net.jonbell.crochet.transform.CheckpointWrapperTest
+[INFO] Running net.jonbell.crochet.transform.CrochetSkipTest
+[INFO] Tests run: 10, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.016 s -- in net.jonbell.crochet.transform.CrochetSkipTest
+[INFO] Running net.jonbell.crochet.transform.DirtyBitTest
+[INFO] Tests run: 6, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 1.220 s -- in net.jonbell.crochet.transform.DirtyBitTest
+[INFO] Running net.jonbell.crochet.transform.EagerCheckpointTest
+[INFO] Tests run: 5, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.019 s -- in net.jonbell.crochet.transform.EagerCheckpointTest
+[INFO] Running net.jonbell.crochet.transform.CrochetTransformerTest
+[INFO] Tests run: 5, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.007 s -- in net.jonbell.crochet.transform.CrochetTransformerTest
+[INFO] Running net.jonbell.crochet.runtime.ReflectionFilterTest
+[INFO] Tests run: 11, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.012 s -- in net.jonbell.crochet.runtime.ReflectionFilterTest
+[INFO] Running net.jonbell.crochet.runtime.ExternalStateRegistryTest
+May 30, 2026 5:04:17 PM net.jonbell.crochet.runtime.ExternalStateRegistry register
+WARNING: ExternalStateRegistry: replacing existing hook "dup"
+[INFO] Tests run: 14, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.060 s -- in net.jonbell.crochet.runtime.ExternalStateRegistryTest
+[INFO] Running net.jonbell.crochet.runtime.HeapWalkerTest
+[crochet-heap] WARNING: native agent not loaded; falling back to checkpointAll. STW guarantees do not apply. Load libcrochet-jvmti.so via -agentpath for the full soundness guarantee. (This warning will not repeat.)
+[INFO] Tests run: 15, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.028 s -- in net.jonbell.crochet.runtime.HeapWalkerTest
+[INFO] Running net.jonbell.crochet.runtime.CheckpointRollbackAgentTest
+[INFO] Tests run: 5, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.006 s -- in net.jonbell.crochet.runtime.CheckpointRollbackAgentTest
+[INFO] Running net.jonbell.crochet.runtime.FastAccessCoordinatorTest
+[INFO] Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.009 s -- in net.jonbell.crochet.runtime.FastAccessCoordinatorTest
+[INFO] Running net.jonbell.crochet.runtime.ArrayRegistryTest
+[INFO] Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.003 s -- in net.jonbell.crochet.runtime.ArrayRegistryTest
+[INFO] Running net.jonbell.crochet.runtime.InitializedClassesDiscoveryTest
+[INFO] Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.007 s -- in net.jonbell.crochet.runtime.InitializedClassesDiscoveryTest
+[INFO] Running net.jonbell.crochet.runtime.CrochetDiffTest
+[INFO] Tests run: 36, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.099 s -- in net.jonbell.crochet.runtime.CrochetDiffTest
+[INFO] 
+[INFO] Results:
+[INFO] 
+[INFO] Tests run: 134, Failures: 0, Errors: 0, Skipped: 0
+[INFO] 
+[INFO] ------------------------------------------------------------------------
+[INFO] BUILD SUCCESS
+[INFO] ------------------------------------------------------------------------
+[INFO] Total time:  3.213 s
+[INFO] Finished at: 2026-05-30T17:04:17Z
+[INFO] ------------------------------------------------------------------------

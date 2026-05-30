@@ -1,0 +1,74 @@
+[INFO] Running net.jonbell.crochet.agent.InstrumentedSurfaceVerifierTest
+[INFO] Tests run: 6, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.063 s -- in net.jonbell.crochet.agent.InstrumentedSurfaceVerifierTest
+[INFO] Running net.jonbell.crochet.transform.CheckpointWrapperTest
+[INFO] Tests run: 12, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.041 s -- in net.jonbell.crochet.transform.CheckpointWrapperTest
+[INFO] Running net.jonbell.crochet.transform.CrochetSkipTest
+[INFO] Tests run: 10, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.015 s -- in net.jonbell.crochet.transform.CrochetSkipTest
+[INFO] Running net.jonbell.crochet.transform.DirtyBitTest
+[INFO] Tests run: 6, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 1.180 s -- in net.jonbell.crochet.transform.DirtyBitTest
+[INFO] Running net.jonbell.crochet.transform.EagerCheckpointTest
+[INFO] Tests run: 5, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.019 s -- in net.jonbell.crochet.transform.EagerCheckpointTest
+[INFO] Running net.jonbell.crochet.transform.CrochetTransformerTest
+[INFO] Tests run: 5, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.006 s -- in net.jonbell.crochet.transform.CrochetTransformerTest
+[INFO] Running net.jonbell.crochet.runtime.ReflectionFilterTest
+[INFO] Tests run: 11, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.012 s -- in net.jonbell.crochet.runtime.ReflectionFilterTest
+[INFO] Running net.jonbell.crochet.runtime.ExternalStateRegistryTest
+[INFO] Tests run: 14, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.062 s -- in net.jonbell.crochet.runtime.ExternalStateRegistryTest
+[INFO] Running net.jonbell.crochet.runtime.HeapWalkerTest
+[INFO] Tests run: 15, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.030 s -- in net.jonbell.crochet.runtime.HeapWalkerTest
+[INFO] Running net.jonbell.crochet.runtime.CheckpointRollbackAgentTest
+[INFO] Tests run: 5, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.006 s -- in net.jonbell.crochet.runtime.CheckpointRollbackAgentTest
+[INFO] Running net.jonbell.crochet.runtime.FastAccessCoordinatorTest
+[INFO] Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.009 s -- in net.jonbell.crochet.runtime.FastAccessCoordinatorTest
+[INFO] Running net.jonbell.crochet.runtime.ArrayRegistryTest
+[INFO] Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.003 s -- in net.jonbell.crochet.runtime.ArrayRegistryTest
+[INFO] Running net.jonbell.crochet.runtime.InitializedClassesDiscoveryTest
+[INFO] Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.007 s -- in net.jonbell.crochet.runtime.InitializedClassesDiscoveryTest
+[INFO] Running net.jonbell.crochet.runtime.CrochetDiffTest
+[INFO] Tests run: 36, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.107 s -- in net.jonbell.crochet.runtime.CrochetDiffTest
+[INFO] Tests run: 134, Failures: 0, Errors: 0, Skipped: 0
+[INFO] Running net.jonbell.crochet.junit5.CrochetSetupExtensionSmokeTest
+[INFO] Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.228 s -- in net.jonbell.crochet.junit5.CrochetSetupExtensionSmokeTest
+[INFO] Tests run: 3, Failures: 0, Errors: 0, Skipped: 0
+[INFO] Running net.jonbell.crochet.compose.CrochetCompositionTestPositiveTest
+[INFO] Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.106 s -- in net.jonbell.crochet.compose.CrochetCompositionTestPositiveTest
+[INFO] Running net.jonbell.crochet.compose.InstrumentedSurfaceVerifierTest
+[INFO] Tests run: 4, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.013 s -- in net.jonbell.crochet.compose.InstrumentedSurfaceVerifierTest
+[INFO] Tests run: 7, Failures: 0, Errors: 0, Skipped: 0
+[INFO] Running edu.neu.crs.prl.crochet.ttd.nondet.NondetOverheadTest
+[INFO] Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.330 s -- in edu.neu.crs.prl.crochet.ttd.nondet.NondetOverheadTest
+[INFO] Running edu.neu.ccs.prl.crochet.ttd.CpsBackstepTest
+[INFO] Tests run: 6, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.170 s -- in edu.neu.ccs.prl.crochet.ttd.CpsBackstepTest
+[INFO] Running edu.neu.ccs.prl.crochet.ttd.StackCaptureTest
+[INFO] Tests run: 14, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.235 s -- in edu.neu.ccs.prl.crochet.ttd.StackCaptureTest
+[INFO] Running edu.neu.ccs.prl.crochet.ttd.InternedLineConstantsTest
+[INFO] Tests run: 13, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.151 s -- in edu.neu.ccs.prl.crochet.ttd.InternedLineConstantsTest
+[INFO] Running edu.neu.ccs.prl.crochet.ttd.cps.LivenessAnalyzerTest
+[INFO] Tests run: 13, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.118 s -- in edu.neu.ccs.prl.crochet.ttd.cps.LivenessAnalyzerTest
+[INFO] Running edu.neu.ccs.prl.crochet.ttd.nondet.NondetTransformerTest
+[INFO] Tests run: 4, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.100 s -- in edu.neu.ccs.prl.crochet.ttd.nondet.NondetTransformerTest
+[INFO] Running edu.neu.ccs.prl.crochet.ttd.nondet.NondetRecorderTest
+[INFO] Tests run: 22, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.133 s -- in edu.neu.ccs.prl.crochet.ttd.nondet.NondetRecorderTest
+[INFO] Running edu.neu.ccs.prl.crochet.ttd.CpsDispatchRoundtripTest
+[INFO] Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.083 s -- in edu.neu.ccs.prl.crochet.ttd.CpsDispatchRoundtripTest
+[INFO] Running edu.neu.ccs.prl.crochet.ttd.ResumeFrameTest
+[INFO] Tests run: 12, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.212 s -- in edu.neu.ccs.prl.crochet.ttd.ResumeFrameTest
+[INFO] Running edu.neu.ccs.prl.crochet.ttd.CallsiteSavePointTest
+[INFO] Tests run: 13, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.138 s -- in edu.neu.ccs.prl.crochet.ttd.CallsiteSavePointTest
+[INFO] Running edu.neu.ccs.prl.crochet.ttd.TtdLineMarkerTest
+[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.121 s -- in edu.neu.ccs.prl.crochet.ttd.TtdLineMarkerTest
+[INFO] Running edu.neu.ccs.prl.crochet.ttd.TtdSmokeTest
+[INFO] Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.127 s -- in edu.neu.ccs.prl.crochet.ttd.TtdSmokeTest
+[INFO] Running edu.neu.ccs.prl.crochet.ttd.CpsCallsiteIntegrationTest
+[INFO] Tests run: 7, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.134 s -- in edu.neu.ccs.prl.crochet.ttd.CpsCallsiteIntegrationTest
+[INFO] Running edu.neu.ccs.prl.crochet.ttd.TtdGenCounterTest
+[INFO] Tests run: 7, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.152 s -- in edu.neu.ccs.prl.crochet.ttd.TtdGenCounterTest
+[INFO] Running edu.neu.ccs.prl.crochet.ttd.CallsiteVerifierTest
+[INFO] Tests run: 5, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.123 s -- in edu.neu.ccs.prl.crochet.ttd.CallsiteVerifierTest
+[INFO] Running edu.neu.ccs.prl.crochet.ttd.LineMarkerTransformerTest
+[INFO] Tests run: 15, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.135 s -- in edu.neu.ccs.prl.crochet.ttd.LineMarkerTransformerTest
+[INFO] Tests run: 142, Failures: 0, Errors: 0, Skipped: 0
+[INFO] Running edu.neu.ccs.prl.crochet.ttd.cps.CorpusLivenessTest
+[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 57.83 s -- in edu.neu.ccs.prl.crochet.ttd.cps.CorpusLivenessTest
+[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0
+[INFO] BUILD SUCCESS

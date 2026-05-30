@@ -1,0 +1,34 @@
+# mode: baseline
+
+=== 01-basic                                 PASS
+=== 02-nested                                PASS
+=== 03-cyclic                                PASS
+=== 04-multi-checkpoint                      PASS
+=== 05-rollback-then-checkpoint              PASS
+=== 06-wide-fields                           PASS
+=== 07-concurrent-reads                      PASS
+=== 08-static-fields                         PASS
+=== 09-arrays                                PASS
+=== 10-concurrent-checkpoint                 PASS
+=== 11-concurrent-rollback                   PASS
+=== 12-checkpoint-then-concurrent-access     PASS
+=== 13-static-fields-auto                    PASS
+=== 14-array-auto                            PASS
+=== 15-hashmap-instrumented                  PASS
+=== 16-chaotic-stress                        PASS
+=== 17-arraycopy                             PASS
+=== 18-checkpointAll                         PASS
+=== 19-coverage-roots                        PASS
+=== 20-eager-checkpoint                      PASS
+=== 21-stack-roots                           PASS
+=== 22-cross-method-backstep                 PASS
+=== 23-backstep-lambda                       PASS
+=== 24-backstep-try-catch                    PASS
+=== 25-backstep-crochet-skip                 PASS
+
+==========================================
+results: 25 passed, 0 failed
+
+real	0m27.303s
+user	1m7.739s
+sys	0m9.805s
