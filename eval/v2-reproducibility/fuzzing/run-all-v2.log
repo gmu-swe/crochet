@@ -1,0 +1,40 @@
+==> Run output: /home/jon/crochet/.claude/worktrees/agent-a808156e0bdbe0014/eval/v2-reproducibility/fuzzing/v2-reproducibility
+==> Budget=300s reps=3 iter_levels=50
+==> [17:54:14] mode=baseline_perIter iters=50 rep=1 seed=107
+[run-one] mode=baseline_perIter budget=300s seed=107 iters=50 out=/home/jon/crochet/.claude/worktrees/agent-a808156e0bdbe0014/eval/v2-reproducibility/fuzzing/v2-reproducibility/baseline_perIter-w50-s107.csv
+[run-one] done: /home/jon/crochet/.claude/worktrees/agent-a808156e0bdbe0014/eval/v2-reproducibility/fuzzing/v2-reproducibility/baseline_perIter-w50-s107.json
+==> [17:59:14] mode=baseline_perIter iters=50 rep=2 seed=207
+[run-one] mode=baseline_perIter budget=300s seed=207 iters=50 out=/home/jon/crochet/.claude/worktrees/agent-a808156e0bdbe0014/eval/v2-reproducibility/fuzzing/v2-reproducibility/baseline_perIter-w50-s207.csv
+[run-one] done: /home/jon/crochet/.claude/worktrees/agent-a808156e0bdbe0014/eval/v2-reproducibility/fuzzing/v2-reproducibility/baseline_perIter-w50-s207.json
+==> [18:04:14] mode=baseline_perIter iters=50 rep=3 seed=307
+[run-one] mode=baseline_perIter budget=300s seed=307 iters=50 out=/home/jon/crochet/.claude/worktrees/agent-a808156e0bdbe0014/eval/v2-reproducibility/fuzzing/v2-reproducibility/baseline_perIter-w50-s307.csv
+[run-one] done: /home/jon/crochet/.claude/worktrees/agent-a808156e0bdbe0014/eval/v2-reproducibility/fuzzing/v2-reproducibility/baseline_perIter-w50-s307.json
+==> [18:09:15] mode=baseline_shared iters=50 rep=1 seed=107
+[run-one] mode=baseline_shared budget=300s seed=107 iters=50 out=/home/jon/crochet/.claude/worktrees/agent-a808156e0bdbe0014/eval/v2-reproducibility/fuzzing/v2-reproducibility/baseline_shared-w50-s107.csv
+[run-one] done: /home/jon/crochet/.claude/worktrees/agent-a808156e0bdbe0014/eval/v2-reproducibility/fuzzing/v2-reproducibility/baseline_shared-w50-s107.json
+==> [18:14:15] mode=baseline_shared iters=50 rep=2 seed=207
+[run-one] mode=baseline_shared budget=300s seed=207 iters=50 out=/home/jon/crochet/.claude/worktrees/agent-a808156e0bdbe0014/eval/v2-reproducibility/fuzzing/v2-reproducibility/baseline_shared-w50-s207.csv
+[run-one] done: /home/jon/crochet/.claude/worktrees/agent-a808156e0bdbe0014/eval/v2-reproducibility/fuzzing/v2-reproducibility/baseline_shared-w50-s207.json
+==> [18:19:15] mode=baseline_shared iters=50 rep=3 seed=307
+[run-one] mode=baseline_shared budget=300s seed=307 iters=50 out=/home/jon/crochet/.claude/worktrees/agent-a808156e0bdbe0014/eval/v2-reproducibility/fuzzing/v2-reproducibility/baseline_shared-w50-s307.csv
+[run-one] done: /home/jon/crochet/.claude/worktrees/agent-a808156e0bdbe0014/eval/v2-reproducibility/fuzzing/v2-reproducibility/baseline_shared-w50-s307.json
+==> [18:24:16] mode=crochet_scoped iters=50 rep=1 seed=107
+[run-one] mode=crochet_scoped budget=300s seed=107 iters=50 out=/home/jon/crochet/.claude/worktrees/agent-a808156e0bdbe0014/eval/v2-reproducibility/fuzzing/v2-reproducibility/crochet_scoped-w50-s107.csv
+[run-one] done: /home/jon/crochet/.claude/worktrees/agent-a808156e0bdbe0014/eval/v2-reproducibility/fuzzing/v2-reproducibility/crochet_scoped-w50-s107.json
+==> [18:29:16] mode=crochet_scoped iters=50 rep=2 seed=207
+[run-one] mode=crochet_scoped budget=300s seed=207 iters=50 out=/home/jon/crochet/.claude/worktrees/agent-a808156e0bdbe0014/eval/v2-reproducibility/fuzzing/v2-reproducibility/crochet_scoped-w50-s207.csv
+[run-one] done: /home/jon/crochet/.claude/worktrees/agent-a808156e0bdbe0014/eval/v2-reproducibility/fuzzing/v2-reproducibility/crochet_scoped-w50-s207.json
+==> [18:34:16] mode=crochet_scoped iters=50 rep=3 seed=307
+[run-one] mode=crochet_scoped budget=300s seed=307 iters=50 out=/home/jon/crochet/.claude/worktrees/agent-a808156e0bdbe0014/eval/v2-reproducibility/fuzzing/v2-reproducibility/crochet_scoped-w50-s307.csv
+[run-one] done: /home/jon/crochet/.claude/worktrees/agent-a808156e0bdbe0014/eval/v2-reproducibility/fuzzing/v2-reproducibility/crochet_scoped-w50-s307.json
+==> [18:39:16] mode=crochet_rollback iters=50 rep=1 seed=107
+[run-one] mode=crochet_rollback budget=300s seed=107 iters=50 out=/home/jon/crochet/.claude/worktrees/agent-a808156e0bdbe0014/eval/v2-reproducibility/fuzzing/v2-reproducibility/crochet_rollback-w50-s107.csv
+[run-one] done: /home/jon/crochet/.claude/worktrees/agent-a808156e0bdbe0014/eval/v2-reproducibility/fuzzing/v2-reproducibility/crochet_rollback-w50-s107.json
+==> [18:44:17] mode=crochet_rollback iters=50 rep=2 seed=207
+[run-one] mode=crochet_rollback budget=300s seed=207 iters=50 out=/home/jon/crochet/.claude/worktrees/agent-a808156e0bdbe0014/eval/v2-reproducibility/fuzzing/v2-reproducibility/crochet_rollback-w50-s207.csv
+[run-one] done: /home/jon/crochet/.claude/worktrees/agent-a808156e0bdbe0014/eval/v2-reproducibility/fuzzing/v2-reproducibility/crochet_rollback-w50-s207.json
+==> [18:49:17] mode=crochet_rollback iters=50 rep=3 seed=307
+[run-one] mode=crochet_rollback budget=300s seed=307 iters=50 out=/home/jon/crochet/.claude/worktrees/agent-a808156e0bdbe0014/eval/v2-reproducibility/fuzzing/v2-reproducibility/crochet_rollback-w50-s307.csv
+[run-one] done: /home/jon/crochet/.claude/worktrees/agent-a808156e0bdbe0014/eval/v2-reproducibility/fuzzing/v2-reproducibility/crochet_rollback-w50-s307.json
+==> Total wall time: 3603s (60 min)
+==> Aggregate with: python3 scripts/aggregate.py /home/jon/crochet/.claude/worktrees/agent-a808156e0bdbe0014/eval/v2-reproducibility/fuzzing/v2-reproducibility

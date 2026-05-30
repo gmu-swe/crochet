@@ -1,0 +1,20 @@
+{
+  "mode": "baseline_shared",
+  "seed": 207,
+  "budgetSec": 300,
+  "iterations": 8424,
+  "distinctEdges": 405,
+  "corpusSize": 542,
+  "totalMs": 300013,
+  "branchesPerSec": 1.3499,
+  "itersPerSec": 28.0788,
+  "meanIterUs": 35196.4456,
+  "setupTotalMs": 336,
+  "teardownTotalMs": 0,
+  "checkpointTotalMs": 0,
+  "rollbackTotalMs": 0,
+  "timeToNBranchesMs": 451,
+  "nBranchesLandmark": 88,
+  "lastChecksumMode1": 0,
+  "lastChecksumMode3": 0
+}

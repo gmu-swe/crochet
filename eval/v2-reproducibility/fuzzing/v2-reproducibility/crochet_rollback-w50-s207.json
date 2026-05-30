@@ -1,0 +1,20 @@
+{
+  "mode": "crochet_rollback",
+  "seed": 207,
+  "budgetSec": 300,
+  "iterations": 6413,
+  "distinctEdges": 405,
+  "corpusSize": 488,
+  "totalMs": 300093,
+  "branchesPerSec": 1.3496,
+  "itersPerSec": 21.3700,
+  "meanIterUs": 43948.3807,
+  "setupTotalMs": 349,
+  "teardownTotalMs": 0,
+  "checkpointTotalMs": 21,
+  "rollbackTotalMs": 2501,
+  "timeToNBranchesMs": 648,
+  "nBranchesLandmark": 88,
+  "lastChecksumMode1": 0,
+  "lastChecksumMode3": -7555991474314392961
+}
