@@ -1,0 +1,40 @@
+==> Run output: results/crossover-180s
+==> Budget=180s reps=1 iter_levels=1 10 30
+==> [03:09:10] mode=baseline_perIter iters=1 rep=1 seed=107
+[run-one] mode=baseline_perIter budget=180s seed=107 iters=1 out=results/crossover-180s/baseline_perIter-w1-s107.csv
+[run-one] done: results/crossover-180s/baseline_perIter-w1-s107.json
+==> [03:12:11] mode=baseline_shared iters=1 rep=1 seed=107
+[run-one] mode=baseline_shared budget=180s seed=107 iters=1 out=results/crossover-180s/baseline_shared-w1-s107.csv
+[run-one] done: results/crossover-180s/baseline_shared-w1-s107.json
+==> [03:15:11] mode=crochet_scoped iters=1 rep=1 seed=107
+[run-one] mode=crochet_scoped budget=180s seed=107 iters=1 out=results/crossover-180s/crochet_scoped-w1-s107.csv
+[run-one] done: results/crossover-180s/crochet_scoped-w1-s107.json
+==> [03:18:11] mode=crochet_rollback iters=1 rep=1 seed=107
+[run-one] mode=crochet_rollback budget=180s seed=107 iters=1 out=results/crossover-180s/crochet_rollback-w1-s107.csv
+[run-one] done: results/crossover-180s/crochet_rollback-w1-s107.json
+==> [03:21:12] mode=baseline_perIter iters=10 rep=1 seed=107
+[run-one] mode=baseline_perIter budget=180s seed=107 iters=10 out=results/crossover-180s/baseline_perIter-w10-s107.csv
+[run-one] done: results/crossover-180s/baseline_perIter-w10-s107.json
+==> [03:24:12] mode=baseline_shared iters=10 rep=1 seed=107
+[run-one] mode=baseline_shared budget=180s seed=107 iters=10 out=results/crossover-180s/baseline_shared-w10-s107.csv
+[run-one] done: results/crossover-180s/baseline_shared-w10-s107.json
+==> [03:27:12] mode=crochet_scoped iters=10 rep=1 seed=107
+[run-one] mode=crochet_scoped budget=180s seed=107 iters=10 out=results/crossover-180s/crochet_scoped-w10-s107.csv
+[run-one] done: results/crossover-180s/crochet_scoped-w10-s107.json
+==> [03:30:13] mode=crochet_rollback iters=10 rep=1 seed=107
+[run-one] mode=crochet_rollback budget=180s seed=107 iters=10 out=results/crossover-180s/crochet_rollback-w10-s107.csv
+[run-one] done: results/crossover-180s/crochet_rollback-w10-s107.json
+==> [03:33:13] mode=baseline_perIter iters=30 rep=1 seed=107
+[run-one] mode=baseline_perIter budget=180s seed=107 iters=30 out=results/crossover-180s/baseline_perIter-w30-s107.csv
+[run-one] done: results/crossover-180s/baseline_perIter-w30-s107.json
+==> [03:36:13] mode=baseline_shared iters=30 rep=1 seed=107
+[run-one] mode=baseline_shared budget=180s seed=107 iters=30 out=results/crossover-180s/baseline_shared-w30-s107.csv
+[run-one] done: results/crossover-180s/baseline_shared-w30-s107.json
+==> [03:39:14] mode=crochet_scoped iters=30 rep=1 seed=107
+[run-one] mode=crochet_scoped budget=180s seed=107 iters=30 out=results/crossover-180s/crochet_scoped-w30-s107.csv
+[run-one] done: results/crossover-180s/crochet_scoped-w30-s107.json
+==> [03:42:14] mode=crochet_rollback iters=30 rep=1 seed=107
+[run-one] mode=crochet_rollback budget=180s seed=107 iters=30 out=results/crossover-180s/crochet_rollback-w30-s107.csv
+[run-one] done: results/crossover-180s/crochet_rollback-w30-s107.json
+==> Total wall time: 2164s (36 min)
+==> Aggregate with: python3 scripts/aggregate.py results/crossover-180s
