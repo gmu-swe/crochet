@@ -1,0 +1,50 @@
+{
+  "bug": "Jsoup-28",
+  "condition": "C1",
+  "started_at": "2026-05-21T18:12:30+00:00",
+  "duration_seconds": 122,
+  "tool_calls": 18,
+  "compile_fail": false,
+  "primary_pass": true,
+  "test_pass": true,
+  "baseline_failing_count": 4,
+  "agent_induced_regressions": [],
+  "regressed_tests": [],
+  "diagnosis_quality": 3,
+  "agent_exit_code": 0,
+  "bug_reproduced_pretest": true,
+  "agent_patch": "diff --git a/maven-build.xml b/maven-build.xml\nindex 93e81600..f77e8eba 100644\n--- a/maven-build.xml\n+++ b/maven-build.xml\n@@ -68,10 +68,10 @@\n            debug=\"true\" \n            optimize=\"false\" \n            deprecation=\"true\" \n-           target=\"1.6\" \n+           target=\"1.8\" \n            verbose=\"false\" \n            fork=\"false\" \n-           source=\"1.6\">\n+           source=\"1.8\">\n       <src>\n         <pathelement location=\"${maven.build.srcDir.0}\"/>\n       </src>\n@@ -99,10 +99,10 @@\n            debug=\"true\" \n            optimize=\"false\" \n            deprecation=\"true\" \n-           target=\"1.6\" \n+           target=\"1.8\" \n            verbose=\"false\" \n            fork=\"false\" \n-           source=\"1.6\">\n+           source=\"1.8\">\n       <src>\n         <pathelement location=\"${maven.build.testDir.0}\"/>\n       </src>\ndiff --git a/src/main/java/org/jsoup/nodes/Entities.java b/src/main/java/org/jsoup/nodes/Entities.java\nindex be73e321..a68e39c1 100644\n--- a/src/main/java/org/jsoup/nodes/Entities.java\n+++ b/src/main/java/org/jsoup/nodes/Entities.java\n@@ -115,8 +115,10 @@ public class Entities {\n                 }\n             } else {\n                 String name = m.group(1);\n-                if (full.containsKey(name))\n-                    charval = full.get(name);\n+                boolean semi = m.group(0).endsWith(\";\");\n+                Map<String, Character> map = semi ? full : base;\n+                if (map.containsKey(name))\n+                    charval = map.get(name);\n             }\n             if (charval != -1 || charval > 0xFFFF) {\n                 String c = Character.toString((char) charval);\n",
+  "agent_log": "{\"type\":\"result\",\"subtype\":\"success\",\"is_error\":false,\"api_error_status\":null,\"duration_ms\":121041,\"duration_api_ms\":102804,\"ttft_ms\":2239,\"num_turns\":18,\"result\":\"All related tests pass. Final diagnosis:\\n\\nDIAGNOSIS COMPLETE\\n\\nThe root cause was in `Entities.unescape(String, boolean)` at `src/main/java/org/jsoup/nodes/Entities.java`. The non-strict regex `unescapePattern` makes the trailing `;` optional (`;?`), so it matches both `&angst;` and the bare `&angst`. The named-entity branch then unconditionally looked up the name in the `full` map, which contains every HTML5 entity (including `angst` \u2192 `\u00c5`). As a result, `&angst` (no semicolon) was being expanded to `\u00c5`, but per the HTML5 rules \u2014 and the test's expectation \u2014 only the legacy \\\"ambiguous-ampersand\\\" entities (the smaller `base` map: `LT`, `lt`, `reg`, `copy`, `COPY`, etc.) are allowed to be unescaped without a trailing semicolon. The fix inspects `m.group(0)` to see whether the match ends with `;`: if it does, look up the name in `full`; if it doesn't, restrict the lookup to `base`, so unknown-without-semicolon entities like `&angst` are left untouched while legacy `&reg`, `&copy`, `&LT`, etc. still resolve correctly.\",\"stop_reason\":\"end_turn\",\"session_id\":\"0130013a-6b64-4106-94a4-744ba9311a7e\",\"total_cost_usd\":0.65728075,\"usage\":{\"input_tokens\":22,\"cache_creation_input_tokens\":27365,\"cache_read_input_tokens\":678929,\"output_tokens\":5867,\"server_tool_use\":{\"web_search_requests\":0,\"web_fetch_requests\":0},\"service_tier\":\"standard\",\"cache_creation\":{\"ephemeral_1h_input_tokens\":27365,\"ephemeral_5m_input_tokens\":0},\"inference_geo\":\"\",\"iterations\":[{\"input_tokens\":1,\"output_tokens\":426,\"cache_read_input_tokens\":45436,\"cache_creation_input_tokens\":428,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":428},\"type\":\"message\"}],\"speed\":\"standard\"},\"modelUsage\":{\"claude-opus-4-7[1m]\":{\"inputTokens\":22,\"outputTokens\":5867,\"cacheReadInputTokens\":678929,\"cacheCreationInputTokens\":27365,\"webSearchRequests\":0,\"costUSD\":0.65728075,\"contextWindow\":1000000,\"maxOutputTokens\":64000}},\"permission_denials\":[],\"terminal_reason\":\"completed\",\"fast_mode_state\":\"off\",\"uuid\":\"fdfcbe1d-5904-4fce-a1b2-2fb905af9368\"}\n",
+  "agent_stderr": "",
+  "judge_reasoning": "The ground-truth describes a bug in the entity trie lookup at the boundary between decimal and hexadecimal references, but the agent diagnosed a different issue: the named-entity branch incorrectly using the 'full' map instead of 'base' for entities without trailing semicolons. The agent identified the right file/component (Entities.unescape) and a real bug in entity handling, but missed the specific numeric/hex boundary issue described in the ground truth.\n",
+  "verify_log": "Running ant (compile.tests)................................................ OK\nRunning ant (run.dev.tests)................................................ OK\nFailing tests: 1\n  - org.jsoup.nodes.EntitiesTest::unescape\n",
+  "baseline_failing_tests": [
+    "org.jsoup.parser.AttributeParseTest::moreAttributeUnescapes",
+    "org.jsoup.parser.AttributeParseTest::strictAttributeUnescapes",
+    "org.jsoup.parser.HtmlParserTest::doesNotFindShortestMatchingEntity",
+    "org.jsoup.parser.HtmlParserTest::relaxedBaseEntityMatchAndStrictExtendedMatch"
+  ],
+  "compile_log": "Running ant (compile)...................................................... OK\nRunning ant (compile.tests)................................................ OK\n",
+  "agent_modified_files": [
+    "maven-build.xml",
+    "src/main/java/org/jsoup/nodes/Entities.java"
+  ],
+  "canonical_modified_files": [
+    "src/main/java/org/jsoup/nodes/Entities.java",
+    "src/main/java/org/jsoup/parser/Parser.java",
+    "src/main/java/org/jsoup/parser/Tokeniser.java"
+  ],
+  "agent_modified_prod_files": [
+    "src/main/java/org/jsoup/nodes/Entities.java"
+  ],
+  "file_overlap": [
+    "src/main/java/org/jsoup/nodes/Entities.java"
+  ],
+  "missed_canonical": [
+    "src/main/java/org/jsoup/parser/Parser.java",
+    "src/main/java/org/jsoup/parser/Tokeniser.java"
+  ],
+  "extra_prod_files": [],
+  "fix_locality_score": 0.5,
+  "test_pass_strict": true
+}

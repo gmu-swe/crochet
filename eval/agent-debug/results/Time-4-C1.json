@@ -1,0 +1,30 @@
+{
+  "bug": "Time-4",
+  "condition": "C1",
+  "started_at": "2026-05-21T01:52:56+00:00",
+  "duration_seconds": 136,
+  "tool_calls": 17,
+  "compile_fail": false,
+  "primary_pass": true,
+  "test_pass": true,
+  "baseline_failing_count": 6,
+  "agent_induced_regressions": [],
+  "regressed_tests": [],
+  "diagnosis_quality": 5,
+  "agent_exit_code": 0,
+  "bug_reproduced_pretest": true,
+  "agent_patch": "diff --git a/maven-build.xml b/maven-build.xml\nindex 1a5047be..0a289f6b 100644\n--- a/maven-build.xml\n+++ b/maven-build.xml\n@@ -71,10 +71,10 @@\n            debug=\"true\" \n            optimize=\"false\" \n            deprecation=\"true\" \n-           target=\"1.6\" \n+           target=\"1.8\" \n            verbose=\"false\" \n            fork=\"false\" \n-           source=\"1.6\">\n+           source=\"1.8\">\n       <src>\n         <pathelement location=\"${maven.build.srcDir.0}\"/>\n       </src>\n@@ -108,10 +108,10 @@\n            debug=\"true\" \n            optimize=\"false\" \n            deprecation=\"true\" \n-           target=\"1.6\" \n+           target=\"1.8\" \n            verbose=\"false\" \n            fork=\"false\" \n-           source=\"1.6\">\n+           source=\"1.8\">\n       <src>\n         <pathelement location=\"${maven.build.testDir.0}\"/>\n       </src>\ndiff --git a/src/main/java/org/joda/time/Partial.java b/src/main/java/org/joda/time/Partial.java\nindex 0d4edf47..69938eff 100644\n--- a/src/main/java/org/joda/time/Partial.java\n+++ b/src/main/java/org/joda/time/Partial.java\n@@ -461,8 +461,7 @@ public final class Partial\n             System.arraycopy(iValues, i, newValues, i + 1, newValues.length - i - 1);\n             // use public constructor to ensure full validation\n             // this isn't overly efficient, but is safe\n-            Partial newPartial = new Partial(iChronology, newTypes, newValues);\n-            iChronology.validate(newPartial, newValues);\n+            Partial newPartial = new Partial(newTypes, newValues, iChronology);\n             return newPartial;\n         }\n         if (value == getValue(index)) {\n",
+  "agent_log": "{\"type\":\"result\",\"subtype\":\"success\",\"is_error\":false,\"api_error_status\":null,\"duration_ms\":135347,\"duration_api_ms\":98935,\"ttft_ms\":2567,\"num_turns\":17,\"result\":\"All testWith3* variants pass. Fix verified.\\n\\nDIAGNOSIS COMPLETE\\n\\nThe root cause was that `Partial.with(DateTimeFieldType, int)` constructed the new Partial using the package-private `Partial(Chronology, DateTimeFieldType[], int[])` constructor at line 464, which performs NO validation of field ordering or duplicates \u2014 despite the inline comment one line above promising \\\"use public constructor to ensure full validation\\\". The follow-up call to `iChronology.validate(newPartial, newValues)` only validates that values are in range for each field; it does not check the largest-to-smallest unit/range ordering invariant. As a result, when the test added `clockhourOfDay` to a Partial already containing `hourOfDay` (both share duration=hours and range=days, making them duplicates with respect to Partial's ordering rules), the insertion-point loop slotted `clockhourOfDay` after `hourOfDay`, the non-validating constructor accepted the malformed types array, and no exception was thrown. The fix is to invoke the public validating constructor `new Partial(newTypes, newValues, iChronology)` (lines 189\u2013249), which contains the explicit duplicate / largest-to-smallest checks and throws `IllegalArgumentException` for this case.\",\"stop_reason\":\"end_turn\",\"session_id\":\"4096f18b-7845-4e9f-95db-1a2a9a57cd8c\",\"total_cost_usd\":0.592602,\"usage\":{\"input_tokens\":21,\"cache_creation_input_tokens\":24854,\"cache_read_input_tokens\":614319,\"output_tokens\":5200,\"server_tool_use\":{\"web_search_requests\":0,\"web_fetch_requests\":0},\"service_tier\":\"standard\",\"cache_creation\":{\"ephemeral_1h_input_tokens\":24854,\"ephemeral_5m_input_tokens\":0},\"inference_geo\":\"\",\"iterations\":[{\"input_tokens\":1,\"output_tokens\":425,\"cache_read_input_tokens\":42845,\"cache_creation_input_tokens\":508,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":508},\"type\":\"message\"}],\"speed\":\"standard\"},\"modelUsage\":{\"claude-opus-4-7[1m]\":{\"inputTokens\":21,\"outputTokens\":5200,\"cacheReadInputTokens\":614319,\"cacheCreationInputTokens\":24854,\"webSearchRequests\":0,\"costUSD\":0.592602,\"contextWindow\":1000000,\"maxOutputTokens\":64000}},\"permission_denials\":[],\"terminal_reason\":\"completed\",\"fast_mode_state\":\"off\",\"uuid\":\"18504678-387b-4576-ac22-e1192fcf960b\"}\n",
+  "agent_stderr": "",
+  "judge_reasoning": "The agent correctly identified that Partial.with(DateTimeFieldType, int) uses the non-validating package-private constructor at line 464 instead of the public validating constructor, allowing illegal field ordering (duplicates with same duration/range like hourOfDay and clockhourOfDay) to slip through. This matches the ground-truth summary precisely, including the mechanism (ordering invariant violation) and the correct fix (call the validating public constructor).\n",
+  "verify_log": "Running ant (compile.tests)................................................ OK\nRunning ant (run.dev.tests)................................................ OK\nFailing tests: 1\n  - org.joda.time.TestPartial_Basics::testWith3\n",
+  "baseline_failing_tests": [
+    "org.joda.time.TestDateMidnight_Properties::testPropertyGetMonthOfYear",
+    "org.joda.time.TestDateTime_Properties::testPropertyGetMonthOfYear",
+    "org.joda.time.TestMonthDay_Properties::testPropertyGetMonthOfYear",
+    "org.joda.time.TestMutableDateTime_Properties::testPropertyGetMonthOfYear",
+    "org.joda.time.convert.TestCalendarConverter::testGetChronology_Object_Zone",
+    "org.joda.time.convert.TestCalendarConverter::testGetChronology_Object_nullChronology"
+  ],
+  "compile_log": "Running ant (compile)...................................................... OK\nRunning ant (compile.tests)................................................ OK\n"
+}

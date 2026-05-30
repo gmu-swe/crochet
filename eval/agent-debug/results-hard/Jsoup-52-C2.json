@@ -1,0 +1,49 @@
+{
+  "bug": "Jsoup-52",
+  "condition": "C2",
+  "started_at": "2026-05-21T18:08:28+00:00",
+  "duration_seconds": 218,
+  "tool_calls": 31,
+  "compile_fail": false,
+  "primary_pass": true,
+  "test_pass": true,
+  "baseline_failing_count": 3,
+  "agent_induced_regressions": [],
+  "regressed_tests": [],
+  "diagnosis_quality": 2,
+  "agent_exit_code": 0,
+  "bug_reproduced_pretest": true,
+  "agent_patch": "diff --git a/maven-build.xml b/maven-build.xml\nindex 2ebfa2aa..5e1d3da6 100644\n--- a/maven-build.xml\n+++ b/maven-build.xml\n@@ -68,10 +68,10 @@\n            debug=\"true\" \n            optimize=\"false\" \n            deprecation=\"true\" \n-           target=\"1.6\" \n+           target=\"1.8\" \n            verbose=\"false\" \n            fork=\"false\" \n-           source=\"1.6\">\n+           source=\"1.8\">\n       <src>\n         <pathelement location=\"${maven.build.srcDir.0}\"/>\n       </src>\n@@ -99,10 +99,10 @@\n            debug=\"true\" \n            optimize=\"false\" \n            deprecation=\"true\" \n-           target=\"1.6\" \n+           target=\"1.8\" \n            verbose=\"false\" \n            fork=\"false\" \n-           source=\"1.6\">\n+           source=\"1.8\">\n       <src>\n         <pathelement location=\"${maven.build.testDir.0}\"/>\n       </src>\ndiff --git a/src/main/java/org/jsoup/nodes/XmlDeclaration.java b/src/main/java/org/jsoup/nodes/XmlDeclaration.java\nindex 24a9f164..8e4d1155 100644\n--- a/src/main/java/org/jsoup/nodes/XmlDeclaration.java\n+++ b/src/main/java/org/jsoup/nodes/XmlDeclaration.java\n@@ -54,6 +54,7 @@ public class XmlDeclaration extends Node {\n             if( encoding != null ) {\n                 sb.append(\" encoding=\\\"\").append(encoding).append(\"\\\"\");\n             }\n+            sb.append(\"?\");\n             return sb.toString();\n         }\n         else {\n",
+  "agent_log": "{\"type\":\"result\",\"subtype\":\"success\",\"is_error\":false,\"api_error_status\":null,\"duration_ms\":216863,\"duration_api_ms\":188806,\"ttft_ms\":2678,\"num_turns\":31,\"result\":\"DIAGNOSIS COMPLETE\\n\\nThe root cause was in `XmlDeclaration.getWholeDeclaration()`, not in `Document.ensureMetaCharsetElement()`. When an `XmlDeclaration` is constructed programmatically by `ensureMetaCharsetElement` (with `name=\\\"xml\\\"` and version/encoding added as attributes), the multi-attribute branch of `getWholeDeclaration` built `xml version=\\\"...\\\" encoding=\\\"...\\\"` without a trailing `?`. The serializer (`outerHtmlHead`) wraps the result with `<?` and `>`, relying on the data itself to supply the closing `?` (the class comment even notes: \\\"last data char should be ?\\\"). For parsed declarations this worked because the parser stored the raw text \u2014 including the trailing `?` \u2014 directly in `name` with `attributes.size() == 0`, sending it down the else branch. But the constructed-with-attrs path produced `<?xml version=\\\"1.0\\\" encoding=\\\"UTF-8\\\">` instead of `<?xml version=\\\"1.0\\\" encoding=\\\"UTF-8\\\"?>`. Fix: append `?` at the end of the multi-attribute branch in `getWholeDeclaration`.\",\"stop_reason\":\"end_turn\",\"session_id\":\"81f0ffc2-8369-4ccc-b881-f110f7ce69e7\",\"total_cost_usd\":1.1691422500000002,\"usage\":{\"input_tokens\":35,\"cache_creation_input_tokens\":35849,\"cache_read_input_tokens\":1265822,\"output_tokens\":12480,\"server_tool_use\":{\"web_search_requests\":0,\"web_fetch_requests\":0},\"service_tier\":\"standard\",\"cache_creation\":{\"ephemeral_1h_input_tokens\":35849,\"ephemeral_5m_input_tokens\":0},\"inference_geo\":\"\",\"iterations\":[{\"input_tokens\":1,\"output_tokens\":392,\"cache_read_input_tokens\":53782,\"cache_creation_input_tokens\":566,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":566},\"type\":\"message\"}],\"speed\":\"standard\"},\"modelUsage\":{\"claude-opus-4-7[1m]\":{\"inputTokens\":35,\"outputTokens\":12480,\"cacheReadInputTokens\":1265822,\"cacheCreationInputTokens\":35849,\"webSearchRequests\":0,\"costUSD\":1.1691422500000002,\"contextWindow\":1000000,\"maxOutputTokens\":64000}},\"permission_denials\":[],\"terminal_reason\":\"completed\",\"fast_mode_state\":\"off\",\"uuid\":\"68fa58f4-82bd-4ac7-a3b2-912314f375e3\"}\n",
+  "agent_stderr": "",
+  "judge_reasoning": "The ground-truth fix is in Document.updateMetaCharsetElement() for the XML mode path that fails to update the declaration when no charset attribute exists. The agent instead diagnosed a missing trailing '?' in XmlDeclaration.getWholeDeclaration()'s multi-attribute branch \u2014 a different component entirely, though in the same general area (XML declaration handling for charset updates). The fix may produce correct-looking output for the test case without addressing the actual root cause in Document.\n",
+  "verify_log": "Running ant (compile.tests)................................................ OK\nRunning ant (run.dev.tests)................................................ OK\nFailing tests: 1\n  - org.jsoup.nodes.DocumentTest::testMetaCharsetUpdateXmlNoCharset\n",
+  "baseline_failing_tests": [
+    "org.jsoup.parser.XmlTreeBuilderTest::handlesXmlDeclarationAsDeclaration",
+    "org.jsoup.parser.XmlTreeBuilderTest::testDetectCharsetEncodingDeclaration",
+    "org.jsoup.parser.XmlTreeBuilderTest::testParseDeclarationAttributes"
+  ],
+  "compile_log": "Running ant (compile)...................................................... OK\nRunning ant (compile.tests)................................................ OK\n",
+  "agent_modified_files": [
+    "maven-build.xml",
+    "src/main/java/org/jsoup/nodes/XmlDeclaration.java"
+  ],
+  "canonical_modified_files": [
+    "src/main/java/org/jsoup/helper/DataUtil.java",
+    "src/main/java/org/jsoup/nodes/XmlDeclaration.java",
+    "src/main/java/org/jsoup/parser/XmlTreeBuilder.java"
+  ],
+  "agent_modified_prod_files": [
+    "src/main/java/org/jsoup/nodes/XmlDeclaration.java"
+  ],
+  "file_overlap": [
+    "src/main/java/org/jsoup/nodes/XmlDeclaration.java"
+  ],
+  "missed_canonical": [
+    "src/main/java/org/jsoup/helper/DataUtil.java",
+    "src/main/java/org/jsoup/parser/XmlTreeBuilder.java"
+  ],
+  "extra_prod_files": [],
+  "fix_locality_score": 0.5,
+  "test_pass_strict": true
+}

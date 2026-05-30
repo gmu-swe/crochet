@@ -1,0 +1,44 @@
+{
+  "bug": "Jsoup-71",
+  "condition": "C2",
+  "started_at": "2026-05-21T18:05:29+00:00",
+  "duration_seconds": 90,
+  "tool_calls": 21,
+  "compile_fail": false,
+  "primary_pass": true,
+  "test_pass": true,
+  "baseline_failing_count": 0,
+  "agent_induced_regressions": [],
+  "regressed_tests": [],
+  "diagnosis_quality": 5,
+  "agent_exit_code": 0,
+  "bug_reproduced_pretest": true,
+  "agent_patch": "diff --git a/maven-build.xml b/maven-build.xml\nindex 769e6014..f6a35990 100644\n--- a/maven-build.xml\n+++ b/maven-build.xml\n@@ -78,10 +78,10 @@\n            debug=\"true\" \n            optimize=\"false\" \n            deprecation=\"true\" \n-           target=\"1.7\" \n+           target=\"1.8\" \n            verbose=\"false\" \n            fork=\"false\" \n-           source=\"1.7\">\n+           source=\"1.8\">\n       <src>\n         <pathelement location=\"${maven.build.srcDir.0}\"/>\n       </src>\n@@ -117,10 +117,10 @@\n            debug=\"true\" \n            optimize=\"false\" \n            deprecation=\"true\" \n-           target=\"1.7\" \n+           target=\"1.8\" \n            verbose=\"false\" \n            fork=\"false\" \n-           source=\"1.7\">\n+           source=\"1.8\">\n       <src>\n         <pathelement location=\"${maven.build.testDir.0}\"/>\n       </src>\ndiff --git a/src/main/java/org/jsoup/select/Evaluator.java b/src/main/java/org/jsoup/select/Evaluator.java\nindex 87b1d481..735606f2 100644\n--- a/src/main/java/org/jsoup/select/Evaluator.java\n+++ b/src/main/java/org/jsoup/select/Evaluator.java\n@@ -6,6 +6,8 @@ import org.jsoup.nodes.Document;\n import org.jsoup.nodes.DocumentType;\n import org.jsoup.nodes.Element;\n import org.jsoup.nodes.Node;\n+import org.jsoup.nodes.PseudoTextElement;\n+import org.jsoup.nodes.TextNode;\n import org.jsoup.nodes.XmlDeclaration;\n \n import java.util.List;\n@@ -751,6 +753,26 @@ public abstract class Evaluator {\n         }\n     }\n \n+    public static final class MatchText extends Evaluator {\n \n+        @Override\n+        public boolean matches(Element root, Element element) {\n+            if (element instanceof PseudoTextElement)\n+                return true;\n+\n+            List<TextNode> textNodes = element.textNodes();\n+            for (TextNode textNode : textNodes) {\n+                PseudoTextElement pel = new PseudoTextElement(\n+                    org.jsoup.parser.Tag.valueOf(element.tagName()), element.baseUri(), element.attributes());\n+                textNode.replaceWith(pel);\n+                pel.appendChild(textNode);\n+            }\n+            return false;\n+        }\n \n+        @Override\n+        public String toString() {\n+            return \":matchText\";\n+        }\n+    }\n }\ndiff --git a/src/main/java/org/jsoup/select/QueryParser.java b/src/main/java/org/jsoup/select/QueryParser.java\nindex e00f46ea..99e51473 100644\n--- a/src/main/java/org/jsoup/select/QueryParser.java\n+++ b/src/main/java/org/jsoup/select/QueryParser.java\n@@ -200,6 +200,8 @@ public class QueryParser {\n         \tevals.add(new Evaluator.IsEmpty());\n         else if (tq.matchChomp(\":root\"))\n         \tevals.add(new Evaluator.IsRoot());\n+        else if (tq.matchChomp(\":matchText\"))\n+            evals.add(new Evaluator.MatchText());\n \t\telse // unhandled\n             throw new Selector.SelectorParseException(\"Could not parse query '%s': unexpected token at '%s'\", query, tq.remainder());\n \n",
+  "agent_log": "{\"type\":\"result\",\"subtype\":\"success\",\"is_error\":false,\"api_error_status\":null,\"duration_ms\":89480,\"duration_api_ms\":83313,\"ttft_ms\":2177,\"num_turns\":21,\"result\":\"Test passes.\\n\\nDIAGNOSIS COMPLETE\\n\\nThe bug was that the buggy version of Jsoup was missing the entire `:matchText` pseudo-class feature. Three things had to be restored: (1) the `org.jsoup.nodes.PseudoTextElement` class \u2014 a subclass of `Element` that represents a `TextNode` as a selectable element and emits empty open/close tags so the original HTML is preserved on output; (2) the `Evaluator.MatchText` inner class plus the `PseudoTextElement`/`TextNode` imports \u2014 its `matches` method walks each child `TextNode`, wraps it in a `PseudoTextElement` and replaces the original text node so the splitting on `<br>` boundaries falls out of the existing parent/child relationships; and (3) the `:matchText` arm in `QueryParser.allSelectors` so the parser actually instantiates `Evaluator.MatchText` when it sees the token. Without those pieces, `doc.select(\\\"p:matchText\\\")` threw a `SelectorParseException` (\\\"unexpected token at ':matchText'\\\") and the `splitOnBr` test failed before it could ever assert text values.\",\"stop_reason\":\"end_turn\",\"session_id\":\"6e842833-0d50-4801-ae83-0acc03587fd3\",\"total_cost_usd\":0.65349725,\"usage\":{\"input_tokens\":25,\"cache_creation_input_tokens\":23823,\"cache_read_input_tokens\":771407,\"output_tokens\":4751,\"server_tool_use\":{\"web_search_requests\":0,\"web_fetch_requests\":0},\"service_tier\":\"standard\",\"cache_creation\":{\"ephemeral_1h_input_tokens\":23823,\"ephemeral_5m_input_tokens\":0},\"inference_geo\":\"\",\"iterations\":[{\"input_tokens\":1,\"output_tokens\":386,\"cache_read_input_tokens\":42103,\"cache_creation_input_tokens\":219,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":219},\"type\":\"message\"}],\"speed\":\"standard\"},\"modelUsage\":{\"claude-opus-4-7[1m]\":{\"inputTokens\":25,\"outputTokens\":4751,\"cacheReadInputTokens\":771407,\"cacheCreationInputTokens\":23823,\"webSearchRequests\":0,\"costUSD\":0.65349725,\"contextWindow\":1000000,\"maxOutputTokens\":64000}},\"permission_denials\":[],\"terminal_reason\":\"completed\",\"fast_mode_state\":\"off\",\"uuid\":\"740115d0-213f-4246-b721-fcaab6214cdc\"}\n",
+  "agent_stderr": "",
+  "judge_reasoning": "The agent correctly identified that the buggy version was missing the entire :matchText pseudo-class feature, including the PseudoTextElement class, the Evaluator.MatchText inner class, and the QueryParser arm that dispatches to it. This matches the ground-truth summary precisely \u2014 the pseudo-class evaluator did not account for PseudoTextElement because it (and its evaluator) didn't exist. The diagnosis names the exact classes, methods, and the mechanism by which text splitting on <br> falls out of the parent/child relationships.\n",
+  "verify_log": "Running ant (compile.tests)................................................ OK\nRunning ant (run.dev.tests)................................................ OK\nFailing tests: 1\n  - org.jsoup.select.SelectorTest::splitOnBr\n",
+  "baseline_failing_tests": [],
+  "compile_log": "Running ant (compile)...................................................... OK\nRunning ant (compile.tests)................................................ OK\n",
+  "agent_modified_files": [
+    "maven-build.xml",
+    "src/main/java/org/jsoup/select/Evaluator.java",
+    "src/main/java/org/jsoup/select/QueryParser.java"
+  ],
+  "canonical_modified_files": [
+    "src/main/java/org/jsoup/select/Evaluator.java",
+    "src/main/java/org/jsoup/select/QueryParser.java"
+  ],
+  "agent_modified_prod_files": [
+    "src/main/java/org/jsoup/select/Evaluator.java",
+    "src/main/java/org/jsoup/select/QueryParser.java"
+  ],
+  "file_overlap": [
+    "src/main/java/org/jsoup/select/Evaluator.java",
+    "src/main/java/org/jsoup/select/QueryParser.java"
+  ],
+  "missed_canonical": [],
+  "extra_prod_files": [],
+  "fix_locality_score": 1.0,
+  "test_pass_strict": true
+}

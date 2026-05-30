@@ -1,0 +1,47 @@
+{
+  "bug": "Time-4",
+  "condition": "C3",
+  "started_at": "2026-05-21T01:55:36+00:00",
+  "duration_seconds": 160,
+  "tool_calls": 22,
+  "compile_fail": false,
+  "primary_pass": true,
+  "test_pass": true,
+  "baseline_failing_count": 6,
+  "agent_induced_regressions": [],
+  "regressed_tests": [],
+  "diagnosis_quality": 5,
+  "agent_exit_code": 0,
+  "bug_reproduced_pretest": true,
+  "agent_patch": "diff --git a/maven-build.xml b/maven-build.xml\nindex 1a5047be..0a289f6b 100644\n--- a/maven-build.xml\n+++ b/maven-build.xml\n@@ -71,10 +71,10 @@\n            debug=\"true\" \n            optimize=\"false\" \n            deprecation=\"true\" \n-           target=\"1.6\" \n+           target=\"1.8\" \n            verbose=\"false\" \n            fork=\"false\" \n-           source=\"1.6\">\n+           source=\"1.8\">\n       <src>\n         <pathelement location=\"${maven.build.srcDir.0}\"/>\n       </src>\n@@ -108,10 +108,10 @@\n            debug=\"true\" \n            optimize=\"false\" \n            deprecation=\"true\" \n-           target=\"1.6\" \n+           target=\"1.8\" \n            verbose=\"false\" \n            fork=\"false\" \n-           source=\"1.6\">\n+           source=\"1.8\">\n       <src>\n         <pathelement location=\"${maven.build.testDir.0}\"/>\n       </src>\ndiff --git a/src/main/java/org/joda/time/Partial.java b/src/main/java/org/joda/time/Partial.java\nindex 0d4edf47..69938eff 100644\n--- a/src/main/java/org/joda/time/Partial.java\n+++ b/src/main/java/org/joda/time/Partial.java\n@@ -461,8 +461,7 @@ public final class Partial\n             System.arraycopy(iValues, i, newValues, i + 1, newValues.length - i - 1);\n             // use public constructor to ensure full validation\n             // this isn't overly efficient, but is safe\n-            Partial newPartial = new Partial(iChronology, newTypes, newValues);\n-            iChronology.validate(newPartial, newValues);\n+            Partial newPartial = new Partial(newTypes, newValues, iChronology);\n             return newPartial;\n         }\n         if (value == getValue(index)) {\n",
+  "agent_log": "{\"type\":\"result\",\"subtype\":\"success\",\"is_error\":false,\"api_error_status\":null,\"duration_ms\":159629,\"duration_api_ms\":131341,\"ttft_ms\":2794,\"num_turns\":22,\"result\":\"The 6 other failures are unrelated (different test classes; monthOfYear properties and Calendar converters \u2014 orthogonal to Partial). My target test passes.\\n\\nDIAGNOSIS COMPLETE\\n\\nThe `Partial.with(DateTimeFieldType, int)` method computes an insertion index to maintain the \\\"largest unit to smallest unit\\\" field ordering invariant, but its loop logic fails when the new field has the same unit duration *and* same range duration as an existing field (a duplicate-role case, e.g. `clockhourOfDay` vs `hourOfDay` \u2014 both hours-within-days). In the `compare == 0` branch, the code only breaks out of the loop when `rangeField.compareTo(loopRangeField) > 0`; when the ranges also compare equal it silently falls through, continuing past the duplicate field. The new field ends up appended after smaller-unit fields, producing an array like `[hourOfDay, minuteOfHour, clockhourOfDay]` that violates the largest-smallest ordering. The new `Partial` was then constructed via the package-private constructor (which performs no ordering validation) and only `Chronology.validate` was called \u2014 and that method only validates numeric value ranges, not field ordering. So no exception was thrown and the test's expected `IllegalArgumentException` never fired. The fix routes construction through the public `Partial(types, values, chronology)` constructor, which performs the full ordering and duplicate-detection checks and throws `IllegalArgumentException` for this illegal field combination.\",\"stop_reason\":\"end_turn\",\"session_id\":\"7e62dc1a-596a-46fe-977d-f086dfb4344c\",\"total_cost_usd\":0.83254325,\"usage\":{\"input_tokens\":26,\"cache_creation_input_tokens\":31769,\"cache_read_input_tokens\":884964,\"output_tokens\":7655,\"server_tool_use\":{\"web_search_requests\":0,\"web_fetch_requests\":0},\"service_tier\":\"standard\",\"cache_creation\":{\"ephemeral_1h_input_tokens\":31769,\"ephemeral_5m_input_tokens\":0},\"inference_geo\":\"\",\"iterations\":[{\"input_tokens\":1,\"output_tokens\":627,\"cache_read_input_tokens\":49459,\"cache_creation_input_tokens\":809,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":809},\"type\":\"message\"}],\"speed\":\"standard\"},\"modelUsage\":{\"claude-opus-4-7[1m]\":{\"inputTokens\":26,\"outputTokens\":7655,\"cacheReadInputTokens\":884964,\"cacheCreationInputTokens\":31769,\"webSearchRequests\":0,\"costUSD\":0.83254325,\"contextWindow\":1000000,\"maxOutputTokens\":64000}},\"permission_denials\":[],\"terminal_reason\":\"completed\",\"fast_mode_state\":\"off\",\"uuid\":\"d5e9f724-e4e0-472e-b18e-5351ae4f94c1\"}\n",
+  "agent_stderr": "",
+  "judge_reasoning": "The agent correctly identifies Partial.with() as the source, pinpoints the specific defect in the compare==0 branch where the loop fails to break when range durations also compare equal, explains why this produces a field array violating the largest-to-smallest ordering invariant, and correctly notes that the package-private constructor skips ordering validation while Chronology.validate only checks value ranges. The proposed fix (routing through the public constructor that performs ordering/duplicate checks to throw IllegalArgumentException) aligns precisely with the ground-truth summary of illegal field ordering causing the assertion failure.\n",
+  "verify_log": "Running ant (compile.tests)................................................ OK\nRunning ant (run.dev.tests)................................................ OK\nFailing tests: 1\n  - org.joda.time.TestPartial_Basics::testWith3\n",
+  "baseline_failing_tests": [
+    "org.joda.time.TestDateMidnight_Properties::testPropertyGetMonthOfYear",
+    "org.joda.time.TestDateTime_Properties::testPropertyGetMonthOfYear",
+    "org.joda.time.TestMonthDay_Properties::testPropertyGetMonthOfYear",
+    "org.joda.time.TestMutableDateTime_Properties::testPropertyGetMonthOfYear",
+    "org.joda.time.convert.TestCalendarConverter::testGetChronology_Object_Zone",
+    "org.joda.time.convert.TestCalendarConverter::testGetChronology_Object_nullChronology"
+  ],
+  "compile_log": "Running ant (compile)...................................................... OK\nRunning ant (compile.tests)................................................ OK\n",
+  "agent_modified_files": [
+    "maven-build.xml",
+    "src/main/java/org/joda/time/Partial.java"
+  ],
+  "canonical_modified_files": [
+    "src/main/java/org/joda/time/Partial.java"
+  ],
+  "agent_modified_prod_files": [
+    "src/main/java/org/joda/time/Partial.java"
+  ],
+  "file_overlap": [
+    "src/main/java/org/joda/time/Partial.java"
+  ],
+  "missed_canonical": [],
+  "extra_prod_files": [],
+  "fix_locality_score": 1.0,
+  "test_pass_strict": true
+}

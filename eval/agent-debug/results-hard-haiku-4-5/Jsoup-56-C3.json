@@ -1,0 +1,59 @@
+{
+  "bug": "Jsoup-56",
+  "condition": "C3",
+  "model": "claude-haiku-4-5",
+  "model_default_used": false,
+  "started_at": "2026-05-22T00:11:42+00:00",
+  "duration_seconds": 311,
+  "tool_calls": 81,
+  "compile_fail": false,
+  "primary_pass": false,
+  "test_pass": false,
+  "baseline_failing_count": 1,
+  "agent_induced_regressions": [],
+  "regressed_tests": [],
+  "diagnosis_quality": 1,
+  "agent_exit_code": 1,
+  "bug_reproduced_pretest": true,
+  "agent_patch": "diff --git a/maven-build.xml b/maven-build.xml\nindex 01b6ee6b..c778aebd 100644\n--- a/maven-build.xml\n+++ b/maven-build.xml\n@@ -71,10 +71,10 @@\n            debug=\"true\" \n            optimize=\"false\" \n            deprecation=\"true\" \n-           target=\"1.6\" \n+           target=\"1.8\" \n            verbose=\"false\" \n            fork=\"false\" \n-           source=\"1.6\">\n+           source=\"1.8\">\n       <src>\n         <pathelement location=\"${maven.build.srcDir.0}\"/>\n       </src>\n@@ -110,10 +110,10 @@\n            debug=\"true\" \n            optimize=\"false\" \n            deprecation=\"true\" \n-           target=\"1.6\" \n+           target=\"1.8\" \n            verbose=\"false\" \n            fork=\"false\" \n-           source=\"1.6\">\n+           source=\"1.8\">\n       <src>\n         <pathelement location=\"${maven.build.testDir.0}\"/>\n       </src>\ndiff --git a/src/main/java/org/jsoup/nodes/DocumentType.java b/src/main/java/org/jsoup/nodes/DocumentType.java\nindex cd0c8df4..ec52fac9 100644\n--- a/src/main/java/org/jsoup/nodes/DocumentType.java\n+++ b/src/main/java/org/jsoup/nodes/DocumentType.java\n@@ -12,6 +12,7 @@ public class DocumentType extends Node {\n     public static final String PUBLIC_KEY = \"PUBLIC\";\n     public static final String SYSTEM_KEY = \"SYSTEM\";\n     private static final String NAME = \"name\";\n+    private static final String PUB_SYS_KEY = \"pubSysKey\";\n     private static final String PUBLIC_ID = \"publicId\";\n     private static final String SYSTEM_ID = \"systemId\";\n     // todo: quirk mode from publicId and systemId\n@@ -28,6 +29,28 @@ public class DocumentType extends Node {\n \n         attr(NAME, name);\n         attr(PUBLIC_ID, publicId);\n+        if (!StringUtil.isBlank(publicId)) {\n+            attr(PUB_SYS_KEY, PUBLIC_KEY);\n+        }\n+        attr(SYSTEM_ID, systemId);\n+    }\n+\n+    /**\n+     * Create a new doctype element.\n+     * @param name the doctype's name\n+     * @param pubSysKey PUBLIC, SYSTEM, or null\n+     * @param publicId the doctype's public ID\n+     * @param systemId the doctype's system ID\n+     * @param baseUri the doctype's base URI\n+     */\n+    public DocumentType(String name, String pubSysKey, String publicId, String systemId, String baseUri) {\n+        super(baseUri);\n+\n+        attr(NAME, name);\n+        if (pubSysKey != null) {\n+            attr(PUB_SYS_KEY, pubSysKey);\n+        }\n+        attr(PUBLIC_ID, publicId);\n         attr(SYSTEM_ID, systemId);\n     }\n \n@@ -55,8 +78,10 @@ public class DocumentType extends Node {\n         }\n         if (has(NAME))\n             accum.append(\" \").append(attr(NAME));\n+        if (has(PUB_SYS_KEY))\n+            accum.append(\" \").append(attr(PUB_SYS_KEY));\n         if (has(PUBLIC_ID))\n-            accum.append(\" PUBLIC \\\"\").append(attr(PUBLIC_ID)).append('\"');\n+            accum.append(\" \\\"\").append(attr(PUBLIC_ID)).append('\"');\n         if (has(SYSTEM_ID))\n             accum.append(\" \\\"\").append(attr(SYSTEM_ID)).append('\"');\n         accum.append('>');\ndiff --git a/src/main/java/org/jsoup/parser/HtmlTreeBuilderState.java b/src/main/java/org/jsoup/parser/HtmlTreeBuilderState.java\nindex 9a408140..c515462c 100644\n--- a/src/main/java/org/jsoup/parser/HtmlTreeBuilderState.java\n+++ b/src/main/java/org/jsoup/parser/HtmlTreeBuilderState.java\n@@ -20,7 +20,7 @@ enum HtmlTreeBuilderState {\n                 // todo: quirk state check on doctype ids\n                 Token.Doctype d = t.asDoctype();\n                 DocumentType doctype = new DocumentType(\n-                    tb.settings.normalizeTag(d.getName()), d.getPublicIdentifier(), d.getSystemIdentifier(), tb.getBaseUri());\n+                    tb.settings.normalizeTag(d.getName()), d.getPubSysKey(), d.getPublicIdentifier(), d.getSystemIdentifier(), tb.getBaseUri());\n                 tb.getDocument().appendChild(doctype);\n                 if (d.isForceQuirks())\n                     tb.getDocument().quirksMode(Document.QuirksMode.quirks);\ndiff --git a/src/main/java/org/jsoup/parser/Token.java b/src/main/java/org/jsoup/parser/Token.java\nindex 0eccbbe4..1256b973 100644\n--- a/src/main/java/org/jsoup/parser/Token.java\n+++ b/src/main/java/org/jsoup/parser/Token.java\n@@ -32,6 +32,7 @@ abstract class Token {\n \n     static final class Doctype extends Token {\n         final StringBuilder name = new StringBuilder();\n+        String pubSysKey = null;\n         final StringBuilder publicIdentifier = new StringBuilder();\n         final StringBuilder systemIdentifier = new StringBuilder();\n         boolean forceQuirks = false;\n@@ -43,6 +44,7 @@ abstract class Token {\n         @Override\n         Token reset() {\n             reset(name);\n+            pubSysKey = null;\n             reset(publicIdentifier);\n             reset(systemIdentifier);\n             forceQuirks = false;\n@@ -54,6 +56,10 @@ abstract class Token {\n         }\n \n \n+        String getPubSysKey() {\n+            return pubSysKey;\n+        }\n+\n         String getPublicIdentifier() {\n             return publicIdentifier.toString();\n         }\ndiff --git a/src/main/java/org/jsoup/parser/TokeniserState.java b/src/main/java/org/jsoup/parser/TokeniserState.java\nindex 24c2f890..6a97238d 100644\n--- a/src/main/java/org/jsoup/parser/TokeniserState.java\n+++ b/src/main/java/org/jsoup/parser/TokeniserState.java\n@@ -1192,8 +1192,10 @@ enum TokeniserState {\n                 t.emitDoctypePending();\n                 t.advanceTransition(Data);\n             } else if (r.matchConsumeIgnoreCase(DocumentType.PUBLIC_KEY)) {\n+                t.doctypePending.pubSysKey = DocumentType.PUBLIC_KEY;\n                 t.transition(AfterDoctypePublicKeyword);\n             } else if (r.matchConsumeIgnoreCase(DocumentType.SYSTEM_KEY)) {\n+                t.doctypePending.pubSysKey = DocumentType.SYSTEM_KEY;\n                 t.transition(AfterDoctypeSystemKeyword);\n             } else {\n                 t.error(this);\n",
+  "agent_log": "{\"type\":\"result\",\"subtype\":\"error_max_turns\",\"duration_ms\":309950,\"duration_api_ms\":279372,\"is_error\":true,\"num_turns\":81,\"stop_reason\":\"tool_use\",\"session_id\":\"d5203fae-1b5b-4c29-a06f-ad3af0d148d2\",\"total_cost_usd\":0.68571475,\"usage\":{\"input_tokens\":562,\"cache_creation_input_tokens\":59625,\"cache_read_input_tokens\":4772915,\"output_tokens\":26666,\"server_tool_use\":{\"web_search_requests\":0,\"web_fetch_requests\":0},\"service_tier\":\"standard\",\"cache_creation\":{\"ephemeral_1h_input_tokens\":59625,\"ephemeral_5m_input_tokens\":0},\"inference_geo\":\"\",\"iterations\":[{\"input_tokens\":7,\"output_tokens\":152,\"cache_read_input_tokens\":84145,\"cache_creation_input_tokens\":247,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":247},\"type\":\"message\"}],\"speed\":\"standard\"},\"modelUsage\":{\"claude-haiku-4-5\":{\"inputTokens\":562,\"outputTokens\":26666,\"cacheReadInputTokens\":4772915,\"cacheCreationInputTokens\":59625,\"webSearchRequests\":0,\"costUSD\":0.68571475,\"contextWindow\":200000,\"maxOutputTokens\":32000}},\"permission_denials\":[],\"terminal_reason\":\"max_turns\",\"fast_mode_state\":\"off\",\"uuid\":\"31657da8-b25b-4df5-b872-21314a2cdc33\",\"errors\":[\"Reached maximum number of turns (80)\"]}\n",
+  "agent_stderr": "",
+  "judge_reasoning": "The agent provided no diagnosis at all (empty response), so it cannot be evaluated as identifying the root cause regarding DocumentType serialization of empty vs null system identifiers.\n",
+  "verify_log": "Running ant (compile.tests)................................................ OK\nRunning ant (run.dev.tests)................................................ OK\nFailing tests: 1\n  - org.jsoup.nodes.DocumentTypeTest::testRoundTrip\n",
+  "baseline_failing_tests": [
+    "org.jsoup.nodes.DocumentTypeTest::testRoundTrip"
+  ],
+  "compile_log": "Running ant (compile)...................................................... OK\nRunning ant (compile.tests)................................................ OK\n",
+  "agent_modified_files": [
+    "maven-build.xml",
+    "src/main/java/org/jsoup/nodes/DocumentType.java",
+    "src/main/java/org/jsoup/parser/HtmlTreeBuilderState.java",
+    "src/main/java/org/jsoup/parser/Token.java",
+    "src/main/java/org/jsoup/parser/TokeniserState.java"
+  ],
+  "canonical_modified_files": [
+    "src/main/java/org/jsoup/nodes/DocumentType.java",
+    "src/main/java/org/jsoup/parser/HtmlTreeBuilderState.java",
+    "src/main/java/org/jsoup/parser/Token.java",
+    "src/main/java/org/jsoup/parser/TokeniserState.java",
+    "src/main/java/org/jsoup/parser/XmlTreeBuilder.java"
+  ],
+  "agent_modified_prod_files": [
+    "src/main/java/org/jsoup/nodes/DocumentType.java",
+    "src/main/java/org/jsoup/parser/HtmlTreeBuilderState.java",
+    "src/main/java/org/jsoup/parser/Token.java",
+    "src/main/java/org/jsoup/parser/TokeniserState.java"
+  ],
+  "file_overlap": [
+    "src/main/java/org/jsoup/nodes/DocumentType.java",
+    "src/main/java/org/jsoup/parser/HtmlTreeBuilderState.java",
+    "src/main/java/org/jsoup/parser/Token.java",
+    "src/main/java/org/jsoup/parser/TokeniserState.java"
+  ],
+  "missed_canonical": [
+    "src/main/java/org/jsoup/parser/XmlTreeBuilder.java"
+  ],
+  "extra_prod_files": [],
+  "fix_locality_score": 0.5,
+  "test_pass_strict": false
+}

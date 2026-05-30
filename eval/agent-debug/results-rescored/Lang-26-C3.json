@@ -1,0 +1,58 @@
+{
+  "bug": "Lang-26",
+  "condition": "C3",
+  "started_at": "2026-05-21T01:53:00+00:00",
+  "duration_seconds": 74,
+  "tool_calls": 15,
+  "compile_fail": false,
+  "primary_pass": true,
+  "test_pass": true,
+  "baseline_failing_count": 17,
+  "agent_induced_regressions": [],
+  "regressed_tests": [],
+  "diagnosis_quality": 5,
+  "agent_exit_code": 0,
+  "bug_reproduced_pretest": true,
+  "agent_patch": "diff --git a/maven-build.xml b/maven-build.xml\nindex 5e4a29822..acccfb4cd 100644\n--- a/maven-build.xml\n+++ b/maven-build.xml\n@@ -69,10 +69,10 @@\n            debug=\"true\" \n            optimize=\"false\" \n            deprecation=\"true\" \n-           target=\"1.6\" \n+           target=\"1.8\" \n            verbose=\"false\" \n            fork=\"false\" \n-           source=\"1.6\">\n+           source=\"1.8\">\n       <src>\n         <pathelement location=\"${maven.build.srcDir.0}\"/>\n       </src>\n@@ -102,10 +102,10 @@\n            debug=\"true\" \n            optimize=\"false\" \n            deprecation=\"true\" \n-           target=\"1.6\" \n+           target=\"1.8\" \n            verbose=\"false\" \n            fork=\"false\" \n-           source=\"1.6\">\n+           source=\"1.8\">\n       <src>\n         <pathelement location=\"${maven.build.testDir.0}\"/>\n       </src>\n@@ -201,7 +201,7 @@\n              nonavbar=\"false\" \n              serialwarn=\"false\" \n              charset=\"ISO-8859-1\" \n-             source=\"1.6\" \n+             source=\"1.8\" \n              linksource=\"true\" \n              breakiterator=\"false\">\n       <link href=\"http://java.sun.com/javase/6/docs/api/\"/>\ndiff --git a/src/main/java/org/apache/commons/lang3/time/FastDateFormat.java b/src/main/java/org/apache/commons/lang3/time/FastDateFormat.java\nindex e30da2a56..ceb77aa5c 100644\n--- a/src/main/java/org/apache/commons/lang3/time/FastDateFormat.java\n+++ b/src/main/java/org/apache/commons/lang3/time/FastDateFormat.java\n@@ -817,7 +817,7 @@ public class FastDateFormat extends Format {\n      * @return the formatted string\n      */\n     public String format(Date date) {\n-        Calendar c = new GregorianCalendar(mTimeZone);\n+        Calendar c = new GregorianCalendar(mTimeZone, mLocale);\n         c.setTime(date);\n         return applyRules(c, new StringBuffer(mMaxLengthEstimate)).toString();\n     }\n@@ -854,7 +854,7 @@ public class FastDateFormat extends Format {\n      * @return the specified string buffer\n      */\n     public StringBuffer format(Date date, StringBuffer buf) {\n-        Calendar c = new GregorianCalendar(mTimeZone);\n+        Calendar c = new GregorianCalendar(mTimeZone, mLocale);\n         c.setTime(date);\n         return applyRules(c, buf);\n     }\n",
+  "agent_log": "{\"type\":\"result\",\"subtype\":\"success\",\"is_error\":false,\"api_error_status\":null,\"duration_ms\":73458,\"duration_api_ms\":59051,\"ttft_ms\":1993,\"num_turns\":15,\"result\":\"The `-t` flag requires the `::method` form. The targeted test passes.\\n\\nDIAGNOSIS COMPLETE\\n\\nThe root cause was that `FastDateFormat.format(Date)` and `FastDateFormat.format(Date, StringBuffer)` constructed their internal `GregorianCalendar` using only the time zone (`new GregorianCalendar(mTimeZone)`) and never passed the formatter's configured `mLocale`. Java's `GregorianCalendar` derives locale-sensitive calendar semantics \u2014 most importantly `firstDayOfWeek` and `minimalDaysInFirstWeek` \u2014 from the locale. With the default (typically US-English) locale, ISO week computations differ from Swedish (`sv_SE`) conventions: January 1, 2010 falls in week 53 of 2009 under the Swedish/ISO convention (Monday-start, min-days-in-first-week = 4), but under the US convention it is week 1 of 2010. The fix is to pass the formatter's locale into the `GregorianCalendar` constructor: `new GregorianCalendar(mTimeZone, mLocale)`. This restores correct week-of-year semantics when formatting via `EEEE', week 'ww` under non-default locales.\",\"stop_reason\":\"end_turn\",\"session_id\":\"a15635ed-d742-448f-bbfb-0be35f335f65\",\"total_cost_usd\":0.47806275000000004,\"usage\":{\"input_tokens\":19,\"cache_creation_input_tokens\":21065,\"cache_read_input_tokens\":535323,\"output_tokens\":3146,\"server_tool_use\":{\"web_search_requests\":0,\"web_fetch_requests\":0},\"service_tier\":\"standard\",\"cache_creation\":{\"ephemeral_1h_input_tokens\":21065,\"ephemeral_5m_input_tokens\":0},\"inference_geo\":\"\",\"iterations\":[{\"input_tokens\":1,\"output_tokens\":416,\"cache_read_input_tokens\":39291,\"cache_creation_input_tokens\":273,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":273},\"type\":\"message\"}],\"speed\":\"standard\"},\"modelUsage\":{\"claude-opus-4-7[1m]\":{\"inputTokens\":19,\"outputTokens\":3146,\"cacheReadInputTokens\":535323,\"cacheCreationInputTokens\":21065,\"webSearchRequests\":0,\"costUSD\":0.47806275000000004,\"contextWindow\":1000000,\"maxOutputTokens\":64000}},\"permission_denials\":[],\"terminal_reason\":\"completed\",\"fast_mode_state\":\"off\",\"uuid\":\"b7d6568e-050e-43bf-a9fe-db8be64f762a\"}\n",
+  "agent_stderr": "",
+  "judge_reasoning": "The agent precisely identified the root cause: FastDateFormat.format constructs GregorianCalendar with only the time zone, dropping the locale (mLocale), which causes firstDayOfWeek and minimalDaysInFirstWeek to default incorrectly. It correctly explained the sv_SE week 53 vs US week 1 behavior for Jan 1, 2010, and proposed the exact fix matching the ground truth (passing mLocale to the GregorianCalendar constructor).\n",
+  "verify_log": "Running ant (compile.tests)................................................ OK\nRunning ant (run.dev.tests)................................................ OK\nFailing tests: 1\n  - org.apache.commons.lang3.time.FastDateFormatTest::testLang645\n",
+  "baseline_failing_tests": [
+    "org.apache.commons.lang3.builder.CompareToBuilderTest::testReflectionHierarchyCompare",
+    "org.apache.commons.lang3.builder.CompareToBuilderTest::testReflectionHierarchyCompareExcludeFields",
+    "org.apache.commons.lang3.builder.CompareToBuilderTest::testReflectionHierarchyCompareTransients",
+    "org.apache.commons.lang3.builder.HashCodeBuilderAndEqualsBuilderTest::testInteger",
+    "org.apache.commons.lang3.builder.HashCodeBuilderAndEqualsBuilderTest::testIntegerWithTransients",
+    "org.apache.commons.lang3.builder.ToStringBuilderTest::testObjectCycle",
+    "org.apache.commons.lang3.builder.ToStringBuilderTest::testReflectionArrayArrayCycle",
+    "org.apache.commons.lang3.builder.ToStringBuilderTest::testReflectionArrayCycle",
+    "org.apache.commons.lang3.builder.ToStringBuilderTest::testReflectionBoolean",
+    "org.apache.commons.lang3.builder.ToStringBuilderTest::testReflectionCharacter",
+    "org.apache.commons.lang3.builder.ToStringBuilderTest::testReflectionDoubleArrayArray",
+    "org.apache.commons.lang3.builder.ToStringBuilderTest::testReflectionFloatArray",
+    "org.apache.commons.lang3.builder.ToStringBuilderTest::testReflectionFloatArrayArray",
+    "org.apache.commons.lang3.builder.ToStringBuilderTest::testReflectionHierarchy",
+    "org.apache.commons.lang3.builder.ToStringBuilderTest::testReflectionInteger",
+    "org.apache.commons.lang3.builder.ToStringBuilderTest::testReflectionLongArrayArray",
+    "org.apache.commons.lang3.builder.ToStringBuilderTest::testSelfInstanceTwoVarsReflectionObjectCycle"
+  ],
+  "compile_log": "Running ant (compile)...................................................... OK\nRunning ant (compile.tests)................................................ OK\n",
+  "agent_modified_files": [
+    "maven-build.xml",
+    "src/main/java/org/apache/commons/lang3/time/FastDateFormat.java"
+  ],
+  "canonical_modified_files": [
+    "src/main/java/org/apache/commons/lang3/time/FastDateFormat.java"
+  ],
+  "agent_modified_prod_files": [
+    "src/main/java/org/apache/commons/lang3/time/FastDateFormat.java"
+  ],
+  "file_overlap": [
+    "src/main/java/org/apache/commons/lang3/time/FastDateFormat.java"
+  ],
+  "missed_canonical": [],
+  "extra_prod_files": [],
+  "fix_locality_score": 1.0,
+  "test_pass_strict": true
+}

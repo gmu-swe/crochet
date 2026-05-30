@@ -1,0 +1,40 @@
+{
+  "bug": "Math-10",
+  "condition": "C2",
+  "started_at": "2026-05-21T02:15:05+00:00",
+  "duration_seconds": 65,
+  "tool_calls": 14,
+  "compile_fail": false,
+  "primary_pass": true,
+  "test_pass": true,
+  "baseline_failing_count": 0,
+  "agent_induced_regressions": [],
+  "regressed_tests": [],
+  "diagnosis_quality": 5,
+  "agent_exit_code": 0,
+  "bug_reproduced_pretest": true,
+  "agent_patch": "diff --git a/build.xml b/build.xml\nindex 15a997c3e..6eba02d4f 100644\n--- a/build.xml\n+++ b/build.xml\n@@ -102,8 +102,8 @@\n   <property name=\"source.encoding\"         value=\"UTF-8\"/>\n     \n   <!-- JDK level -->\n-  <property name=\"compile.source\"          value=\"1.6\"/>\n-  <property name=\"compile.target\"          value=\"1.6\"/>\n+  <property name=\"compile.source\"          value=\"1.8\"/>\n+  <property name=\"compile.target\"          value=\"1.8\"/>\n \n   <!-- Base compile classpath -->\n   <path id=\"compile.classpath\">\ndiff --git a/src/main/java/org/apache/commons/math3/analysis/differentiation/DSCompiler.java b/src/main/java/org/apache/commons/math3/analysis/differentiation/DSCompiler.java\nindex bf6dd65d5..d5a3c18b8 100644\n--- a/src/main/java/org/apache/commons/math3/analysis/differentiation/DSCompiler.java\n+++ b/src/main/java/org/apache/commons/math3/analysis/differentiation/DSCompiler.java\n@@ -1416,6 +1416,7 @@ public class DSCompiler {\n         }\n \n         // fix value to take special cases (+0/+0, +0/-0, -0/+0, -0/-0, +/-infinity) correctly\n+        result[resultOffset] = FastMath.atan2(y[yOffset], x[xOffset]);\n \n     }\n \n",
+  "agent_log": "{\"type\":\"result\",\"subtype\":\"success\",\"is_error\":false,\"api_error_status\":null,\"duration_ms\":63216,\"duration_api_ms\":53541,\"ttft_ms\":3169,\"num_turns\":14,\"result\":\"Test passes.\\n\\nDIAGNOSIS COMPLETE\\n\\nThe root cause is in `DSCompiler.atan2(...)`. The method computes `atan2(y, x)` as `2 * atan(y / (r + x))` (or `\u00b1\u03c0 - 2 * atan(y / (r - x))` when `x < 0`). For the degenerate case `atan2(0, 0)`, `r = sqrt(0+0) = 0`, so `r + x = 0` and the division `y / (r + x) = 0/0` produces `NaN`, which propagates into `result[resultOffset]`. The buggy version had a stale comment `// fix value to take special cases (+0/+0, +0/-0, -0/+0, -0/-0, +/-infinity) correctly` with no actual fix beneath it. The fix is to overwrite the computed value with `FastMath.atan2(y[yOffset], x[xOffset])`, which correctly handles all signed-zero and infinity edge cases. The partial derivatives (entries `result[resultOffset+1..]`) are unaffected because the formula still produces well-defined derivative values from the surrounding finite-arithmetic chain.\",\"stop_reason\":\"end_turn\",\"session_id\":\"61edfe6c-e823-4fd7-9079-851f7dc9d8cd\",\"total_cost_usd\":0.4319085,\"usage\":{\"input_tokens\":18,\"cache_creation_input_tokens\":19468,\"cache_read_input_tokens\":478037,\"output_tokens\":2845,\"server_tool_use\":{\"web_search_requests\":0,\"web_fetch_requests\":0},\"service_tier\":\"standard\",\"cache_creation\":{\"ephemeral_1h_input_tokens\":19468,\"ephemeral_5m_input_tokens\":0},\"inference_geo\":\"\",\"iterations\":[{\"input_tokens\":1,\"output_tokens\":383,\"cache_read_input_tokens\":37746,\"cache_creation_input_tokens\":221,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":221},\"type\":\"message\"}],\"speed\":\"standard\"},\"modelUsage\":{\"claude-opus-4-7[1m]\":{\"inputTokens\":18,\"outputTokens\":2845,\"cacheReadInputTokens\":478037,\"cacheCreationInputTokens\":19468,\"webSearchRequests\":0,\"costUSD\":0.4319085,\"contextWindow\":1000000,\"maxOutputTokens\":64000}},\"permission_denials\":[],\"terminal_reason\":\"completed\",\"fast_mode_state\":\"off\",\"uuid\":\"0abd21c3-53dd-41c8-a4fd-dd4bac9ac18c\"}\n",
+  "agent_stderr": "",
+  "judge_reasoning": "The agent correctly identified DSCompiler.atan2 as the location, pinpointed the exact mechanism (r+x=0 causing 0/0=NaN in the value computation), and proposed the correct fix (overwriting with FastMath.atan2 to handle signed-zero/infinity cases). This matches the ground-truth summary about atan2(0,0) returning NaN due to the degenerate case not being handled, with even more precision about the arithmetic cause.\n",
+  "verify_log": "Running ant (compile.tests)................................................ OK\nRunning ant (run.dev.tests)................................................ OK\nFailing tests: 1\n  - org.apache.commons.math3.analysis.differentiation.DerivativeStructureTest::testAtan2SpecialCases\n",
+  "baseline_failing_tests": [],
+  "compile_log": "Running ant (compile)...................................................... OK\nRunning ant (compile.tests)................................................ OK\n",
+  "agent_modified_files": [
+    "build.xml",
+    "src/main/java/org/apache/commons/math3/analysis/differentiation/DSCompiler.java"
+  ],
+  "canonical_modified_files": [
+    "src/main/java/org/apache/commons/math3/analysis/differentiation/DSCompiler.java"
+  ],
+  "agent_modified_prod_files": [
+    "src/main/java/org/apache/commons/math3/analysis/differentiation/DSCompiler.java"
+  ],
+  "file_overlap": [
+    "src/main/java/org/apache/commons/math3/analysis/differentiation/DSCompiler.java"
+  ],
+  "missed_canonical": [],
+  "extra_prod_files": [],
+  "fix_locality_score": 1.0,
+  "test_pass_strict": true
+}

@@ -1,0 +1,49 @@
+{
+  "bug": "Closure-155",
+  "condition": "C1",
+  "started_at": "2026-05-21T18:30:38+00:00",
+  "duration_seconds": 535,
+  "tool_calls": 55,
+  "compile_fail": false,
+  "primary_pass": true,
+  "test_pass": true,
+  "baseline_failing_count": 3,
+  "agent_induced_regressions": [],
+  "regressed_tests": [],
+  "diagnosis_quality": 5,
+  "agent_exit_code": 0,
+  "bug_reproduced_pretest": true,
+  "agent_patch": "diff --git a/build.xml b/build.xml\nindex e9f85364d..0bbf2827c 100644\n--- a/build.xml\n+++ b/build.xml\n@@ -16,8 +16,8 @@\n <project name=\"compiler\" basedir=\".\" default=\"jar\" xmlns:artifact=\"antlib:org.apache.maven.artifact.ant\">\n \n   <!-- Force java 6 -->\n-  <property name=\"ant.build.javac.source\" value=\"1.6\" />\n-  <property name=\"ant.build.javac.target\" value=\"1.6\" />\n+  <property name=\"ant.build.javac.source\" value=\"1.8\" />\n+  <property name=\"ant.build.javac.target\" value=\"1.8\" />\n \n   <!-- define other variables -->\n   <property name=\"src.dir\" value=\"${basedir}/src\" />\ndiff --git a/src/com/google/javascript/jscomp/InlineVariables.java b/src/com/google/javascript/jscomp/InlineVariables.java\nindex 18c9fbe2c..a4c3609ca 100644\n--- a/src/com/google/javascript/jscomp/InlineVariables.java\n+++ b/src/com/google/javascript/jscomp/InlineVariables.java\n@@ -274,7 +274,8 @@ class InlineVariables implements CompilerPass {\n       // the next pass.)\n       if (\n           !staleVars.contains(v) && referenceInfo.isWellDefined() &&\n-          referenceInfo.isAssignedOnceInLifetime()) {\n+          referenceInfo.isAssignedOnceInLifetime() &&\n+          !isParameterAffectedByArgumentsModification(v)) {\n         List<Reference> refs = referenceInfo.references;\n         for (int i = 1 /* start from a read */; i < refs.size(); i++) {\n           Node nameNode = refs.get(i).getNameNode();\n@@ -296,6 +297,57 @@ class InlineVariables implements CompilerPass {\n       }\n     }\n \n+    /**\n+     * If v is a function parameter whose function's \"arguments\" object\n+     * is modified, the value of v is not stable (writes to arguments[i]\n+     * alias parameter i), so v is not safe to use as an alias source.\n+     */\n+    private boolean isParameterAffectedByArgumentsModification(Var v) {\n+      Node parent = v.getParentNode();\n+      if (parent == null || parent.getType() != Token.LP) {\n+        return false;\n+      }\n+      Node function = parent.getParent();\n+      if (function == null || function.getType() != Token.FUNCTION) {\n+        return false;\n+      }\n+      return hasArgumentsAssignment(function.getLastChild());\n+    }\n+\n+    /**\n+     * Returns true if the subtree rooted at n contains an assignment whose\n+     * left-hand side is a property/element access on the local \"arguments\"\n+     * object. Does not descend into nested function bodies, since those have\n+     * their own \"arguments\".\n+     */\n+    private boolean hasArgumentsAssignment(Node n) {\n+      if (n == null) {\n+        return false;\n+      }\n+      if (NodeUtil.isAssignmentOp(n)) {\n+        Node lhs = n.getFirstChild();\n+        if (lhs != null\n+            && (lhs.getType() == Token.GETELEM\n+                || lhs.getType() == Token.GETPROP)) {\n+          Node target = lhs.getFirstChild();\n+          if (target != null\n+              && target.getType() == Token.NAME\n+              && \"arguments\".equals(target.getString())) {\n+            return true;\n+          }\n+        }\n+      }\n+      for (Node c = n.getFirstChild(); c != null; c = c.getNext()) {\n+        if (c.getType() == Token.FUNCTION) {\n+          continue;\n+        }\n+        if (hasArgumentsAssignment(c)) {\n+          return true;\n+        }\n+      }\n+      return false;\n+    }\n+\n     /**\n      * If there are any variable references in the given node tree, blacklist\n      * them to prevent the pass from trying to inline the variable.\n",
+  "agent_log": "{\"type\":\"result\",\"subtype\":\"success\",\"is_error\":false,\"api_error_status\":null,\"duration_ms\":534619,\"duration_api_ms\":464151,\"ttft_ms\":2332,\"num_turns\":55,\"result\":\"The trigger test passes and no debug prints remain.\\n\\nDIAGNOSIS COMPLETE\\n\\nThe root cause is in `InlineVariables.java`'s alias-inlining path (the block starting at the \\\"If this variable was not inlined normally, check if we can inline an alias of it\\\" comment). When the variable `v` being processed is a function parameter, the pass would happily inline `var x = callback` to `callback` at the alias-inline use site, bypassing the normal `canInline` / `canMoveModerately` side-effect checks. But a function's parameters are aliased by its `arguments` object: any statement like `arguments[0] = this` between the alias declaration and its use can silently rewrite the parameter's value. By inlining `x` \u2192 `callback`, the post-`arguments[0]=this` use of `x` (still bound to the original callback) gets replaced by a read of `callback` (now `this`), which changes the program's semantics. The fix adds `isParameterAffectedByArgumentsModification(v)`, which detects whether `v` is a parameter of a function whose body contains an assignment whose LHS is `arguments[\u2026]` or `arguments.\u2026` (without descending into nested functions, since those have their own `arguments`). When it does, the alias-inlining path is skipped for `v`, preserving the original behavior for the safe cases (e.g. `testIssue378ArgumentsRead1/2`, `testArgumentsModifiedInOuterFunction`'s inner scope) while blocking the unsafe ones (the new test plus the outer scope of `testArgumentsModifiedInOuterFunction`).\",\"stop_reason\":\"end_turn\",\"session_id\":\"7c11b69d-c210-4274-b611-0eb5fc1ec458\",\"total_cost_usd\":2.86633825,\"usage\":{\"input_tokens\":59,\"cache_creation_input_tokens\":74567,\"cache_read_input_tokens\":3280149,\"output_tokens\":30397,\"server_tool_use\":{\"web_search_requests\":0,\"web_fetch_requests\":0},\"service_tier\":\"standard\",\"cache_creation\":{\"ephemeral_1h_input_tokens\":74567,\"ephemeral_5m_input_tokens\":0},\"inference_geo\":\"\",\"iterations\":[{\"input_tokens\":1,\"output_tokens\":524,\"cache_read_input_tokens\":92287,\"cache_creation_input_tokens\":779,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":779},\"type\":\"message\"}],\"speed\":\"standard\"},\"modelUsage\":{\"claude-opus-4-7[1m]\":{\"inputTokens\":59,\"outputTokens\":30397,\"cacheReadInputTokens\":3280149,\"cacheCreationInputTokens\":74567,\"webSearchRequests\":0,\"costUSD\":2.86633825,\"contextWindow\":1000000,\"maxOutputTokens\":64000}},\"permission_denials\":[],\"terminal_reason\":\"completed\",\"fast_mode_state\":\"off\",\"uuid\":\"c02d0416-b529-407f-86bd-f96704f5e5a0\"}\n",
+  "agent_stderr": "",
+  "judge_reasoning": "The agent precisely identifies the root cause: InlineVariables' alias-inlining path inlines a variable across a closure/arguments boundary when the variable is a parameter that can be modified via the arguments object. This matches the ground-truth summary exactly, including the mechanism (arguments aliasing function parameters) and the specific code path (alias-inlining bypassing side-effect checks), and the fix correctly detects arguments[...] writes without descending into nested functions.\n",
+  "verify_log": "Running ant (compile.tests)................................................ OK\nRunning ant (run.dev.tests)................................................ OK\nFailing tests: 1\n  - com.google.javascript.jscomp.InlineVariablesTest::testArgumentsModifiedInInnerFunction\n",
+  "baseline_failing_tests": [
+    "com.google.javascript.jscomp.InlineVariablesTest::testIssue378EscapedArguments1",
+    "com.google.javascript.jscomp.InlineVariablesTest::testIssue378EscapedArguments2",
+    "com.google.javascript.jscomp.InlineVariablesTest::testIssue378EscapedArguments4"
+  ],
+  "compile_log": "Running ant (compile)...................................................... OK\nRunning ant (compile.tests)................................................ OK\n",
+  "agent_modified_files": [
+    "build.xml",
+    "src/com/google/javascript/jscomp/InlineVariables.java"
+  ],
+  "canonical_modified_files": [
+    "src/com/google/javascript/jscomp/InlineVariables.java",
+    "src/com/google/javascript/jscomp/ReferenceCollectingCallback.java",
+    "src/com/google/javascript/jscomp/Scope.java"
+  ],
+  "agent_modified_prod_files": [
+    "src/com/google/javascript/jscomp/InlineVariables.java"
+  ],
+  "file_overlap": [
+    "src/com/google/javascript/jscomp/InlineVariables.java"
+  ],
+  "missed_canonical": [
+    "src/com/google/javascript/jscomp/ReferenceCollectingCallback.java",
+    "src/com/google/javascript/jscomp/Scope.java"
+  ],
+  "extra_prod_files": [],
+  "fix_locality_score": 0.5,
+  "test_pass_strict": true
+}
