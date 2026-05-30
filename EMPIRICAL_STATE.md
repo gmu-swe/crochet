@@ -21,6 +21,27 @@ Raw re-run outputs live under `eval/v2-reproducibility/{mutation,fuzzing,agent-d
 
 ---
 
+## TL;DR
+
+- **Phases I–III (LLM-agent debugging) are honest negative or null.** Across 54 C3 trials
+  on Opus 4.7 / Sonnet 4.6 / Haiku 4.5 × easy + hard Defects4J corpora, the Crochet TTD
+  CLI was invoked exactly 0 times. Pass rate is C3 ≤ C1 in every cell.
+- **Phase IV.1 (mutation testing) is the design-intent win.** Crochet 2.01× over PIT's
+  default fork-mode, with exact kill-set parity across 1602 single-JVM trials. Crochet
+  loses 18% to a leaner same-JVM `redefineClasses` baseline that the 2018 paper did not
+  have to contend with — workload-bounded by fixture cost.
+- **Phase IV.3 (fuzzing) is a threshold win.** Crochet ~2× iter/s and 1.33× branches
+  vs full-reset baseline at w=50 (~50 ms setup), with the crossover lying at ~15–20 ms.
+  A real trace-parity caveat: Mode 3 diverges from Mode 1 on 49/50 deterministic inputs
+  due to Crochet's lazy klass-swap restore — "noisier exploration that finds more
+  bands" for fuzzers, "hard correctness bug" for behaviour-regression users.
+- **Cross-phase synthesis:** Crochet is a useful primitive for the workloads it was
+  designed for (mutation, fuzzing) above their setup-cost thresholds. It is not a useful
+  primitive for autonomous LLM coding agents on the Defects4J surface — not because
+  the infrastructure is broken (verified working) but because agents do not reach for it.
+
+---
+
 ## §1 What we measured and why
 
 The Crochet TTD evaluation answers two distinct questions, each about a different user:
@@ -613,6 +634,17 @@ The honest synthesis across phases:
   IV.3 uses it too. Disabling it would push Crochet's wall-clock numbers in
   both phases substantially worse. The flag is documented but a reader picking
   up the case study and disabling it would see different absolute numbers.
+
+- **Co-tenant Crochet workloads can deadlock.** During the V.2 reruns, an
+  initial attempt to run mutation (Phase IV.1) and fuzzing (Phase IV.3) in
+  parallel on the same host produced a hung mutation runner: all 104 JVM
+  threads stuck in `futex_wait_queue`, no progress for 5+ minutes (vs the
+  expected ~62s sweep time). Running the same harness sequentially completed
+  cleanly. The case study's "single host, no concurrent mode runs" note
+  (CASE_STUDY-MUTATION §6) is load-bearing, not stylistic — two Crochet-
+  instrumented JVMs sharing a host appear to be able to wedge each other.
+  This is a latent finding worth a separate investigation; we did not chase
+  it in V.2.
 
 - **Stale aggregator output in Phase III.** The committed
   `results-cross-model-summary.md` is one aggregator-run behind the trial JSON
