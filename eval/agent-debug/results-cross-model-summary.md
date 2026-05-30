@@ -41,15 +41,15 @@
 | Lang-10      |   TOUT   |   TOUT   |   TOUT   |
 | Lang-26      |   PASS   |   PASS   |   PASS   |
 | Time-4       |   PASS   |   PASS   |   PASS   |
-| Time-11      |   MISS   |   MISS   |   MISS   |
-| Math-5       |   MISS   |   MISS   |   MISS   |
-| Math-27      |   MISS   |   MISS   |   MISS   |
-| Math-3       |   MISS   |   MISS   |   MISS   |
-| Math-10      |   MISS   |   MISS   |   MISS   |
-| Closure-1    |   MISS   |   MISS   |   MISS   |
-| Closure-10   |   MISS   |   MISS   |   MISS   |
+| Time-11      |   PASS   |   PASS   |   PASS   |
+| Math-5       |   PASS   |   PASS   |   PASS   |
+| Math-27      |   PASS   |   PASS   |   RLIM   |
+| Math-3       |   RLIM   |   RLIM   |   RLIM   |
+| Math-10      |   RLIM   |   RLIM   |   RLIM   |
+| Closure-1    |   RLIM   |   RLIM   |   RLIM   |
+| Closure-10   |   RLIM   |   RLIM   |   RLIM   |
 |--------------|----------|----------|----------|
-| TOTAL        |   3/11   |   3/11   |   3/11   |
+| TOTAL        |   6/11   |   6/11   |   5/11   |
 
 #### Phase I × Haiku 4.5
 
@@ -137,7 +137,7 @@
 | Model        |  C1 pass%   |  C1 tools   |  C2 pass%   |  C2 tools   |  C3 pass%   |  C3 tools   |
 |--------------|-------------|-------------|-------------|-------------|-------------|-------------|
 | Opus 4.7     |    11/11    |    18.4     |    11/11    |    17.5     |    11/11    |    17.2     |
-| Sonnet 4.6   |     3/4     |    11.8     |     3/4     |    11.0     |     3/4     |    14.5     |
+| Sonnet 4.6   |  6/7 +4RL   |    14.1     |  6/7 +4RL   |    11.9     |  5/6 +5RL   |    15.2     |
 | Haiku 4.5    |    11/11    |    38.2     |    11/11    |    33.3     |    10/11    |    48.5     |
 |--------------|-------------|-------------|-------------|-------------|-------------|-------------|
 
@@ -157,7 +157,7 @@ How many C3 trials actually used Crochet TTD commands?
 | Phase | Model | C3 trials | TTD invoked | % TTD used |
 |-------|-------|-----------|-------------|------------|
 | Phase I | Opus 4.7 | 11 | 0 | 0% |
-| Phase I | Sonnet 4.6 | 4 | 0 | 0% |
+| Phase I | Sonnet 4.6 | 6 | 0 | 0% |
 | Phase I | Haiku 4.5 | 11 | 0 | 0% |
 | Phase II | Opus 4.7 | 12 | 0 | 0% |
 | Phase II | Sonnet 4.6 | 2 | 0 | 0% |
@@ -172,7 +172,7 @@ How many C3 trials actually used Crochet TTD commands?
 | Phase | Model | C1 pass% | C3 pass% | C3-C1 delta |
 |-------|-------|----------|----------|-------------|
 | Phase I | Opus 4.7 | 11/11 (100%) | 11/11 (100%) | 0pp |
-| Phase I | Sonnet 4.6 | 3/4 (75%) | 3/4 (75%) | 0pp |
+| Phase I | Sonnet 4.6 | 6/7 (86%) | 5/6 (83%) | -2pp |
 | Phase I | Haiku 4.5 | 11/11 (100%) | 10/11 (91%) | -9pp |
 | Phase II | Opus 4.7 | 12/12 (100%) | 12/12 (100%) | 0pp |
 | Phase II | Sonnet 4.6 | 3/3 (100%) | 1/2 (50%) | -50pp |
