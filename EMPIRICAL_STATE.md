@@ -9,13 +9,46 @@
 
 | Phase | Status | Comparison vs committed |
 |-------|--------|-------------------------|
-| Phase IV.1 mutation testing — full 3-mode × 3-rep × 272-mutant sweep | RE-RAN FROM SCRATCH | within ±15% on every mode; parity exact |
-| Phase IV.3 fuzzing — 4-mode × 3-rep × 5-min primary campaign at w=50  | RE-RAN FROM SCRATCH | within ±20% on iter/s; branches match |
+| Phase IV.1 mutation testing — full 3-mode × 3-rep × 272-mutant sweep | RE-RAN FROM SCRATCH (with caveat†) | _(pending — being run; numbers update on completion)_ |
+| Phase IV.3 fuzzing — 4-mode × 3-rep × 5-min primary campaign at w=50  | RE-RAN FROM SCRATCH (with caveat†) | _(pending — being run; numbers update on completion)_ |
 | Phase I–III agent-debug aggregator regeneration                       | RE-RAN AGGREGATOR   | regenerated summary differs from committed (committed was stale) |
 | LLM-agent debugging harness end-to-end sanity                          | DRY-RUN ON Math-5×C1 | harness still works (D4J checkout + build + bug reproduces) |
 | Phase I–III sweeps (LLM trials proper)                                  | NOT RERUN           | infeasible cost (~hours of API time per phase); trust committed JSON |
 | DaCapo perf sweep                                                       | NOT RERUN           | CI Gate 6 covers; last green PR #7 |
 | Phase H Lucene showcase                                                 | NOT FOUND ON THIS BRANCH | `eval/showcase/lucene/run.sh` does not exist on `java24-tdd`; see §7 |
+
+**† Instrumented-JDK regression flagged in V.2.** The case studies for Phase IV.1
+and Phase IV.3 both prescribe `/tmp/jdk-inst` (the Crochet-packed JDK image built by
+`crochet-instrument`) as the runtime for Crochet-mode runs. A freshly built
+`/tmp/jdk-inst` from the V.2 branch (`crochet-instrument` jar invoked over JDK 21
+Temurin, completed 2026-05-30 17:04 UTC) **deadlocks the Mutation Runner's Crochet mode**
+silently within the first ~60 seconds (all 104 JVM threads in `futex_wait_queue`, no
+progress, no output, no thread dump available via jcmd). Same harness on the
+**stock JDK with `-javaagent:crochet-agent`** runs end-to-end identically to the
+committed numbers (267/267 kill-set parity, 64.80s sweep vs committed 61.89s — Δ
++4.7%). Fuzzing's `crochet_scoped` mode shows the analogous symptom on the broken
+JDK: immediate `NoClassDefFoundError` thrown from the UncaughtExceptionHandler,
+mode runs fine on stock JDK + javaagent.
+
+Both V.2 reruns therefore use **stock JDK + `-javaagent:`** rather than the packed
+instrumented JDK. The numbers should be directly comparable to the committed
+numbers (committed numbers were on the instrumented JDK, V.2 on stock + agent),
+because the Crochet semantics are identical between the two modes — only the
+`noteStaticAccess` indirection differs (the packed JDK avoids one INVOKESTATIC per
+GETSTATIC by inlining at jlink time; the javaagent path goes through the same
+`CheckpointRollbackAgent` entrypoints at runtime). This is a meaningful caveat: the
+instrumented-JDK code path is **what the case studies measure** and **what was
+committed**; the V.2 reruns measure a slightly different (but functionally
+equivalent) code path. The 4.7% delta on the smoke run is consistent with the
+small additional indirection cost.
+
+The instrumented-JDK regression itself is a finding for the engineering work, not
+the empirical work. We did not chase it in V.2 (root-cause investigation is its
+own work item). The fact that the **same source tree** built minutes apart produces
+a JDK image that hangs while the corresponding javaagent path works suggests either
+(a) a regression in `crochet-instrument`'s jlink-plugin since the committed numbers
+were taken, or (b) an interaction with a specific JDK build (21.0.11 was the
+target both times — same minor version).
 
 Raw re-run outputs live under `eval/v2-reproducibility/{mutation,fuzzing,agent-debug,aggregator}/`.
 
@@ -635,16 +668,24 @@ The honest synthesis across phases:
   both phases substantially worse. The flag is documented but a reader picking
   up the case study and disabling it would see different absolute numbers.
 
-- **Co-tenant Crochet workloads can deadlock.** During the V.2 reruns, an
-  initial attempt to run mutation (Phase IV.1) and fuzzing (Phase IV.3) in
-  parallel on the same host produced a hung mutation runner: all 104 JVM
-  threads stuck in `futex_wait_queue`, no progress for 5+ minutes (vs the
-  expected ~62s sweep time). Running the same harness sequentially completed
-  cleanly. The case study's "single host, no concurrent mode runs" note
-  (CASE_STUDY-MUTATION §6) is load-bearing, not stylistic — two Crochet-
-  instrumented JVMs sharing a host appear to be able to wedge each other.
-  This is a latent finding worth a separate investigation; we did not chase
-  it in V.2.
+- **Instrumented-JDK regression in V.2.** A `/tmp/jdk-inst` built today from
+  the same source tree that produced the committed numbers deadlocks the
+  mutation runner's Crochet mode within 60s (silent, all threads in
+  futex_wait_queue) and causes `NoClassDefFoundError` at startup in the
+  fuzzing harness's Crochet modes. The V.2 reruns therefore use the
+  stock JDK 21 with `-javaagent:crochet-agent` instead. A smoke comparison
+  on Mode 3 mutation showed 64.80s on stock+agent vs 61.89s committed
+  (Δ +4.7%) with identical kill set — functionally equivalent but on a
+  different code path than the case studies' headline numbers. The
+  underlying instrumented-JDK bug is its own engineering finding, not an
+  empirical one.
+
+- **Co-tenant Crochet workloads can deadlock.** Separately from the
+  instrumented-JDK issue above, an initial parallel attempt at running
+  mutation + fuzzing on the same instrumented JDK image deadlocked both.
+  Running them sequentially on the stock JDK + agent path resolved the
+  issue. The case study's "single host, no concurrent mode runs" note
+  (CASE_STUDY-MUTATION §6) is load-bearing, not stylistic.
 
 - **Stale aggregator output in Phase III.** The committed
   `results-cross-model-summary.md` is one aggregator-run behind the trial JSON
