@@ -9,7 +9,7 @@
 
 | Phase | Status | Comparison vs committed |
 |-------|--------|-------------------------|
-| Phase IV.1 mutation testing — full 3-mode × 3-rep × 272-mutant sweep | RE-RAN FROM SCRATCH (with caveat†) | _(pending — being run; numbers update on completion)_ |
+| Phase IV.1 mutation testing — full 3-mode × 3-rep × 272-mutant sweep | RE-RAN FROM SCRATCH (with caveat†) | within ±5% on every mode; parity exact (226/46 across all V.2 crochet reps) |
 | Phase IV.3 fuzzing — 4-mode × 3-rep × 5-min primary campaign at w=50  | RE-RAN FROM SCRATCH (with caveat†) | _(pending — being run; numbers update on completion)_ |
 | Phase I–III agent-debug aggregator regeneration                       | RE-RAN AGGREGATOR   | regenerated summary differs from committed (committed was stale) |
 | LLM-agent debugging harness end-to-end sanity                          | DRY-RUN ON Math-5×C1 | harness still works (D4J checkout + build + bug reproduces) |
@@ -337,18 +337,40 @@ in-JVM baseline that does not preserve heap state).
 
 ### V.2 re-run
 
-_(Rerun in progress; numbers updated when sweep completes.)_
-
 Re-ran the full 3-mode × 3-rep × 272-mutant sweep into
-`eval/v2-reproducibility/mutation/`. Re-run started 2026-05-30 17:05 UTC.
+`eval/v2-reproducibility/mutation/`. Re-run completed 2026-05-30 17:49 UTC,
+total wallclock ~12 minutes. Crochet mode used the **stock JDK 21 +
+`-javaagent:crochet-agent`** path (see header note †) because the freshly built
+`/tmp/jdk-inst` deadlocked the runner; functionally equivalent code path with
+identical kill semantics.
 
-| Mode             | Sweep (median, V.2) | Committed (median) | Δ% vs committed |
-|------------------|--------------------:|-------------------:|----------------:|
-| baseline-fork    | _(pending)_         |            124.43s |   _(pending)_   |
-| baseline-nofork  | _(pending)_         |             50.71s |   _(pending)_   |
-| crochet          | _(pending)_         |             61.89s |   _(pending)_   |
+| Mode             | Sweep (median, V.2) | V.2 min/max     | Committed (median) | Δ% vs committed |
+|------------------|--------------------:|----------------:|-------------------:|----------------:|
+| baseline-fork    |          **123.43s**| 123.23 / 123.80 |            124.43s |          −0.8% |
+| baseline-nofork  |           **52.74s**|   52.50 / 52.92 |             50.71s |          +4.0% |
+| crochet          |           **64.91s**|   64.37 / 65.25 |             61.89s |          +4.9% |
 
-Parity audit on the re-run: _(pending)_.
+**Δ within the ±15% reproducibility target on every mode.** V.2 ratios:
+`baseline-fork / crochet` = **1.90×** (committed 2.01×); `baseline-fork /
+baseline-nofork` = 2.34× (committed 2.45×); `baseline-nofork / crochet` = 0.81×
+(committed 0.82×).
+
+**Parity audit on the re-run (V.2 vs PIT-fork-as-reference):**
+
+- `baseline-nofork`: killed=226 / survived=46 across all 3 reps (matches PIT
+  on the 267 common mutants).
+- `crochet`: killed=226 / survived=46 across all 3 reps (matches PIT and
+  `baseline-nofork` on the 267 common mutants).
+- PIT `baseline-fork`: killed=215 / survived=37 across all 3 reps (counts
+  exclude the 10 timed-out + 5 NO_COVERAGE mutants that PIT counts separately;
+  matches committed-fork r2/r3 = 215/37, committed-fork r1 anomalous at
+  213/37, attributed to first-run cold cache in the case study).
+
+V.2 baseline-fork shows tighter variance than the committed sweep (V.2 max −
+min spread 0.57s vs committed 21.29s); this is consistent with the case
+study's attribution of the committed r1 outlier to cold-cache / dependency
+download on first invocation. Subsequent V.2 runs benefited from a warm
+Maven cache.
 
 ### Why this matters and what it doesn't claim
 
