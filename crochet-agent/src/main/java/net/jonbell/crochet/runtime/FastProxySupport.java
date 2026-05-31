@@ -377,17 +377,15 @@ final class FastProxySupport {
         // {@code net.jonbell.crochet.*} and shaded ASM). Such classes
         // inherit {@link CRIJInstrumented} from an instrumented parent
         // ({@link java.lang.ref.Reference} for {@code ArrayRegistry$IdKey})
-        // but lack their own {@code $$crochetLookup}.
-        String name = c.getName();
-        if (name.startsWith("net.jonbell.crochet.")
-                || name.startsWith("edu.neu.ccs.prl.crochet.")) {
+        // but lack their own {@code $$crochetLookup}. The predicate is
+        // owned by {@link net.jonbell.crochet.transform.CrochetTransformer}
+        // so the runtime and transformer can't drift on what counts as
+        // internal.
+        if (net.jonbell.crochet.transform.CrochetTransformer
+                .isInternalDottedName(c.getName())) {
             return;
         }
-        ClassMeta meta = ClassMeta.of(c);
-        if (meta == null) {
-            return;
-        }
-        ClassMeta.VersionHandles handles = meta.versionHandles();
+        ClassMeta.VersionHandles handles = ClassMeta.of(c).versionHandles();
         if (handles.dirty == null) {
             return;
         }

@@ -214,6 +214,36 @@ class InitializedClassesDiscoveryTest {
         }
     }
 
+    /**
+     * V.5: round-trip the 2-arg {@link CheckpointRollbackAgent#registerInitializedClass(Class,
+     * java.lang.invoke.MethodHandles.Lookup)} → {@link ClassMeta#resolveLookup()} path.
+     * The 2-arg overload is what {@code ClinitRegistrar} emits on every instrumented
+     * user-class clinit; this guards against a regression in the side-table
+     * publication that would silently force {@code resolveLookup} back onto the
+     * reflective fallback (and bring back the {@code DirectMethodHandleAccessor}
+     * lookupClass bug that V.4 fixed).
+     */
+    @Test
+    void twoArgRegisterPublishesLookupForResolveLookup() {
+        Class<?> c = SampleHolder.class;
+        java.lang.invoke.MethodHandles.Lookup expected =
+                java.lang.invoke.MethodHandles.lookup();
+        // Idempotent under repeat: first wins. Second call must NOT clobber.
+        CheckpointRollbackAgent.registerInitializedClass(c, expected);
+        CheckpointRollbackAgent.registerInitializedClass(c,
+                java.lang.invoke.MethodHandles.lookup());
+        assertEquals(expected, CheckpointRollbackAgent.publishedLookup(c),
+                "first-write-wins semantics violated");
+        // Reading via publishedLookup must NOT touch TOUCHED_CLASSES — that
+        // invariant is reserved for ClassMeta.of (the InitializedClasses test
+        // class above verifies the inverse direction).
+        assertFalse(CheckpointRollbackAgent.TOUCHED_CLASSES.contains(c),
+                "publishedLookup read must not register the class for checkpoint");
+    }
+
+    /** Minimal stand-in for a user class with a Lookup to publish. */
+    private static final class SampleHolder { }
+
     /** Sanity: a synthesized-only {@code <clinit>} shouldn't require ClassMeta.of to register. */
     @Test
     void synthesizedClinitRegistersWithoutClassMetaOf() throws Exception {
