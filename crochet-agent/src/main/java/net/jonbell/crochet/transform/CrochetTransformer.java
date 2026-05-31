@@ -21,6 +21,34 @@ public class CrochetTransformer {
 
     private static final String ANNOTATION_PACKAGE_PREFIX = "net/jonbell/crochet/annotation/";
 
+    /**
+     * Dotted-name prefix shared by every internal Crochet runtime package
+     * ({@code net.jonbell.crochet.runtime}, {@code .transform},
+     * {@code .agent}, {@code .patch}, {@code .annotation}). These are all
+     * skip-listed inside {@link #shouldSkip(String)} via the slash-form
+     * prefixes above; this constant lets runtime callers (which see dotted
+     * names from {@link Class#getName()}) check the same condition without
+     * duplicating the package list.
+     */
+    public static final String CROCHET_INTERNAL_DOTTED_PREFIX = "net.jonbell.crochet.";
+
+    /** Dotted-name prefix for the shaded ASM package and other transformer
+     *  internals relocated by the maven-shade-plugin. */
+    public static final String CROCHET_SHADED_DOTTED_PREFIX = "edu.neu.ccs.prl.crochet.";
+
+    /**
+     * Predicate variant of the runtime-side check used by
+     * {@link net.jonbell.crochet.runtime.FastProxySupport#noteDirty}: returns
+     * {@code true} when the class's dotted name lives in one of the
+     * Crochet-internal packages (the same packages {@link #shouldSkip}
+     * excludes from instrumentation). Pulled here so that the runtime and the
+     * transformer cannot drift on what counts as "internal".
+     */
+    public static boolean isInternalDottedName(String dottedName) {
+        return dottedName.startsWith(CROCHET_INTERNAL_DOTTED_PREFIX)
+                || dottedName.startsWith(CROCHET_SHADED_DOTTED_PREFIX);
+    }
+
     /** Descriptor of {@link net.jonbell.crochet.annotation.CrochetSkip}. */
     static final String CROCHET_SKIP_DESC =
             "Lnet/jonbell/crochet/annotation/CrochetSkip;";

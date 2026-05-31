@@ -222,22 +222,11 @@ public final class CheckpointRollbackAgent {
 
     /**
      * Side table of Lookups published by user-class {@code <clinit>}
-     * blocks. Keyed by Class&lt;?&gt; via {@link ClassValue} so the Lookup is
-     * weakly attached to its class (no leak on classloader GC) and lookup
-     * is constant-time. Kept SEPARATE from {@link ClassMeta} so publishing
-     * a Lookup does not register the class in
-     * {@link #TOUCHED_CLASSES} — that registration is reserved for
-     * {@code ClassMeta.of} (the moment a class is actually accessed for
-     * checkpoint/rollback purposes).
+     * blocks. Kept SEPARATE from {@link ClassMeta} so that publishing a
+     * Lookup does not register the class in {@link #TOUCHED_CLASSES} —
+     * that registration is reserved for {@code ClassMeta.of} (the moment
+     * a class is actually accessed for checkpoint/rollback purposes).
      */
-    private static final ClassValue<java.lang.invoke.MethodHandles.Lookup> PUBLISHED_LOOKUPS =
-            new ClassValue<>() {
-                @Override
-                protected java.lang.invoke.MethodHandles.Lookup computeValue(Class<?> type) {
-                    return null;
-                }
-            };
-
     private static final java.util.Map<Class<?>, java.lang.invoke.MethodHandles.Lookup>
             PUBLISHED_LOOKUP_MAP = new java.util.concurrent.ConcurrentHashMap<>();
 

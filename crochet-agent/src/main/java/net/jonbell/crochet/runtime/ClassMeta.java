@@ -40,22 +40,15 @@ public final class ClassMeta {
     };
 
     public static ClassMeta of(Class<?> userClass) {
-        ClassValue<ClassMeta> cache = CACHE;
-        if (cache == null) {
-            // ClassMeta.<clinit> still in flight — see {@link #warmup()} for
-            // why this should not normally happen, and callers (noteDirty,
-            // fastAccess) for the null-tolerant fallback.
-            return null;
-        }
-        return cache.get(userClass);
+        return CACHE.get(userClass);
     }
 
     /**
-     * Force {@link #CACHE}'s assignment to complete by triggering this class's
-     * {@code <clinit>} now, while {@code RuntimeReady.VERSION_GATE == 0}. This
-     * is invoked from {@link net.jonbell.crochet.agent.CrochetAgent#premain}
-     * to prevent the following cycle observed under the instrumented JDK
-     * after the first {@code Crochet.checkpoint()} call lifts VERSION_GATE:
+     * Force this class's {@code <clinit>} to complete now, while
+     * {@code RuntimeReady.VERSION_GATE == 0}. Invoked from
+     * {@link net.jonbell.crochet.agent.CrochetAgent#premain} to prevent the
+     * following cycle observed under the instrumented JDK after the first
+     * {@code Crochet.checkpoint()} call lifts VERSION_GATE:
      *
      * <pre>
      *   instrumented-JDK PUTFIELD
@@ -68,23 +61,24 @@ public final class ClassMeta {
      *                 → ClassMeta.of(...)        // CACHE still null → NPE
      * </pre>
      *
-     * <p>{@link FastProxySupport#NOTE_DIRTY_GUARD} stops re-entry through
-     * {@code noteDirty}, but the prehook also calls {@code $$crochetAccess}
-     * which can reach {@link #of} via {@link FastProxySupport#fastAccess}
-     * without going through that guard. The cheapest, broadest fix is to
-     * pre-resolve {@code CACHE} during {@code premain} (when {@code
-     * VERSION_GATE == 0}, so the inner PUTFIELDs short-circuit before
-     * reaching {@code noteDirty} at all) — same idiom as
-     * {@link ArrayRegistry#warmup()} for the same class of bug.
+     * <p>Per JLS §12.4.1, invoking a static method triggers {@code <clinit>}
+     * for free, but {@code <clinit>} alone is not enough: the body also
+     * needs to drive {@code CACHE.get(...)} once so that
+     * {@code java.lang.ClassValue$ClassValueMap} loads here, while
+     * {@code VERSION_GATE == 0}. Without that, the first user-code
+     * {@code ClassMeta.of(...)} after a checkpoint lifts VERSION_GATE
+     * fires instrumented PUTFIELDs during the mid-load
+     * {@code ClassValueMap.<clinit>}, producing a {@link ClassCircularityError}.
+     *
+     * <p>We then cleanly remove the synthetic {@code Object.class} entry
+     * from {@link CheckpointRollbackAgent#TOUCHED_CLASSES} that the
+     * {@code computeValue} side-effect added — {@code Object} is in the
+     * transformer's skip-list, has no {@code $$crochet*} surface, and must
+     * not appear as a checkpointAll root.
      */
     public static void warmup() {
-        // Touching CACHE forces ClassMeta's <clinit> to complete. The
-        // get() call exercises the full path so the ClassValue's own
-        // <clinit> + the first computeValue's <clinit>-of-its-impl-class
-        // also resolve here. After return, CACHE is non-null and any
-        // subsequent ClassMeta.of() lookup from a noteDirty / fastAccess
-        // path on a hot stack will hit the cache directly.
         CACHE.get(Object.class);
+        CheckpointRollbackAgent.TOUCHED_CLASSES.remove(Object.class);
     }
 
     /**
@@ -160,15 +154,11 @@ public final class ClassMeta {
     private volatile VersionHandles versionHandles;
 
     /** Cached bytecode-emitting {@link MethodHandles.Lookup} for this class.
-     *
-     *  <p>Populated by {@link #publishLookup(MethodHandles.Lookup)} from the
-     *  user class's {@code <clinit>} (via {@code
-     *  CheckpointRollbackAgent.registerInitializedClass(Class, Lookup)}), so
-     *  the Lookup is captured inside the user class's own frame and has
-     *  {@code lookupClass() == userClass}. The reflective fallback in
-     *  {@link #resolveLookup()} would otherwise return a Lookup whose
-     *  {@code lookupClass()} is {@code DirectMethodHandleAccessor} due to
-     *  {@code @CallerSensitive} resolution through {@code Method.invoke}. */
+     *  Populated by {@link #resolveLookup()} the first time it is called.
+     *  See {@link #resolveLookup()} for the {@code @CallerSensitive} hazard
+     *  that forces the Lookup to be captured inside the user-class frame
+     *  (via {@code CheckpointRollbackAgent.PUBLISHED_LOOKUP_MAP}) rather
+     *  than obtained reflectively. */
     volatile MethodHandles.Lookup lookup;
 
     /* ---- Gap 3 (bytecode): static-field helper fields ---- */
@@ -193,17 +183,6 @@ public final class ClassMeta {
 
     private ClassMeta(Class<?> userClass) {
         this.userClass = userClass;
-    }
-
-    /**
-     * Cache a Lookup captured inside the user class's own {@code <clinit>}
-     * frame. First write wins (the ClinitRegistrar emit is exactly once per
-     * class; subsequent reflective lookups would have to match anyway).
-     */
-    public void publishLookup(MethodHandles.Lookup l) {
-        if (l != null && lookup == null) {
-            lookup = l;
-        }
     }
 
     public MethodHandles.Lookup resolveLookup() {
