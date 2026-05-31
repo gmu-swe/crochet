@@ -221,6 +221,70 @@ public final class CheckpointRollbackAgent {
     }
 
     /**
+     * Side table of Lookups published by user-class {@code <clinit>}
+     * blocks. Keyed by Class&lt;?&gt; via {@link ClassValue} so the Lookup is
+     * weakly attached to its class (no leak on classloader GC) and lookup
+     * is constant-time. Kept SEPARATE from {@link ClassMeta} so publishing
+     * a Lookup does not register the class in
+     * {@link #TOUCHED_CLASSES} — that registration is reserved for
+     * {@code ClassMeta.of} (the moment a class is actually accessed for
+     * checkpoint/rollback purposes).
+     */
+    private static final ClassValue<java.lang.invoke.MethodHandles.Lookup> PUBLISHED_LOOKUPS =
+            new ClassValue<>() {
+                @Override
+                protected java.lang.invoke.MethodHandles.Lookup computeValue(Class<?> type) {
+                    return null;
+                }
+            };
+
+    private static final java.util.Map<Class<?>, java.lang.invoke.MethodHandles.Lookup>
+            PUBLISHED_LOOKUP_MAP = new java.util.concurrent.ConcurrentHashMap<>();
+
+    /** Read a Lookup previously published by
+     *  {@link #registerInitializedClass(Class, java.lang.invoke.MethodHandles.Lookup)},
+     *  or {@code null} if none. Called from {@link ClassMeta#resolveLookup}. */
+    public static java.lang.invoke.MethodHandles.Lookup publishedLookup(Class<?> c) {
+        return c == null ? null : PUBLISHED_LOOKUP_MAP.get(c);
+    }
+
+    /**
+     * Variant called from user-class {@code <clinit>} after the class's own
+     * {@code $$crochetLookup} has been invoked. Publishing the Lookup here
+     * — captured inside the user class's clinit frame, where
+     * {@code MethodHandles.lookup().lookupClass() == thisClass} — avoids
+     * the {@code @CallerSensitive} hazard of obtaining the Lookup via
+     * {@link java.lang.reflect.Method#invoke} or
+     * {@link java.lang.invoke.MethodHandle#invoke}: when CROCHET runtime
+     * classes are packed into {@code java.base}, reflective invocation
+     * of the {@code @CallerSensitive} {@code MethodHandles.lookup()}
+     * yields a Lookup whose {@code lookupClass()} is
+     * {@code jdk.internal.reflect.DirectMethodHandleAccessor} (not the
+     * user class), and any subsequent {@code findVarHandle} fails with
+     * "symbolic reference class is not accessible".
+     *
+     * <p>The Lookup is stored in a side map (not on {@link ClassMeta})
+     * so this registration does not eagerly touch
+     * {@link #TOUCHED_CLASSES}. {@link ClassMeta#resolveLookup} reads
+     * the side map first, falling back to the reflective resolution path
+     * when nothing is published (the typical {@code -javaagent} case
+     * where the stock JDK has no instrumented user clinit yet).
+     */
+    public static void registerInitializedClass(Class<?> c,
+                                                java.lang.invoke.MethodHandles.Lookup lookup) {
+        if (c == null) {
+            return;
+        }
+        try {
+            INITIALIZED_CLASSES.add(c);
+            if (lookup != null) {
+                PUBLISHED_LOOKUP_MAP.putIfAbsent(c, lookup);
+            }
+        } catch (Throwable ignored) {
+        }
+    }
+
+    /**
      * Opt-out for users whose test frameworks or hosting containers assume
      * the system classloader / thread list are stable. When {@code true},
      * {@link #checkpointAll} / {@link #rollbackAll} skip those two roots and

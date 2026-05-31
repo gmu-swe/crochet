@@ -147,6 +147,22 @@ jobs:
           cd demo && bash run-all.sh 2>&1
         continue-on-error: false
 
+      - name: Build instrumented JDK
+        run: |
+          rm -rf /tmp/jdk-inst
+          java -jar crochet-instrument/target/crochet-instrument-*.jar \
+              "$JAVA_HOME" /tmp/jdk-inst
+
+      - name: Run demo scenarios (instrumented JDK)
+        run: |
+          # Baseline-pass parity: every scenario that passes under stock JDK
+          # should also pass under the packed instrumented JDK. V.1 found
+          # the instrumented mode was 0/25 due to an F.1+Gap 7 regression that
+          # CI never caught because this step did not exist. The exit status
+          # of run-all.sh is non-zero on any failure, which fails this step.
+          cd demo && bash run-all.sh --instrumented 2>&1
+        continue-on-error: false
+
   # ─────────────────────────────────────────────────────────────────────────
   # Gate 4: DaCapo functional sweep
   # Verifies every benchmark in the DaCapo 23.11-MR2-chopin suite exits 0

@@ -1,5 +1,6 @@
 package net.jonbell.crochet.runtime;
 
+import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.VarHandle;
 import java.lang.reflect.Field;
@@ -39,7 +40,51 @@ public final class ClassMeta {
     };
 
     public static ClassMeta of(Class<?> userClass) {
-        return CACHE.get(userClass);
+        ClassValue<ClassMeta> cache = CACHE;
+        if (cache == null) {
+            // ClassMeta.<clinit> still in flight — see {@link #warmup()} for
+            // why this should not normally happen, and callers (noteDirty,
+            // fastAccess) for the null-tolerant fallback.
+            return null;
+        }
+        return cache.get(userClass);
+    }
+
+    /**
+     * Force {@link #CACHE}'s assignment to complete by triggering this class's
+     * {@code <clinit>} now, while {@code RuntimeReady.VERSION_GATE == 0}. This
+     * is invoked from {@link net.jonbell.crochet.agent.CrochetAgent#premain}
+     * to prevent the following cycle observed under the instrumented JDK
+     * after the first {@code Crochet.checkpoint()} call lifts VERSION_GATE:
+     *
+     * <pre>
+     *   instrumented-JDK PUTFIELD
+     *     → noteDirty(obj)
+     *       → ClassMeta.of(obj.getClass())     // first reference: triggers <clinit>
+     *         → ClassMeta.<clinit> runs
+     *           → new ClassValue&lt;&gt;() { ... }   // constructs anonymous subclass
+     *             → ClassValue.&lt;init&gt; PUTFIELDs (instrumented under Gap 7)
+     *               → noteDirty(thisClassValue)
+     *                 → ClassMeta.of(...)        // CACHE still null → NPE
+     * </pre>
+     *
+     * <p>{@link FastProxySupport#NOTE_DIRTY_GUARD} stops re-entry through
+     * {@code noteDirty}, but the prehook also calls {@code $$crochetAccess}
+     * which can reach {@link #of} via {@link FastProxySupport#fastAccess}
+     * without going through that guard. The cheapest, broadest fix is to
+     * pre-resolve {@code CACHE} during {@code premain} (when {@code
+     * VERSION_GATE == 0}, so the inner PUTFIELDs short-circuit before
+     * reaching {@code noteDirty} at all) — same idiom as
+     * {@link ArrayRegistry#warmup()} for the same class of bug.
+     */
+    public static void warmup() {
+        // Touching CACHE forces ClassMeta's <clinit> to complete. The
+        // get() call exercises the full path so the ClassValue's own
+        // <clinit> + the first computeValue's <clinit>-of-its-impl-class
+        // also resolve here. After return, CACHE is non-null and any
+        // subsequent ClassMeta.of() lookup from a noteDirty / fastAccess
+        // path on a hot stack will hit the cache directly.
+        CACHE.get(Object.class);
     }
 
     /**
@@ -114,7 +159,16 @@ public final class ClassMeta {
     private volatile FieldOffsets fieldOffsets;
     private volatile VersionHandles versionHandles;
 
-    /** Cached bytecode-emitting {@link MethodHandles.Lookup} for this class. */
+    /** Cached bytecode-emitting {@link MethodHandles.Lookup} for this class.
+     *
+     *  <p>Populated by {@link #publishLookup(MethodHandles.Lookup)} from the
+     *  user class's {@code <clinit>} (via {@code
+     *  CheckpointRollbackAgent.registerInitializedClass(Class, Lookup)}), so
+     *  the Lookup is captured inside the user class's own frame and has
+     *  {@code lookupClass() == userClass}. The reflective fallback in
+     *  {@link #resolveLookup()} would otherwise return a Lookup whose
+     *  {@code lookupClass()} is {@code DirectMethodHandleAccessor} due to
+     *  {@code @CallerSensitive} resolution through {@code Method.invoke}. */
     volatile MethodHandles.Lookup lookup;
 
     /* ---- Gap 3 (bytecode): static-field helper fields ---- */
@@ -141,24 +195,64 @@ public final class ClassMeta {
         this.userClass = userClass;
     }
 
+    /**
+     * Cache a Lookup captured inside the user class's own {@code <clinit>}
+     * frame. First write wins (the ClinitRegistrar emit is exactly once per
+     * class; subsequent reflective lookups would have to match anyway).
+     */
+    public void publishLookup(MethodHandles.Lookup l) {
+        if (l != null && lookup == null) {
+            lookup = l;
+        }
+    }
+
     public MethodHandles.Lookup resolveLookup() {
         MethodHandles.Lookup l = lookup;
         if (l != null) {
             return l;
         }
+        // Side-table publication (from user-class clinit) is the preferred
+        // source — its Lookup was captured inside the user class's own frame
+        // and has the correct lookupClass(). The reflective fallback below
+        // is only reached on classes whose clinit didn't run our emit (JDK
+        // internals reached during very early boot before agent install).
+        l = CheckpointRollbackAgent.publishedLookup(userClass);
+        if (l != null) {
+            lookup = l;
+            return l;
+        }
         try {
+            // Resolve via a MethodHandle rather than {@link
+            // java.lang.reflect.Method#invoke}. {@code MethodHandles.lookup()}
+            // inside the user class's {@code $$crochetLookup} body is
+            // {@code @CallerSensitive}: when reached through
+            // {@code Method.invoke}, the JVM's caller-class resolution
+            // identifies {@code jdk.internal.reflect.DirectMethodHandleAccessor}
+            // (the reflection accessor introduced in JDK 18) as the caller,
+            // not the user class — so the returned Lookup has
+            // {@code lookupClass() == DirectMethodHandleAccessor}. Any
+            // subsequent {@code findVarHandle} then fails with
+            // "symbolic reference class is not accessible: class
+            // DirectMethodHandleAccessor, from class
+            // net.jonbell.crochet.runtime.ClassMeta (module java.base)"
+            // because that accessor is qualified-exported only to a
+            // hardcoded set of modules. Invoking through
+            // {@link MethodHandle} preserves the user-class frame, so
+            // {@code lookupClass() == userClass} as intended. The agent
+            // jar's {@link MethodHandles#lookup} call below is fine: it
+            // gives ClassMeta the right to {@link MethodHandles.Lookup#unreflect}
+            // any setAccessible-cleared {@link Method}.
             Method m = userClass.getDeclaredMethod("$$crochetLookup");
-            // Package-private classes (e.g. org.apache.commons.cli.Util) still
-            // reject reflective invocation of their public members from outside
-            // the package without setAccessible. The injected $$crochetLookup is
-            // ACC_PUBLIC ACC_STATIC but the enclosing class access controls
-            // whether callers can actually reach it.
             m.setAccessible(true);
-            Object result = m.invoke(null);
+            MethodHandle handle = MethodHandles.lookup().unreflect(m);
+            Object result = handle.invoke();
             l = (MethodHandles.Lookup) result;
             lookup = l;
             return l;
-        } catch (ReflectiveOperationException e) {
+        } catch (Throwable e) {
+            if (e instanceof Error err) {
+                throw err;
+            }
             throw new IllegalStateException(
                     "User class " + userClass.getName()
                             + " was not instrumented with $$crochetLookup; was the Java agent attached?",

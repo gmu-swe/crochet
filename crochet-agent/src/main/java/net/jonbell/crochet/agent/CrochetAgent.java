@@ -5,6 +5,7 @@ import java.lang.instrument.Instrumentation;
 import net.jonbell.crochet.annotation.Internal;
 import net.jonbell.crochet.runtime.ArrayRegistry;
 import net.jonbell.crochet.runtime.CheckpointRollbackAgent;
+import net.jonbell.crochet.runtime.ClassMeta;
 import net.jonbell.crochet.runtime.RuntimeReady;
 
 @Internal
@@ -47,6 +48,15 @@ public final class CrochetAgent {
         // class initializers indirectly invoke early-exits in RuntimeReady.
         try {
             ArrayRegistry.warmup();
+        } catch (Throwable ignored) {
+        }
+        // Same idiom for ClassMeta: trigger <clinit> here, while
+        // VERSION_GATE == 0, so the inner instrumented PUTFIELDs that fire
+        // during ClassValue.<init> short-circuit out of noteDirty before
+        // they can re-enter ClassMeta.of with CACHE still null. See
+        // {@link ClassMeta#warmup()} for the full cycle.
+        try {
+            ClassMeta.warmup();
         } catch (Throwable ignored) {
         }
 
