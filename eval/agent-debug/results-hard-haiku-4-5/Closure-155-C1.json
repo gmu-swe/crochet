@@ -1,0 +1,55 @@
+{
+  "bug": "Closure-155",
+  "condition": "C1",
+  "model": "claude-haiku-4-5",
+  "model_default_used": false,
+  "started_at": "2026-06-01T03:56:23+00:00",
+  "duration_seconds": 197,
+  "tool_calls": 81,
+  "compile_fail": false,
+  "primary_pass": false,
+  "test_pass": false,
+  "baseline_failing_count": 7,
+  "agent_induced_regressions": [],
+  "regressed_tests": [],
+  "diagnosis_quality": 1,
+  "agent_exit_code": 1,
+  "bug_reproduced_pretest": true,
+  "agent_patch": "diff --git a/build.xml b/build.xml\nindex e9f85364d..0bbf2827c 100644\n--- a/build.xml\n+++ b/build.xml\n@@ -16,8 +16,8 @@\n <project name=\"compiler\" basedir=\".\" default=\"jar\" xmlns:artifact=\"antlib:org.apache.maven.artifact.ant\">\n \n   <!-- Force java 6 -->\n-  <property name=\"ant.build.javac.source\" value=\"1.6\" />\n-  <property name=\"ant.build.javac.target\" value=\"1.6\" />\n+  <property name=\"ant.build.javac.source\" value=\"1.8\" />\n+  <property name=\"ant.build.javac.target\" value=\"1.8\" />\n \n   <!-- define other variables -->\n   <property name=\"src.dir\" value=\"${basedir}/src\" />\ndiff --git a/src/com/google/javascript/jscomp/InlineVariables.java b/src/com/google/javascript/jscomp/InlineVariables.java\nindex 18c9fbe2c..6c6e12e6d 100644\n--- a/src/com/google/javascript/jscomp/InlineVariables.java\n+++ b/src/com/google/javascript/jscomp/InlineVariables.java\n@@ -195,6 +195,8 @@ class InlineVariables implements CompilerPass {\n      */\n     private void doInlinesForScope(NodeTraversal t,\n         Map<Var, ReferenceCollection> referenceMap) {\n+      boolean maybeModifiedArguments = maybeEscapedOrModifiedArguments(\n+          t.getScope(), referenceMap);\n \n       for (Iterator<Var> it = t.getScope().getVars(); it.hasNext();) {\n         Var v = it.next();\n@@ -217,17 +219,45 @@ class InlineVariables implements CompilerPass {\n           // inlining heuristics. See InlineConstantsTest.\n           continue;\n         } else {\n-          inlineNonConstants(v, referenceInfo);\n+          inlineNonConstants(v, referenceInfo, maybeModifiedArguments);\n         }\n       }\n     }\n \n+    private boolean maybeEscapedOrModifiedArguments(\n+        Scope scope, Map<Var, ReferenceCollection> referenceMap) {\n+      if (scope.isLocal()) {\n+        Var arguments = scope.getVar(\"arguments\");\n+        ReferenceCollection refs = referenceMap.get(arguments);\n+        if (refs != null && !refs.references.isEmpty()) {\n+          for (Reference ref : refs.references) {\n+            Node refNode = ref.getNameNode();\n+            Node refParent = ref.getParent();\n             // Any reference that is not a read of the arguments property\n             // consider a escape of the arguments object.\n+            if (!(NodeUtil.isGet(refParent)\n+                && refNode == ref.getParent().getFirstChild()\n+                && !isLValue(refParent))) {\n+              return true;\n+            }\n+          }\n+        }\n+      }\n+      return false;\n+    }\n+\n+    private boolean isLValue(Node n) {\n+      Node parent = n.getParent();\n+      return (parent.getType() == Token.INC\n+          || parent.getType() == Token.DEC\n+          || (NodeUtil.isAssignmentOp(parent)\n+          && parent.getFirstChild() == n));\n+    }\n \n \n     private void inlineNonConstants(\n-        Var v, ReferenceCollection referenceInfo) {\n+        Var v, ReferenceCollection referenceInfo,\n+        boolean maybeModifiedArguments) {\n       int refCount = referenceInfo.references.size();\n       Reference declaration = referenceInfo.references.get(0);\n       Reference init = referenceInfo.getInitializingReference();\n@@ -272,7 +302,7 @@ class InlineVariables implements CompilerPass {\n       // inline an alias of it. (If the variable was inlined, then the\n       // reference data is out of sync. We're better off just waiting for\n       // the next pass.)\n-      if (\n+      if (!maybeModifiedArguments &&\n           !staleVars.contains(v) && referenceInfo.isWellDefined() &&\n           referenceInfo.isAssignedOnceInLifetime()) {\n         List<Reference> refs = referenceInfo.references;\n",
+  "agent_log": "{\"type\":\"result\",\"subtype\":\"error_max_turns\",\"duration_ms\":195693,\"duration_api_ms\":189397,\"is_error\":true,\"num_turns\":81,\"stop_reason\":\"tool_use\",\"session_id\":\"cc5630ba-0b66-45b1-a95f-876129ea4d56\",\"total_cost_usd\":0.7151151499999999,\"usage\":{\"input_tokens\":84,\"cache_creation_input_tokens\":80723,\"cache_read_input_tokens\":5296874,\"output_tokens\":16888,\"server_tool_use\":{\"web_search_requests\":0,\"web_fetch_requests\":0},\"service_tier\":\"standard\",\"cache_creation\":{\"ephemeral_1h_input_tokens\":80723,\"ephemeral_5m_input_tokens\":0},\"inference_geo\":\"not_available\",\"iterations\":[{\"input_tokens\":0,\"output_tokens\":503,\"cache_read_input_tokens\":92527,\"cache_creation_input_tokens\":923,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":923},\"type\":\"message\"}],\"speed\":\"standard\"},\"modelUsage\":{\"claude-haiku-4-5\":{\"inputTokens\":84,\"outputTokens\":16888,\"cacheReadInputTokens\":5296874,\"cacheCreationInputTokens\":80723,\"webSearchRequests\":0,\"costUSD\":0.7151151499999999,\"contextWindow\":200000,\"maxOutputTokens\":32000}},\"permission_denials\":[],\"terminal_reason\":\"max_turns\",\"fast_mode_state\":\"off\",\"uuid\":\"7c79cad4-927f-4fde-b7e2-7f041554f727\",\"errors\":[\"Reached maximum number of turns (80)\"]}\n",
+  "agent_stderr": "",
+  "judge_reasoning": "The agent's final diagnosis is empty\u2014no root cause was identified, no method/line/variable was named, and no explanation of the 'arguments'-object closure-boundary inlining bug was provided. With nothing to evaluate against the ground-truth summary, this is a wrong/unhelpful response.\n",
+  "verify_log": "Running ant (compile.tests)................................................ OK\nRunning ant (run.dev.tests)................................................ OK\nFailing tests: 1\n  - com.google.javascript.jscomp.InlineVariablesTest::testArgumentsModifiedInInnerFunction\n",
+  "baseline_failing_tests": [
+    "com.google.javascript.jscomp.InlineVariablesTest::testArgumentsModifiedInInnerFunction",
+    "com.google.javascript.jscomp.InlineVariablesTest::testArgumentsModifiedInOuterFunction",
+    "com.google.javascript.jscomp.InlineVariablesTest::testIssue378EscapedArguments1",
+    "com.google.javascript.jscomp.InlineVariablesTest::testIssue378EscapedArguments2",
+    "com.google.javascript.jscomp.InlineVariablesTest::testIssue378EscapedArguments4",
+    "com.google.javascript.jscomp.InlineVariablesTest::testIssue378ModifiedArguments1",
+    "com.google.javascript.jscomp.InlineVariablesTest::testIssue378ModifiedArguments2"
+  ],
+  "compile_log": "Running ant (compile)...................................................... OK\nRunning ant (compile.tests)................................................ OK\n",
+  "agent_modified_files": [
+    "build.xml",
+    "src/com/google/javascript/jscomp/InlineVariables.java"
+  ],
+  "canonical_modified_files": [
+    "src/com/google/javascript/jscomp/InlineVariables.java",
+    "src/com/google/javascript/jscomp/ReferenceCollectingCallback.java",
+    "src/com/google/javascript/jscomp/Scope.java"
+  ],
+  "agent_modified_prod_files": [
+    "src/com/google/javascript/jscomp/InlineVariables.java"
+  ],
+  "file_overlap": [
+    "src/com/google/javascript/jscomp/InlineVariables.java"
+  ],
+  "missed_canonical": [
+    "src/com/google/javascript/jscomp/ReferenceCollectingCallback.java",
+    "src/com/google/javascript/jscomp/Scope.java"
+  ],
+  "extra_prod_files": [],
+  "fix_locality_score": 0.5,
+  "test_pass_strict": false
+}

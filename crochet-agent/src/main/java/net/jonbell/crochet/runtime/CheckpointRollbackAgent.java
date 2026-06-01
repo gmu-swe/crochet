@@ -7,6 +7,7 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 import net.jonbell.crochet.annotation.CrochetEager;
+import net.jonbell.crochet.annotation.Stable;
 
 import sun.misc.Unsafe;
 
@@ -47,6 +48,7 @@ import sun.misc.Unsafe;
  * needed — a thrown path leaves the object in the user-class state with a
  * consistent (zeroed) view, preserving the paper's I3 continuity invariant.
  */
+@Stable
 public final class CheckpointRollbackAgent {
 
     private CheckpointRollbackAgent() {}
@@ -181,6 +183,15 @@ public final class CheckpointRollbackAgent {
     }
 
     /**
+     * Package-private accessor for {@link HeapWalker} to read the
+     * Instrumentation handle without reflection. Both classes live in
+     * {@code net.jonbell.crochet.runtime} so package-private access suffices.
+     */
+    static Instrumentation getInstrumentation() {
+        return INSTRUMENTATION_HANDLE;
+    }
+
+    /**
      * Registration call emitted by {@link net.jonbell.crochet.transform.FieldAdder}
      * at the top of every user class's {@code <clinit>} (synthesised if
      * absent). Captures every class whose {@code <clinit>} runs on the
@@ -206,6 +217,59 @@ public final class CheckpointRollbackAgent {
             // Very-early boot: INITIALIZED_CLASSES may not yet be initialized
             // (the containing CheckpointRollbackAgent class initializer could
             // still be running). Silently skip — next call will succeed.
+        }
+    }
+
+    /**
+     * Side table of Lookups published by user-class {@code <clinit>}
+     * blocks. Kept SEPARATE from {@link ClassMeta} so that publishing a
+     * Lookup does not register the class in {@link #TOUCHED_CLASSES} —
+     * that registration is reserved for {@code ClassMeta.of} (the moment
+     * a class is actually accessed for checkpoint/rollback purposes).
+     */
+    private static final java.util.Map<Class<?>, java.lang.invoke.MethodHandles.Lookup>
+            PUBLISHED_LOOKUP_MAP = new java.util.concurrent.ConcurrentHashMap<>();
+
+    /** Read a Lookup previously published by
+     *  {@link #registerInitializedClass(Class, java.lang.invoke.MethodHandles.Lookup)},
+     *  or {@code null} if none. Called from {@link ClassMeta#resolveLookup}. */
+    public static java.lang.invoke.MethodHandles.Lookup publishedLookup(Class<?> c) {
+        return c == null ? null : PUBLISHED_LOOKUP_MAP.get(c);
+    }
+
+    /**
+     * Variant called from user-class {@code <clinit>} after the class's own
+     * {@code $$crochetLookup} has been invoked. Publishing the Lookup here
+     * — captured inside the user class's clinit frame, where
+     * {@code MethodHandles.lookup().lookupClass() == thisClass} — avoids
+     * the {@code @CallerSensitive} hazard of obtaining the Lookup via
+     * {@link java.lang.reflect.Method#invoke} or
+     * {@link java.lang.invoke.MethodHandle#invoke}: when CROCHET runtime
+     * classes are packed into {@code java.base}, reflective invocation
+     * of the {@code @CallerSensitive} {@code MethodHandles.lookup()}
+     * yields a Lookup whose {@code lookupClass()} is
+     * {@code jdk.internal.reflect.DirectMethodHandleAccessor} (not the
+     * user class), and any subsequent {@code findVarHandle} fails with
+     * "symbolic reference class is not accessible".
+     *
+     * <p>The Lookup is stored in a side map (not on {@link ClassMeta})
+     * so this registration does not eagerly touch
+     * {@link #TOUCHED_CLASSES}. {@link ClassMeta#resolveLookup} reads
+     * the side map first, falling back to the reflective resolution path
+     * when nothing is published (the typical {@code -javaagent} case
+     * where the stock JDK has no instrumented user clinit yet).
+     */
+    public static void registerInitializedClass(Class<?> c,
+                                                java.lang.invoke.MethodHandles.Lookup lookup) {
+        if (c == null) {
+            return;
+        }
+        try {
+            INITIALIZED_CLASSES.add(c);
+            if (lookup != null) {
+                PUBLISHED_LOOKUP_MAP.putIfAbsent(c, lookup);
+            }
+        } catch (Throwable ignored) {
         }
     }
 
@@ -290,6 +354,10 @@ public final class CheckpointRollbackAgent {
      */
     public static int checkpointAll() {
         int v = nextCheckpointVersion();
+        // Fire external-state snapshots BEFORE the root walk so hooks see
+        // the pre-checkpoint heap. If any hook throws, the exception
+        // propagates immediately and the root walk is skipped.
+        ExternalStateRegistry.fireSnapshots();
         // Snapshot all root sets before iterating — a new $$crochetAccess
         // from a peer thread can populate TOUCHED_CLASSES mid-iteration
         // otherwise and we'd capture a class at the wrong version. The
@@ -401,6 +469,12 @@ public final class CheckpointRollbackAgent {
                 System.err.println("rollbackAll: stack roots skipped: " + t);
             }
         }
+        // Fire external-state restore hooks AFTER the heap has been restored
+        // so hooks see the post-rollback heap. Throws a
+        // RollbackException.HookFailure (with all hook exceptions suppressed)
+        // if any hook's restore threw; the heap is already restored at that
+        // point.
+        ExternalStateRegistry.fireRestores();
     }
 
     /**
@@ -526,6 +600,40 @@ public final class CheckpointRollbackAgent {
     /** See {@link FastProxySupport#fastAccess(CRIJInstrumented)}. */
     public static void fastAccess(CRIJInstrumented obj) {
         FastProxySupport.fastAccess(obj);
+    }
+
+    /**
+     * F.1 dirty-bit: called from the PUTFIELD pre-hook in
+     * {@link net.jonbell.crochet.transform.FieldAccessWrapper} for every
+     * PUTFIELD site on an instrumented receiver. Sets {@code $$crochetDirty = 1}
+     * on {@code inst} so that the next checkpoint's {@link #fastAccess} call
+     * knows to materialize a shadow rather than reuse the prior snap.
+     *
+     * <p>The receiver is typed as {@link Object} (not {@link CRIJInstrumented})
+     * because the PUTFIELD pre-hook may fire on receivers whose static type is a
+     * non-instrumented interface or JDK class — the cast gate in the pre-hook
+     * already ensures the receiver is {@link CRIJInstrumented} before calling
+     * this, so the cast here is safe.
+     *
+     * <p>The set is a plain (non-volatile) Unsafe write. Ordering is guaranteed
+     * by the subsequent {@code $$crochetAccess()} call:
+     * <ul>
+     *   <li>If the klass is a Fast proxy, {@link #fastAccess} acquires the stripe
+     *       lock; the lock's release-acquire pair provides happens-before between
+     *       this write and any stripe-lock holder's read.
+     *   <li>If the klass is user (no active checkpoint), dirty is set but
+     *       {@code fastAccess} is not called. The next checkpoint's klass swap +
+     *       stripe-lock will observe the dirty bit correctly.
+     * </ul>
+     *
+     * <p>Early-return on null to tolerate instrumented classes whose
+     * {@code $$crochetDirty} offset resolution failed (pre-F.1 cached class
+     * bytes, or an unloaded class race during warm-up). The cost of the null
+     * check is a single branch on the hot path — benign given that this call
+     * fires on every PUTFIELD in user code.
+     */
+    public static void noteDirty(Object inst) {
+        FastProxySupport.noteDirty(inst);
     }
 
     /* ---------- Gap 3: reflective static-field checkpoint ---------- */

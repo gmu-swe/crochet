@@ -2,10 +2,13 @@ package net.jonbell.crochet.agent;
 
 import java.lang.instrument.Instrumentation;
 
+import net.jonbell.crochet.annotation.Internal;
 import net.jonbell.crochet.runtime.ArrayRegistry;
 import net.jonbell.crochet.runtime.CheckpointRollbackAgent;
+import net.jonbell.crochet.runtime.ClassMeta;
 import net.jonbell.crochet.runtime.RuntimeReady;
 
+@Internal
 public final class CrochetAgent {
 
     private CrochetAgent() {}
@@ -47,8 +50,23 @@ public final class CrochetAgent {
             ArrayRegistry.warmup();
         } catch (Throwable ignored) {
         }
+        // Same idiom for ClassMeta: trigger <clinit> here, while
+        // VERSION_GATE == 0, so the inner instrumented PUTFIELDs that fire
+        // during ClassValue.<init> short-circuit out of noteDirty before
+        // they can re-enter ClassMeta.of with CACHE still null. See
+        // {@link ClassMeta#warmup()} for the full cycle.
+        try {
+            ClassMeta.warmup();
+        } catch (Throwable ignored) {
+        }
 
         inst.addTransformer(new TransformerWrapper(), true);
+        // Surface verifier: registered after TransformerWrapper so it sees
+        // the final class bytes (post all transformers). Enabled only when
+        // -Dcrochet.verifyInstrumented=true is set. Gate inside the verifier
+        // keeps this registration itself zero-cost when disabled — the JVM
+        // still calls the transformer but it exits at the ENABLED check.
+        inst.addTransformer(new InstrumentedSurfaceVerifier(), false);
         // Gap 7 closure: flip the RuntimeReady flag now that the agent
         // runtime's dependency closure is installed and reachable. Before
         // this point, pre-hooks emitted in JDK bytecode (HashMap.put,

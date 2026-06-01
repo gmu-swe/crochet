@@ -1,0 +1,4 @@
+BUDGET_SEC=15
+REPS=1
+ITER_LEVELS=50
+MODES=baseline_perIter baseline_shared crochet_scoped crochet_rollback

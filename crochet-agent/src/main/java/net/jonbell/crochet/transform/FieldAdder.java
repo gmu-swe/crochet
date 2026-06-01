@@ -14,6 +14,8 @@ import org.objectweb.asm.MethodVisitor;
 import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.Type;
 
+import net.jonbell.crochet.annotation.Internal;
+
 /**
  * Adds the CRIJInstrumented surface to every user class that passes the
  * CrochetTransformer filter.
@@ -51,10 +53,24 @@ import org.objectweb.asm.Type;
  * entry ({@link #emitVersionGuardedEntry}) is user-class-specific and stays
  * here.
  */
+@Internal
 public final class FieldAdder extends ClassVisitor {
 
     public static final String VERSION_FIELD = "$$crochetVersion";
     public static final String SNAP_FIELD = "$$crochetSnap";
+    /**
+     * F.1 dirty-bit field. Set to {@code 1} by the PUTFIELD pre-hook in
+     * {@link FieldAccessWrapper} whenever a field on this instance is written.
+     * Read and cleared by {@link net.jonbell.crochet.runtime.FastProxySupport#fastAccess}
+     * under the stripe lock at checkpoint time — if dirty is {@code 0} and a prior
+     * snap already exists, the shadow allocation is skipped (the prior snap already
+     * reflects the current field values, since no PUTFIELD has fired).
+     *
+     * <p>Marked {@code transient} (same as {@link #VERSION_FIELD} and
+     * {@link #SNAP_FIELD}) to hide it from Java serialization and from h2o's
+     * {@code Schema.fillFromParms} reflective field walker.
+     */
+    public static final String DIRTY_FIELD = "$$crochetDirty";
 
     private static final String INSTRUMENTED = "net/jonbell/crochet/runtime/CRIJInstrumented";
     private static final String AGENT = "net/jonbell/crochet/runtime/CheckpointRollbackAgent";
@@ -250,6 +266,7 @@ public final class FieldAdder extends ClassVisitor {
     private boolean alreadyInstrumented;
     private boolean hasVersionField;
     private boolean hasSnapField;
+    private boolean hasDirtyField;
     private boolean hasClinit;
     private final boolean emitClinitRegistration;
     private boolean eagerMode;
@@ -354,6 +371,8 @@ public final class FieldAdder extends ClassVisitor {
             hasVersionField = true;
         } else if (SNAP_FIELD.equals(name)) {
             hasSnapField = true;
+        } else if (DIRTY_FIELD.equals(name)) {
+            hasDirtyField = true;
         } else if ((access & Opcodes.ACC_STATIC) == 0
                 && (access & Opcodes.ACC_FINAL) == 0
                 && !name.startsWith("$$crochet")) {
@@ -433,14 +452,35 @@ public final class FieldAdder extends ClassVisitor {
      * it) to emit any required stack-map frames for the catch landing pad.
      */
     static void emitRegisterCall(MethodVisitor mv, String ownerInternal) {
+        // Body emits:
+        //   try {
+        //       Lookup l = ThisClass.$$crochetLookup();      // captured in ThisClass frame
+        //       CheckpointRollbackAgent.registerInitializedClass(ThisClass.class, l);
+        //   } catch (Throwable t) {
+        //       // swallow; runtime not yet ready
+        //   }
+        //
+        // Calling $$crochetLookup before registerInitializedClass keeps the
+        // @CallerSensitive resolution of MethodHandles.lookup() inside the
+        // user-class frame, so the Lookup's lookupClass is ThisClass rather
+        // than DirectMethodHandleAccessor. This matters when the runtime is
+        // packed into java.base: a reflective lookup from ClassMeta would
+        // otherwise yield a Lookup whose lookupClass is the reflection
+        // accessor, and any subsequent findVarHandle would fail with
+        // "symbolic reference class is not accessible".
         Label tryStart = new Label();
         Label tryEnd = new Label();
         Label handler = new Label();
         Label after = new Label();
         mv.visitLabel(tryStart);
         mv.visitLdcInsn(Type.getObjectType(ownerInternal));
+        // Stack: [thisClass]
+        mv.visitMethodInsn(Opcodes.INVOKESTATIC, ownerInternal,
+                "$$crochetLookup",
+                "()Ljava/lang/invoke/MethodHandles$Lookup;", false);
+        // Stack: [thisClass, lookup]
         mv.visitMethodInsn(Opcodes.INVOKESTATIC, AGENT, "registerInitializedClass",
-                "(Ljava/lang/Class;)V", false);
+                "(Ljava/lang/Class;Ljava/lang/invoke/MethodHandles$Lookup;)V", false);
         mv.visitLabel(tryEnd);
         mv.visitJumpInsn(Opcodes.GOTO, after);
         mv.visitLabel(handler);
@@ -481,6 +521,15 @@ public final class FieldAdder extends ClassVisitor {
                 super.visitField(
                         Opcodes.ACC_PRIVATE | Opcodes.ACC_SYNTHETIC | Opcodes.ACC_TRANSIENT,
                         SNAP_FIELD, "Ljava/lang/Object;", null, null).visitEnd();
+            }
+            // F.1: emit the dirty-bit field. Set to 1 by the PUTFIELD pre-hook in
+            // FieldAccessWrapper whenever a field on this instance is mutated.
+            // Read and cleared by FastProxySupport.fastAccess at checkpoint time;
+            // if dirty == 0 AND a prior snap exists, the shadow allocation is skipped.
+            if (!hasDirtyField) {
+                super.visitField(
+                        Opcodes.ACC_PRIVATE | Opcodes.ACC_SYNTHETIC | Opcodes.ACC_TRANSIENT,
+                        DIRTY_FIELD, "I", null, null).visitEnd();
             }
             // Pass `this` (i.e. the outer ClassVisitor) so emit calls thread
             // through the FieldAdder's own visitMethod -> ClassVisitor.cv

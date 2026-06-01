@@ -9,6 +9,8 @@ import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 
+import net.jonbell.crochet.annotation.Internal;
+
 /**
  * Gap 4 (bytecode): per-array metadata registry.
  *
@@ -27,6 +29,7 @@ import java.util.concurrent.ConcurrentHashMap;
  * default because the walk is substantially slower than the direct-field
  * path.
  */
+@Internal
 public final class ArrayRegistry {
 
     private ArrayRegistry() {}

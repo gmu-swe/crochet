@@ -21,6 +21,9 @@
         <module>crochet-instrument</module>
         <module>crochet-maven-plugin</module>
         <module>crochet-junit5</module>
+        <module>crochet-compose-kit</module>
+        <module>crochet-ttd</module>
+        <module>crochet-debug</module>
         <module>crochet-integration-tests</module>
     </modules>
 
@@ -60,6 +63,11 @@
             <dependency>
                 <groupId>org.ow2.asm</groupId>
                 <artifactId>asm-util</artifactId>
+                <version>${asm.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.ow2.asm</groupId>
+                <artifactId>asm-analysis</artifactId>
                 <version>${asm.version}</version>
             </dependency>
             <dependency>

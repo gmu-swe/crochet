@@ -1,0 +1,19 @@
+{
+  "bug": "Closure-163",
+  "condition": "C1",
+  "seed": 2,
+  "started_at": "2026-05-21T13:12:51.247552Z",
+  "duration_seconds": 600,
+  "tool_calls": 0,
+  "test_pass": false,
+  "timeout": true,
+  "compile_fail": false,
+  "primary_pass": false,
+  "agent_induced_regressions": [],
+  "regressed_tests": [],
+  "diagnosis_quality": 0,
+  "agent_exit_code": 124,
+  "agent_patch": "",
+  "agent_log": "",
+  "judge_reasoning": "Trial timed out after 600s"
+}

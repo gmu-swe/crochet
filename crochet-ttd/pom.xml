@@ -1,0 +1,227 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>edu.neu.ccs.prl.crochet</groupId>
+        <artifactId>crochet-parent</artifactId>
+        <version>2.0.0-SNAPSHOT</version>
+    </parent>
+
+    <artifactId>crochet-ttd</artifactId>
+    <packaging>jar</packaging>
+
+    <description>
+        Time-travel debugger primitive built on Crochet's checkpoint/rollback.
+        Phase 0: programmatic Ttd.breakpoint() in user code.
+        Phase 1: @TimeTravelBody annotation + javaagent that auto-instruments
+        each source line as an implicit pause point. Single-threaded;
+        deterministic body required (no currentTimeMillis, Random, IO).
+    </description>
+
+    <dependencies>
+        <dependency>
+            <groupId>edu.neu.ccs.prl.crochet</groupId>
+            <artifactId>crochet-agent</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.ow2.asm</groupId>
+            <artifactId>asm</artifactId>
+        </dependency>
+        <!-- asm-tree + asm-analysis: used by LivenessAnalyzer (B.1) -->
+        <dependency>
+            <groupId>org.ow2.asm</groupId>
+            <artifactId>asm-tree</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.ow2.asm</groupId>
+            <artifactId>asm-analysis</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <artifactId>maven-jar-plugin</artifactId>
+                <configuration>
+                    <archive>
+                        <manifestEntries>
+                            <Premain-Class>edu.neu.ccs.prl.crochet.ttd.TtdAgent</Premain-Class>
+                            <Agent-Class>edu.neu.ccs.prl.crochet.ttd.TtdAgent</Agent-Class>
+                            <Can-Redefine-Classes>true</Can-Redefine-Classes>
+                            <Can-Retransform-Classes>true</Can-Retransform-Classes>
+                        </manifestEntries>
+                    </archive>
+                </configuration>
+            </plugin>
+            <plugin>
+                <artifactId>maven-shade-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>shade</goal>
+                        </goals>
+                        <configuration>
+                            <createDependencyReducedPom>false</createDependencyReducedPom>
+                            <relocations>
+                                <relocation>
+                                    <pattern>org.objectweb.asm</pattern>
+                                    <shadedPattern>edu.neu.ccs.prl.crochet.ttd.shaded.asm</shadedPattern>
+                                </relocation>
+                            </relocations>
+                            <artifactSet>
+                                <includes>
+                                    <include>org.ow2.asm:*</include>
+                                </includes>
+                            </artifactSet>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <configuration>
+                    <reuseForks>false</reuseForks>
+                    <forkCount>1</forkCount>
+                </configuration>
+                <executions>
+                    <!--
+                      Default execution: all tests EXCEPT CorpusLivenessTest, under both
+                      javaagents and -Xverify:all. CorpusLivenessTest is excluded here
+                      because it creates ASM ClassNode objects that Crochet's field-access
+                      wrapper wraps with $$crochetAccess() calls; when other test classes
+                      loaded ASM's ClassNode before the Crochet agent fully processed it
+                      (class-load ordering is non-deterministic under -Xverify:all), the
+                      wrapper call fails with NoSuchMethodError. The test itself exercises
+                      only LivenessAnalyzer (pure analysis, no TTD runtime), so running it
+                      without the javaagents in the corpus execution below is correct.
+                    -->
+                    <execution>
+                        <id>default-test</id>
+                        <goals><goal>test</goal></goals>
+                        <configuration>
+                            <excludes>
+                                <exclude>**/cps/CorpusLivenessTest.java</exclude>
+                                <!-- PipelineFuzzTest: long-running; activated via -Pfuzz profile. -->
+                                <exclude>**/PipelineFuzzTest.java</exclude>
+                            </excludes>
+                            <argLine>-Xverify:all -javaagent:${project.basedir}/target/crochet-ttd-${project.version}.jar -javaagent:${project.basedir}/../crochet-agent/target/crochet-agent-${project.version}.jar --add-reads java.base=jdk.unsupported</argLine>
+                        </configuration>
+                    </execution>
+                    <!--
+                      Corpus execution: CorpusLivenessTest only, in its own forked JVM
+                      without the javaagents. The test reads JDK class files and runs
+                      LivenessAnalyzer — no TTD or Crochet runtime is needed. Running it
+                      in isolation avoids the ASM ClassNode instrumentation ordering issue
+                      described above.
+                    -->
+                    <execution>
+                        <id>corpus-test</id>
+                        <goals><goal>test</goal></goals>
+                        <configuration>
+                            <includes>
+                                <include>**/cps/CorpusLivenessTest.java</include>
+                            </includes>
+                            <argLine>-Xverify:all</argLine>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
+
+    <profiles>
+        <!--
+          Fuzz profile: runs PipelineFuzzTest for ≥1 hour against the JDK
+          base image corpus. Activate with: mvn -pl crochet-ttd test -Pfuzz
+          The default fuzz duration is 60 minutes (3600000 ms). Override with
+          -Dcrochet.ttd.fuzzDuration=N (milliseconds).
+
+          The test uses a standalone execution without the javaagents to avoid
+          the class-ordering issue described in CorpusLivenessTest's exclusion
+          comment: PipelineFuzzTest invokes the transformer directly without
+          going through the agent, so no circular instrumentation occurs.
+
+          B.6 exit gate: run for ≥10 minutes (600000 ms) minimum; document
+          actual duration in designs/phase-b/EXIT.md.
+        -->
+        <profile>
+            <id>fuzz</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <artifactId>maven-surefire-plugin</artifactId>
+                        <executions>
+                            <execution>
+                                <id>fuzz-test</id>
+                                <goals><goal>test</goal></goals>
+                                <configuration>
+                                    <includes>
+                                        <include>**/PipelineFuzzTest.java</include>
+                                    </includes>
+                                    <!-- No javaagents: transformer invoked directly. -->
+                                    <argLine>-Xverify:all</argLine>
+                                    <systemPropertyVariables>
+                                        <crochet.ttd.fuzzDuration>${crochet.ttd.fuzzDuration}</crochet.ttd.fuzzDuration>
+                                    </systemPropertyVariables>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+                </plugins>
+            </build>
+            <properties>
+                <!-- Default 60-minute fuzz run. Override on command line. -->
+                <crochet.ttd.fuzzDuration>3600000</crochet.ttd.fuzzDuration>
+            </properties>
+        </profile>
+        <!--
+          jmh profile: compile src/jmh/java benchmarks into the main jar
+          so they can be run with -cp crochet-ttd-*.jar.
+
+          Activate with: mvn -P jmh package -pl crochet-agent,crochet-ttd
+
+          Then run:
+            JAVA_HOME=/usr/lib/jvm/java-21-openjdk-amd64
+            TTD_JAR=crochet-ttd/target/crochet-ttd-2.0.0-SNAPSHOT.jar
+            AGENT_JAR=crochet-agent/target/crochet-agent-2.0.0-SNAPSHOT.jar
+            $JAVA_HOME/bin/java \
+              -javaagent:$TTD_JAR \
+              -javaagent:$AGENT_JAR \
+              -cp $TTD_JAR \
+              edu.neu.ccs.prl.crochet.ttd.jmh.overhead.OverheadBenchmark
+        -->
+        <profile>
+            <id>jmh</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <artifactId>maven-compiler-plugin</artifactId>
+                        <executions>
+                            <execution>
+                                <id>compile-jmh-benchmarks</id>
+                                <phase>compile</phase>
+                                <goals><goal>compile</goal></goals>
+                                <configuration>
+                                    <compileSourceRoots>
+                                        <compileSourceRoot>${project.basedir}/src/main/java</compileSourceRoot>
+                                        <compileSourceRoot>${project.basedir}/src/jmh/java</compileSourceRoot>
+                                    </compileSourceRoots>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+    </profiles>
+</project>

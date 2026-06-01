@@ -1,0 +1,58 @@
+{
+  "smoke_test_meta": {
+    "description": "C3 condition smoke test — crochet-debug-d4j annotate + run-test helpers",
+    "bug": "Math-5",
+    "bug_test": "org.apache.commons.math3.complex.ComplexTest::testReciprocalZero",
+    "condition": "C3",
+    "date": "2026-05-21",
+    "baseline_subtraction_note": "I.3.2 baseline subtraction not retroactively applied to this C3 infrastructure smoke test (it validates TTD tooling, not patch scoring). Stage 3 trials will use the corrected scorer from run-trial.sh which subtracts pre-existing baseline failures before counting agent-induced regressions.",
+    "instrumented_jdk": "/tmp/jdk-inst",
+    "crochet_agent_jar": "/home/jon/crochet/crochet-agent/target/crochet-agent-2.0.0-SNAPSHOT.jar",
+    "crochet_debug_jar": "/home/jon/crochet/crochet-debug/target/crochet-debug-2.0.0-SNAPSHOT-standalone.jar"
+  },
+  "step1_annotate": {
+    "command": "crochet-debug-d4j annotate --workdir /tmp/smoke-c3-math5 --class org.apache.commons.math3.complex.Complex --method reciprocal --crochet-agent <agent_jar> --debug-jar <debug_jar>",
+    "result": "PASS",
+    "annotation_injected": true,
+    "source_file": "src/main/java/org/apache/commons/math3/complex/Complex.java",
+    "method_annotated": "reciprocal",
+    "recompile_strategy": "defects4j compile (baseline) + javac recompile with crochet-debug standalone jar on -cp",
+    "recompile_ok": true,
+    "annotation_visible_in_source": "@TimeTravelBody\n    public Complex reciprocal() {"
+  },
+  "step2_run_test": {
+    "command": "crochet-debug-d4j run-test --workdir /tmp/smoke-c3-math5 --test org.apache.commons.math3.complex.ComplexTest::testReciprocalZero --crochet-agent <agent_jar> --debug-jar <debug_jar>",
+    "result": "PASS",
+    "run_under_ttd_generated": true,
+    "run_under_ttd_compiled": true,
+    "jvm_launched": true,
+    "jdwp_port": 5005,
+    "repl_port": 5006,
+    "cli_connected": true,
+    "jdwp_events": [
+      "{\"ok\":true,\"event\":\"connecting\",\"transport\":\"jdwp\",\"port\":5005}",
+      "{\"ok\":true,\"event\":\"suspended\",\"reason\":\"start\",\"location\":\"vm-started\"}",
+      "{\"ok\":true,\"event\":\"resuming-for-repl\",\"note\":\"resuming JVM so target can bind REPL port\"}",
+      "{\"ok\":true,\"event\":\"connecting\",\"transport\":\"repl\",\"port\":5006}",
+      "{\"ok\":true,\"event\":\"repl-connected\",\"port\":5006}"
+    ]
+  },
+  "step3_ttd_commands": {
+    "commands_issued": ["back-step", "capture-stack", "inspect", "quit"],
+    "responses": {
+      "back-step": "{\"ok\":true,\"ttd-response\":\"[ttd] already at first breakpoint; use 'goto 1' to re-enter from session start\"}",
+      "capture-stack": "{\"ok\":true,\"ttd-response\":\"[ttd] breakpoint 0 (end of body)\"}",
+      "inspect": "{\"ok\":true,\"ttd-response\":\"[ttd] TestContext {\\n  passed = false\\n  failureMessage = \\\"expected:<(NaN, NaN)> but was:<(Infinity, Infinity)>\\\"\\n}\"}",
+      "quit": "{\"ok\":true,\"result\":\"bye\"}"
+    },
+    "all_commands_ok": true,
+    "failure_symptom_visible_in_inspect": "expected:<(NaN, NaN)> but was:<(Infinity, Infinity)>",
+    "note": "Math-5 symptom correctly captured: Complex.reciprocal(ZERO) returns (Infinity,Infinity) instead of (NaN,NaN)"
+  },
+  "gaps_surfaced": [
+    "Crochet root cannot be a JDK class (java.lang.Class): RollbackException from klass-swap on JDK types. RunUnderTtd uses a user-class TestContext wrapper as root to avoid this.",
+    "D4J Ant build does not auto-include lib/ on compile.classpath, so @TimeTravelBody import requires a separate javac recompile step with the crochet-debug jar on -cp rather than patching the D4J build system.",
+    "back-step at end-of-body reports 'already at first breakpoint' — the session body completed before the first TTD breakpoint was hit (test ran to failure). For real debugging, the @TimeTravelBody annotation on the target method generates lineHit() calls that become breakpoints within the method body."
+  ],
+  "recommendation": "Helpers functional for C3 condition. Ready for Stage 3 dispatch with the following note: agents should issue 'ttd-goto 1' or 'continue' after connecting to step into the annotated method's first save-point rather than issuing back-step first. The C3 prompt now says 'back-step' which works once inside the method body. For Math-5 specifically, the reciprocal() method generates save-points at each line, so once the CLI connects the agent can step through them."
+}

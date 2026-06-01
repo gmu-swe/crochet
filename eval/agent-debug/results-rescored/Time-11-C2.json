@@ -1,0 +1,47 @@
+{
+  "bug": "Time-11",
+  "condition": "C2",
+  "started_at": "2026-05-21T01:56:20+00:00",
+  "duration_seconds": 164,
+  "tool_calls": 27,
+  "compile_fail": false,
+  "primary_pass": true,
+  "test_pass": true,
+  "baseline_failing_count": 6,
+  "agent_induced_regressions": [],
+  "regressed_tests": [],
+  "diagnosis_quality": 1,
+  "agent_exit_code": 0,
+  "bug_reproduced_pretest": true,
+  "agent_patch": "diff --git a/maven-build.xml b/maven-build.xml\nindex 21b233c1..f73ad386 100644\n--- a/maven-build.xml\n+++ b/maven-build.xml\n@@ -72,10 +72,10 @@\n            debug=\"true\" \n            optimize=\"true\" \n            deprecation=\"false\" \n-           target=\"1.6\" \n+           target=\"1.8\" \n            verbose=\"true\" \n            fork=\"true\" \n-           source=\"1.6\">\n+           source=\"1.8\">\n       <src>\n         <pathelement location=\"${maven.build.srcDir.0}\"/>\n       </src>\n@@ -111,10 +111,10 @@\n            debug=\"true\" \n            optimize=\"true\" \n            deprecation=\"false\" \n-           target=\"1.6\" \n+           target=\"1.8\" \n            verbose=\"true\" \n            fork=\"true\" \n-           source=\"1.6\">\n+           source=\"1.8\">\n       <src>\n         <pathelement location=\"${maven.build.testDir.0}\"/>\n       </src>\ndiff --git a/src/main/java/org/joda/time/tz/ZoneInfoCompiler.java b/src/main/java/org/joda/time/tz/ZoneInfoCompiler.java\nindex 6efe0716..21918d18 100644\n--- a/src/main/java/org/joda/time/tz/ZoneInfoCompiler.java\n+++ b/src/main/java/org/joda/time/tz/ZoneInfoCompiler.java\n@@ -65,10 +65,12 @@ public class ZoneInfoCompiler {\n \n     static Chronology cLenientISO;\n \n-    static ThreadLocal<Boolean> cVerbose = new ThreadLocal<Boolean>();\n-    static {\n-        cVerbose.set(Boolean.FALSE);\n-    }\n+    static ThreadLocal<Boolean> cVerbose = new ThreadLocal<Boolean>() {\n+        @Override\n+        protected Boolean initialValue() {\n+            return Boolean.FALSE;\n+        }\n+    };\n \n     /**\n      * Gets a flag indicating that verbose logging is required.\n",
+  "agent_log": "{\"type\":\"result\",\"subtype\":\"success\",\"is_error\":false,\"api_error_status\":null,\"duration_ms\":162868,\"duration_api_ms\":118649,\"ttft_ms\":3050,\"num_turns\":27,\"result\":\"Test passes.\\n\\nDIAGNOSIS COMPLETE\\n\\nThe root cause was in `org.joda.time.tz.ZoneInfoCompiler`. The `cVerbose` field is a `ThreadLocal<Boolean>` initialized with a `static` block that calls `cVerbose.set(Boolean.FALSE)`. A `ThreadLocal.set` call only affects the calling thread \u2014 in this case, the thread that loaded the class. Any other thread that calls `cVerbose.get()` receives `null`, since no `initialValue()` was defined. The test `testDateTimeZoneBuilder` spawns a worker thread that calls `toDateTimeZone(...)`, which calls `PrecalculatedZone.create(...)`, which calls `ZoneInfoCompiler.verbose()`. Returning the `null` Boolean is auto-unboxed via `booleanValue()`, throwing `NullPointerException`. The thread dies, the main test thread sees `zone[0] == null`, and `assertNotNull` fails. Fix: replace the static-initializer `set` with a `ThreadLocal` subclass overriding `initialValue()` to return `Boolean.FALSE`, so every thread sees a sensible default.\",\"stop_reason\":\"end_turn\",\"session_id\":\"fe73576e-a3c1-4ecf-b613-17f78328833a\",\"total_cost_usd\":1.01338275,\"usage\":{\"input_tokens\":31,\"cache_creation_input_tokens\":40093,\"cache_read_input_tokens\":1238093,\"output_tokens\":5744,\"server_tool_use\":{\"web_search_requests\":0,\"web_fetch_requests\":0},\"service_tier\":\"standard\",\"cache_creation\":{\"ephemeral_1h_input_tokens\":40093,\"ephemeral_5m_input_tokens\":0},\"inference_geo\":\"\",\"iterations\":[{\"input_tokens\":1,\"output_tokens\":413,\"cache_read_input_tokens\":58369,\"cache_creation_input_tokens\":223,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":223},\"type\":\"message\"}],\"speed\":\"standard\"},\"modelUsage\":{\"claude-opus-4-7[1m]\":{\"inputTokens\":31,\"outputTokens\":5744,\"cacheReadInputTokens\":1238093,\"cacheCreationInputTokens\":40093,\"webSearchRequests\":0,\"costUSD\":1.01338275,\"contextWindow\":1000000,\"maxOutputTokens\":64000}},\"permission_denials\":[],\"terminal_reason\":\"completed\",\"fast_mode_state\":\"off\",\"uuid\":\"22a89151-1251-43ec-bb43-0827112827e7\"}\n",
+  "agent_stderr": "",
+  "judge_reasoning": "The ground-truth root cause is in DateTimeZoneBuilder mishandling recurrence transitions, producing wrong zone offsets. The agent instead diagnosed a ThreadLocal initialization issue in ZoneInfoCompiler causing a NullPointerException \u2014 a completely different component and failure mode unrelated to the actual bug.\n",
+  "verify_log": "Running ant (compile.tests)................................................ OK\nRunning ant (run.dev.tests)................................................ OK\nFailing tests: 1\n  - org.joda.time.tz.TestCompiler::testDateTimeZoneBuilder\n",
+  "baseline_failing_tests": [
+    "org.joda.time.TestDateMidnight_Properties::testPropertyGetMonthOfYear",
+    "org.joda.time.TestDateTime_Properties::testPropertyGetMonthOfYear",
+    "org.joda.time.TestMonthDay_Properties::testPropertyGetMonthOfYear",
+    "org.joda.time.TestMutableDateTime_Properties::testPropertyGetMonthOfYear",
+    "org.joda.time.convert.TestCalendarConverter::testGetChronology_Object_Zone",
+    "org.joda.time.convert.TestCalendarConverter::testGetChronology_Object_nullChronology"
+  ],
+  "compile_log": "Running ant (compile)...................................................... OK\nRunning ant (compile.tests)................................................ OK\n",
+  "agent_modified_files": [
+    "maven-build.xml",
+    "src/main/java/org/joda/time/tz/ZoneInfoCompiler.java"
+  ],
+  "canonical_modified_files": [
+    "src/main/java/org/joda/time/tz/ZoneInfoCompiler.java"
+  ],
+  "agent_modified_prod_files": [
+    "src/main/java/org/joda/time/tz/ZoneInfoCompiler.java"
+  ],
+  "file_overlap": [
+    "src/main/java/org/joda/time/tz/ZoneInfoCompiler.java"
+  ],
+  "missed_canonical": [],
+  "extra_prod_files": [],
+  "fix_locality_score": 1.0,
+  "test_pass_strict": true
+}

@@ -1,0 +1,47 @@
+{
+  "bug": "Closure-155",
+  "condition": "C3",
+  "model": "claude-haiku-4-5",
+  "model_default_used": false,
+  "started_at": "2026-06-01T03:59:12+00:00",
+  "duration_seconds": 249,
+  "tool_calls": 81,
+  "compile_fail": true,
+  "primary_pass": false,
+  "test_pass": false,
+  "baseline_failing_count": 0,
+  "agent_induced_regressions": [],
+  "regressed_tests": [],
+  "diagnosis_quality": 1,
+  "agent_exit_code": 1,
+  "bug_reproduced_pretest": true,
+  "agent_patch": "diff --git a/build.xml b/build.xml\nindex e9f85364d..0bbf2827c 100644\n--- a/build.xml\n+++ b/build.xml\n@@ -16,8 +16,8 @@\n <project name=\"compiler\" basedir=\".\" default=\"jar\" xmlns:artifact=\"antlib:org.apache.maven.artifact.ant\">\n \n   <!-- Force java 6 -->\n-  <property name=\"ant.build.javac.source\" value=\"1.6\" />\n-  <property name=\"ant.build.javac.target\" value=\"1.6\" />\n+  <property name=\"ant.build.javac.source\" value=\"1.8\" />\n+  <property name=\"ant.build.javac.target\" value=\"1.8\" />\n \n   <!-- define other variables -->\n   <property name=\"src.dir\" value=\"${basedir}/src\" />\ndiff --git a/src/com/google/javascript/jscomp/InlineVariables.java b/src/com/google/javascript/jscomp/InlineVariables.java\nindex 18c9fbe2c..4e3248e0a 100644\n--- a/src/com/google/javascript/jscomp/InlineVariables.java\n+++ b/src/com/google/javascript/jscomp/InlineVariables.java\n@@ -499,6 +499,22 @@ class InlineVariables implements CompilerPass {\n         return false;\n       }\n \n+      // Don't inline a parameter reference if the containing function\n+      // modifies the arguments object, since arguments[i] is an alias for\n+      // the i-th parameter.\n+      Node value = initialization.getAssignedValue();\n+      if (value != null && value.getType() == Token.NAME) {\n+        Scope initScope = initialization.getScope();\n+        if (initScope != null && argumentsModifiedInScope(initScope)) {\n+          // Check if value is a parameter of this scope\n+          String varName = value.getString();\n+          Var var = initScope.getVar(varName);\n+          if (var != null && isParameter(var)) {\n+            return false;\n+          }\n+        }\n+      }\n+\n       // If the value is read more than once, skip it.\n       // VAR declarations and EXPR_RESULT don't need the value, but other\n       // ASSIGN expressions parents do.\n@@ -523,7 +539,6 @@ class InlineVariables implements CompilerPass {\n       //   var a = b.c;\n       //   f(a)\n       // is ok.\n-      Node value = initialization.getAssignedValue();\n       Preconditions.checkState(value != null);\n       if (value.getType() == Token.GETPROP\n           && reference.getParent().getType() == Token.CALL\n@@ -633,6 +648,40 @@ class InlineVariables implements CompilerPass {\n       return !reference.isDeclaration() && !reference.isLvalue();\n     }\n \n+    /**\n+     * Checks if the given scope modifies the arguments object.\n+     * If arguments is modified, we cannot safely inline parameters.\n+     */\n+    private boolean argumentsModifiedInScope(Scope scope) {\n+      Node scopeNode = scope.getRootNode();\n+      if (scopeNode == null) {\n+        return false;\n+      }\n+      return argumentsModifiedInNode(scopeNode);\n+    }\n+\n+    private boolean argumentsModifiedInNode(Node n) {\n+      if (n.getType() == Token.ASSIGN) {\n+        Node lhs = n.getFirstChild();\n+        // Check for arguments[x] = ... or arguments.x = ...\n+        if (lhs.getType() == Token.GETELEM || lhs.getType() == Token.GETPROP) {\n+          Node obj = lhs.getFirstChild();\n+          if (obj.getType() == Token.NAME && \"arguments\".equals(obj.getString())) {\n+            return true;\n+          }\n+        }\n+      }\n+      // Only search within the current function scope, not nested scopes\n+      for (Node child = n.getFirstChild(); child != null; child = child.getNext()) {\n+        if (child.getType() != Token.FUNCTION) {\n+          if (argumentsModifiedInNode(child)) {\n+            return true;\n+          }\n+        }\n+      }\n+      return false;\n+    }\n+\n     /**\n      * Determines whether the reference collection describes a variable that\n      * is initialized to an immutable value, never modified, and defined before\n",
+  "agent_log": "{\"type\":\"result\",\"subtype\":\"error_max_turns\",\"duration_ms\":247402,\"duration_api_ms\":169511,\"is_error\":true,\"num_turns\":81,\"stop_reason\":\"tool_use\",\"session_id\":\"4ccda124-6bce-4637-b6c8-e8a59126e721\",\"total_cost_usd\":0.5740630500000001,\"usage\":{\"input_tokens\":64,\"cache_creation_input_tokens\":60835,\"cache_read_input_tokens\":4272703,\"output_tokens\":14137,\"server_tool_use\":{\"web_search_requests\":0,\"web_fetch_requests\":0},\"service_tier\":\"standard\",\"cache_creation\":{\"ephemeral_1h_input_tokens\":60835,\"ephemeral_5m_input_tokens\":0},\"inference_geo\":\"not_available\",\"iterations\":[{\"input_tokens\":0,\"output_tokens\":122,\"cache_read_input_tokens\":71761,\"cache_creation_input_tokens\":514,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":514},\"type\":\"message\"}],\"speed\":\"standard\"},\"modelUsage\":{\"claude-haiku-4-5\":{\"inputTokens\":64,\"outputTokens\":14137,\"cacheReadInputTokens\":4272703,\"cacheCreationInputTokens\":60835,\"webSearchRequests\":0,\"costUSD\":0.5740630500000001,\"contextWindow\":200000,\"maxOutputTokens\":32000}},\"permission_denials\":[],\"terminal_reason\":\"max_turns\",\"fast_mode_state\":\"off\",\"uuid\":\"2f32e23e-e1f1-4843-91ce-185d0cb9191e\",\"errors\":[\"Reached maximum number of turns (80)\"]}\n",
+  "agent_stderr": "",
+  "judge_reasoning": "The agent provided no diagnosis at all \u2014 the final diagnosis field is empty, so there is no root cause identified, no method or variable named, and no fix applied. An absent diagnosis cannot match any part of the ground-truth summary about InlineVariables and the 'arguments' object closure boundary.\n",
+  "verify_log": "Running ant (compile.tests)................................................ OK\nRunning ant (run.dev.tests)................................................ OK\nFailing tests: 1\n  - com.google.javascript.jscomp.InlineVariablesTest::testArgumentsModifiedInInnerFunction\n",
+  "baseline_failing_tests": [],
+  "compile_log": "Running ant (compile)...................................................... FAIL\nExecuted command:  cd /tmp/trial-Closure-155-C3/buggy && /home/jon/defects4j/major/bin/ant -f /home/jon/defects4j/framework/projects/defects4j.build.xml -Dd4j.home=/home/jon/defects4j -Dd4j.dir.projects=/home/jon/defects4j/framework/projects -Dbasedir=/tmp/trial-Closure-155-C3/buggy  compile 2>&1\nBuildfile: /home/jon/defects4j/framework/projects/defects4j.build.xml\n\nsvnversion:\n     [exec] Execute failed: java.io.IOException: Cannot run program \"svnversion\": Exec failed, error: 2 (No such file or directory) \n\ncompile:\n    [javac] /tmp/trial-Closure-155-C3/buggy/build.xml:185: warning: 'includeantruntime' was not set, defaulting to build.sysclasspath=last; set to false for repeatable builds\n    [javac] /tmp/trial-Closure-155-C3/buggy/build.xml:191: warning: 'includeantruntime' was not set, defaulting to build.sysclasspath=last; set to false for repeatable builds\n    [javac] Compiling 1 source file to /tmp/trial-Closure-155-C3/buggy/build/classes\n    [javac] warning: [options] bootstrap class path not set in conjunction with -source 8\n    [javac] warning: [options] source value 8 is obsolete and will be removed in a future release\n    [javac] warning: [options] target value 8 is obsolete and will be removed in a future release\n    [javac] warning: [options] To suppress warnings about obsolete options, use -Xlint:-options.\n    [javac] /tmp/trial-Closure-155-C3/buggy/src/com/google/javascript/jscomp/InlineVariables.java:512: error: cannot find symbol\n    [javac]           if (var != null && isParameter(var)) {\n    [javac]                              ^\n    [javac]   symbol:   method isParameter(Var)\n    [javac]   location: class InlineVariables.InliningBehavior\n    [javac] 1 error\n    [javac] 4 warnings\n\nBUILD FAILED\n/tmp/trial-Closure-155-C3/buggy/build.xml:191: Compile failed; see the compiler error output for details.\n\nTotal time: 1 second\nCannot compile sources! at /home/jon/defects4j/framework/bin/d4j/d4j-compile line 82.\nCompilation failed in require at /home/jon/defects4j/framework/bin/defects4j line 195.\n",
+  "agent_modified_files": [
+    "build.xml",
+    "src/com/google/javascript/jscomp/InlineVariables.java"
+  ],
+  "canonical_modified_files": [
+    "src/com/google/javascript/jscomp/InlineVariables.java",
+    "src/com/google/javascript/jscomp/ReferenceCollectingCallback.java",
+    "src/com/google/javascript/jscomp/Scope.java"
+  ],
+  "agent_modified_prod_files": [
+    "src/com/google/javascript/jscomp/InlineVariables.java"
+  ],
+  "file_overlap": [
+    "src/com/google/javascript/jscomp/InlineVariables.java"
+  ],
+  "missed_canonical": [
+    "src/com/google/javascript/jscomp/ReferenceCollectingCallback.java",
+    "src/com/google/javascript/jscomp/Scope.java"
+  ],
+  "extra_prod_files": [],
+  "fix_locality_score": 0.5,
+  "test_pass_strict": false
+}

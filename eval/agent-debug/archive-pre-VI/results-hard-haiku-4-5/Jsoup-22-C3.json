@@ -1,0 +1,51 @@
+{
+  "bug": "Jsoup-22",
+  "condition": "C3",
+  "model": "claude-haiku-4-5",
+  "model_default_used": false,
+  "started_at": "2026-05-22T00:26:58+00:00",
+  "duration_seconds": 282,
+  "tool_calls": 81,
+  "compile_fail": false,
+  "primary_pass": true,
+  "test_pass": true,
+  "baseline_failing_count": 1,
+  "agent_induced_regressions": [],
+  "regressed_tests": [],
+  "diagnosis_quality": 1,
+  "agent_exit_code": 1,
+  "bug_reproduced_pretest": true,
+  "agent_patch": "diff --git a/maven-build.xml b/maven-build.xml\nindex 44658237..31a48d32 100644\n--- a/maven-build.xml\n+++ b/maven-build.xml\n@@ -68,10 +68,10 @@\n            debug=\"true\" \n            optimize=\"false\" \n            deprecation=\"true\" \n-           target=\"1.6\" \n+           target=\"1.8\" \n            verbose=\"false\" \n            fork=\"false\" \n-           source=\"1.6\">\n+           source=\"1.8\">\n       <src>\n         <pathelement location=\"${maven.build.srcDir.0}\"/>\n       </src>\n@@ -94,10 +94,10 @@\n            debug=\"true\" \n            optimize=\"false\" \n            deprecation=\"true\" \n-           target=\"1.6\" \n+           target=\"1.8\" \n            verbose=\"false\" \n            fork=\"false\" \n-           source=\"1.6\">\n+           source=\"1.8\">\n       <src>\n         <pathelement location=\"${maven.build.testDir.0}\"/>\n       </src>\ndiff --git a/src/main/java/org/jsoup/nodes/Element.java b/src/main/java/org/jsoup/nodes/Element.java\nindex fd2b542f..b975b91c 100644\n--- a/src/main/java/org/jsoup/nodes/Element.java\n+++ b/src/main/java/org/jsoup/nodes/Element.java\n@@ -431,8 +431,17 @@ public class Element extends Node {\n      * @return sibling elements\n      */\n     public Elements siblingElements() {\n-\n-        return parent().children();\n+        if (parent() == null)\n+            return new Elements();\n+\n+        Elements children = parent().children();\n+        Elements siblings = new Elements();\n+        for (Element element : children) {\n+            if (!element.equals(this)) {\n+                siblings.add(element);\n+            }\n+        }\n+        return siblings;\n     }\n \n     /**\ndiff --git a/src/main/java/org/jsoup/nodes/Node.java b/src/main/java/org/jsoup/nodes/Node.java\nindex 92a2f8f8..2fcc06e3 100644\n--- a/src/main/java/org/jsoup/nodes/Node.java\n+++ b/src/main/java/org/jsoup/nodes/Node.java\n@@ -441,8 +441,17 @@ public abstract class Node implements Cloneable {\n      @return node siblings. If the node has no parent, returns an empty list.\n      */\n     public List<Node> siblingNodes() {\n+        if (parentNode == null)\n+            return new ArrayList<Node>();\n \n-        return parent().childNodes();\n+        List<Node> childNodes = parentNode.childNodes();\n+        List<Node> siblings = new ArrayList<Node>();\n+        for (Node node : childNodes) {\n+            if (node != this) {\n+                siblings.add(node);\n+            }\n+        }\n+        return siblings;\n     }\n \n     /**\n@@ -452,8 +461,8 @@ public abstract class Node implements Cloneable {\n     public Node nextSibling() {\n         if (parentNode == null)\n             return null; // root\n-        \n-        List<Node> siblings = parentNode.childNodes;\n+\n+        List<Node> siblings = parentNode.childNodes();\n         Integer index = siblingIndex();\n         Validate.notNull(index);\n         if (siblings.size() > index+1)\n@@ -467,8 +476,10 @@ public abstract class Node implements Cloneable {\n      @return the previous sibling, or null if this is the first sibling\n      */\n     public Node previousSibling() {\n+        if (parentNode == null)\n+            return null;\n \n-        List<Node> siblings = parentNode.childNodes;\n+        List<Node> siblings = parentNode.childNodes();\n         Integer index = siblingIndex();\n         Validate.notNull(index);\n         if (index > 0)\n",
+  "agent_log": "{\"type\":\"result\",\"subtype\":\"error_max_turns\",\"duration_ms\":281149,\"duration_api_ms\":201092,\"is_error\":true,\"num_turns\":81,\"stop_reason\":\"tool_use\",\"session_id\":\"1eef3e19-4017-4bd3-80b7-4398fd0e3cd0\",\"total_cost_usd\":0.6476578500000001,\"usage\":{\"input_tokens\":562,\"cache_creation_input_tokens\":63041,\"cache_read_input_tokens\":4821496,\"output_tokens\":17229,\"server_tool_use\":{\"web_search_requests\":0,\"web_fetch_requests\":0},\"service_tier\":\"standard\",\"cache_creation\":{\"ephemeral_1h_input_tokens\":63041,\"ephemeral_5m_input_tokens\":0},\"inference_geo\":\"\",\"iterations\":[{\"input_tokens\":7,\"output_tokens\":175,\"cache_read_input_tokens\":87044,\"cache_creation_input_tokens\":764,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":764},\"type\":\"message\"}],\"speed\":\"standard\"},\"modelUsage\":{\"claude-haiku-4-5\":{\"inputTokens\":562,\"outputTokens\":17229,\"cacheReadInputTokens\":4821496,\"cacheCreationInputTokens\":63041,\"webSearchRequests\":0,\"costUSD\":0.6476578500000001,\"contextWindow\":200000,\"maxOutputTokens\":32000}},\"permission_denials\":[],\"terminal_reason\":\"max_turns\",\"fast_mode_state\":\"off\",\"uuid\":\"f7415eac-20f3-476c-b484-1b0417eeef4c\",\"errors\":[\"Reached maximum number of turns (80)\"]}\n",
+  "agent_stderr": "",
+  "judge_reasoning": "The agent provided no diagnosis at all (empty response), so it cannot be evaluated as identifying the root cause in Element.siblingElements() where self-exclusion uses position rather than identity comparison.\n",
+  "verify_log": "Running ant (compile.tests)................................................ OK\nRunning ant (run.dev.tests)................................................ OK\nFailing tests: 1\n  - org.jsoup.nodes.ElementTest::elementIsNotASiblingOfItself\n",
+  "baseline_failing_tests": [
+    "org.jsoup.nodes.NodeTest::orphanNodeReturnsNullForSiblingElements"
+  ],
+  "compile_log": "Running ant (compile)...................................................... OK\nRunning ant (compile.tests)................................................ OK\n",
+  "agent_modified_files": [
+    "maven-build.xml",
+    "src/main/java/org/jsoup/nodes/Element.java",
+    "src/main/java/org/jsoup/nodes/Node.java"
+  ],
+  "canonical_modified_files": [
+    "src/main/java/org/jsoup/nodes/Element.java",
+    "src/main/java/org/jsoup/nodes/Node.java",
+    "src/main/java/org/jsoup/select/Elements.java"
+  ],
+  "agent_modified_prod_files": [
+    "src/main/java/org/jsoup/nodes/Element.java",
+    "src/main/java/org/jsoup/nodes/Node.java"
+  ],
+  "file_overlap": [
+    "src/main/java/org/jsoup/nodes/Element.java",
+    "src/main/java/org/jsoup/nodes/Node.java"
+  ],
+  "missed_canonical": [
+    "src/main/java/org/jsoup/select/Elements.java"
+  ],
+  "extra_prod_files": [],
+  "fix_locality_score": 0.5,
+  "test_pass_strict": true
+}

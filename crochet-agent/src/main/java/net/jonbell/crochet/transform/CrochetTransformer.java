@@ -6,6 +6,9 @@ import org.objectweb.asm.ClassVisitor;
 import org.objectweb.asm.ClassWriter;
 import org.objectweb.asm.Opcodes;
 
+import net.jonbell.crochet.annotation.Internal;
+
+@Internal
 public class CrochetTransformer {
 
     public static final String RUNTIME_PACKAGE_PREFIX = "net/jonbell/crochet/runtime/";
@@ -17,6 +20,38 @@ public class CrochetTransformer {
     private static final String PATCH_PACKAGE_PREFIX = "net/jonbell/crochet/patch/";
 
     private static final String ANNOTATION_PACKAGE_PREFIX = "net/jonbell/crochet/annotation/";
+
+    /**
+     * Dotted-name prefix shared by every internal Crochet runtime package
+     * ({@code net.jonbell.crochet.runtime}, {@code .transform},
+     * {@code .agent}, {@code .patch}, {@code .annotation}). These are all
+     * skip-listed inside {@link #shouldSkip(String)} via the slash-form
+     * prefixes above; this constant lets runtime callers (which see dotted
+     * names from {@link Class#getName()}) check the same condition without
+     * duplicating the package list.
+     */
+    public static final String CROCHET_INTERNAL_DOTTED_PREFIX = "net.jonbell.crochet.";
+
+    /** Dotted-name prefix for the shaded ASM package and other transformer
+     *  internals relocated by the maven-shade-plugin. */
+    public static final String CROCHET_SHADED_DOTTED_PREFIX = "edu.neu.ccs.prl.crochet.";
+
+    /**
+     * Predicate variant of the runtime-side check used by
+     * {@link net.jonbell.crochet.runtime.FastProxySupport#noteDirty}: returns
+     * {@code true} when the class's dotted name lives in one of the
+     * Crochet-internal packages (the same packages {@link #shouldSkip}
+     * excludes from instrumentation). Pulled here so that the runtime and the
+     * transformer cannot drift on what counts as "internal".
+     */
+    public static boolean isInternalDottedName(String dottedName) {
+        return dottedName.startsWith(CROCHET_INTERNAL_DOTTED_PREFIX)
+                || dottedName.startsWith(CROCHET_SHADED_DOTTED_PREFIX);
+    }
+
+    /** Descriptor of {@link net.jonbell.crochet.annotation.CrochetSkip}. */
+    static final String CROCHET_SKIP_DESC =
+            "Lnet/jonbell/crochet/annotation/CrochetSkip;";
 
     /** Descriptor of the marker annotation added to every transformed class. */
     public static final String CROCHET_INSTRUMENTED_DESC =
@@ -53,6 +88,14 @@ public class CrochetTransformer {
         ClassReader reader = new ClassReader(classFileBuffer);
         String name = reader.getClassName();
         if (shouldSkip(name)) {
+            return null;
+        }
+        // User-class opt-out via @CrochetSkip: check the class file's own
+        // annotation table and walk the superclass chain. This fires after the
+        // hardcoded shouldSkip list (which already short-circuits for JDK /
+        // framework incompatibilities the user cannot annotate) — the two
+        // mechanisms are ORed together.
+        if (hasSkipAnnotation(classFileBuffer, loader)) {
             return null;
         }
         // Enum classes, interfaces, annotations, and modules reject the
@@ -156,6 +199,15 @@ public class CrochetTransformer {
         // because JDK reflection call sites are not our concern.
         if (!isJdkClass && REFLECTION_REWRITER_ENABLED) {
             chain = new ReflectionRewriter(Opcodes.ASM9, chain);
+        }
+        // CheckpointWrapper sits above ReflectionRewriter / JsrInliner so it
+        // sees the original (pre-JSR-inlined) descriptor but still operates on
+        // fully inlined bytecode for older class files.  It does not need
+        // scratch locals, so placement above SharedLocalsProvider is fine.
+        // Only applied to user classes — JDK methods do not carry
+        // @CrochetCheckpoint, and adding the visitor there would be dead weight.
+        if (!isJdkClass) {
+            chain = new CheckpointWrapper(Opcodes.ASM9, chain);
         }
         if (needsJsrInlining) {
             chain = new JsrInliner(Opcodes.ASM9, chain);
@@ -295,7 +347,7 @@ public class CrochetTransformer {
         return ((buf[6] & 0xFF) << 8) | (buf[7] & 0xFF);
     }
 
-    static boolean shouldSkip(String internalName) {
+    public static boolean shouldSkip(String internalName) {
         if (internalName == null) {
             return true;
         }
@@ -383,6 +435,29 @@ public class CrochetTransformer {
                 || internalName.equals("java/lang/Character")) {
             return true;
         }
+        // java.lang.ThreadLocal and its nested classes: instrumenting them
+        // causes infinite recursion at scale.  When many objects are being
+        // checkpointed (checkpointWorldSafe with N > ~10k instances), the
+        // JVMTI Phase-B CallVoidMethod path triggers GC reference processing
+        // on the Reference Handler thread.  That thread calls
+        // ThreadLocal.getMap() → $$crochetAccess on the ThreadLocal instance
+        // → FastProxySupport.fastAccess → PropagateWorklist.enqueueOrRun
+        // (which does DRAINING.get() → ThreadLocal.get() → ...) →
+        // StackOverflowError.
+        //
+        // ThreadLocalMap is skipped for the same reason: it accesses ThreadLocal
+        // fields and calls ThreadLocal.$$crochetAccess(), which doesn't exist once
+        // ThreadLocal itself is skipped → NoSuchMethodError.
+        //
+        // Skipping these classes means thread-local state is not tracked across
+        // checkpoint/rollback; this is acceptable because PropagateWorklist
+        // uses ThreadLocals only for runtime bookkeeping (recursion detection,
+        // drain queue), not for user-visible state.
+        if (internalName.equals("java/lang/ThreadLocal")
+                || internalName.equals("java/lang/InheritableThreadLocal")
+                || internalName.startsWith("java/lang/ThreadLocal$")) {
+            return true;
+        }
         // Our own runtime/transform/agent/patch/annotation code must never
         // recurse — the instrumentation chain uses these classes directly.
         if (internalName.startsWith(RUNTIME_PACKAGE_PREFIX)
@@ -393,7 +468,12 @@ public class CrochetTransformer {
             return true;
         }
         // Shaded ASM under the agent's own relocated package.
-        if (internalName.startsWith("net/jonbell/crochet/agent/shaded/")) {
+        // The maven-shade-plugin relocates org.objectweb.asm →
+        // edu.neu.ccs.prl.crochet.agent.shaded.asm, so the internal-name
+        // prefix is edu/neu/ccs/prl/crochet/agent/shaded/.
+        // (An older comment said "net/jonbell/crochet/agent/shaded/" but that
+        // path does not exist in the shaded jar.)
+        if (internalName.startsWith("edu/neu/ccs/prl/crochet/agent/shaded/")) {
             return true;
         }
         // crochet-instrument's own classes (jlink plugins, runtime support
@@ -530,21 +610,134 @@ public class CrochetTransformer {
      * only the header and attribute table are read.
      */
     private static boolean alreadyInstrumented(ClassReader reader) {
-        AnnotationPresenceVisitor v = new AnnotationPresenceVisitor();
+        return hasAnnotation(reader, CROCHET_INSTRUMENTED_DESC);
+    }
+
+    /**
+     * Cheap pre-scan that returns {@code true} iff the class file carries the
+     * named annotation descriptor (e.g.
+     * {@code "Lnet/jonbell/crochet/annotation/CrochetSkip;"}).
+     * Skips code, debug, and frame data; only the header and attribute table
+     * are read.
+     */
+    private static boolean hasAnnotation(ClassReader reader, String desc) {
+        AnnotationPresenceVisitor v = new AnnotationPresenceVisitor(desc);
         reader.accept(v, ClassReader.SKIP_CODE | ClassReader.SKIP_DEBUG | ClassReader.SKIP_FRAMES);
         return v.found;
     }
 
     private static final class AnnotationPresenceVisitor extends ClassVisitor {
+        private final String target;
         boolean found;
 
-        AnnotationPresenceVisitor() {
+        AnnotationPresenceVisitor(String target) {
+            super(Opcodes.ASM9);
+            this.target = target;
+        }
+
+        @Override
+        public AnnotationVisitor visitAnnotation(String descriptor, boolean visible) {
+            if (target.equals(descriptor)) {
+                found = true;
+            }
+            return null;
+        }
+    }
+
+    /**
+     * Returns {@code true} if the class (or any of its superclasses, excluding
+     * {@code java.lang.Object}) carries {@code @CrochetSkip}.
+     *
+     * <p>Java's {@link java.lang.annotation.Inherited} meta-annotation is not
+     * used because it operates on the reflective layer and requires the
+     * annotated class to be loaded. The transformer runs before classes are
+     * loaded, so inheritance is implemented explicitly by walking the superclass
+     * chain via class-file resource reads — the same technique used by
+     * {@link SafeClassWriter#superOfUncached}.
+     *
+     * <p>The class file passed as {@code classFileBuffer} is the bytes already
+     * available in the caller (no re-read). For each ancestor we re-read from
+     * the class loader's resource stream. The walk stops at {@code java/lang/Object}
+     * (which can never carry {@code @CrochetSkip} — it lives in the hardcoded
+     * list), at a name that {@link #shouldSkip} would already suppress, or when
+     * the resource stream can't locate the ancestor class file.
+     *
+     * @param classFileBuffer bytes of the class being transformed (non-null)
+     * @param loader          the classloader active at transform time, or
+     *                        {@code null} for the boot loader
+     * @return {@code true} to suppress instrumentation of this class
+     */
+    static boolean hasSkipAnnotation(byte[] classFileBuffer, ClassLoader loader) {
+        // Check the class itself first.
+        if (classFileHasSkipAnnotation(classFileBuffer)) {
+            return true;
+        }
+        // Walk superclasses.
+        ClassReader root = new ClassReader(classFileBuffer);
+        String superName = root.getSuperName();
+        while (superName != null
+                && !superName.equals("java/lang/Object")
+                && !shouldSkip(superName)) {
+            byte[] superBytes = loadClassBytes(superName, loader);
+            if (superBytes == null) {
+                break;
+            }
+            if (classFileHasSkipAnnotation(superBytes)) {
+                return true;
+            }
+            superName = new ClassReader(superBytes).getSuperName();
+        }
+        return false;
+    }
+
+    /**
+     * Checks whether the given raw class-file bytes carry
+     * {@code @CrochetSkip} (RUNTIME-retained, so {@code visible=true}).
+     */
+    private static boolean classFileHasSkipAnnotation(byte[] classBytes) {
+        SkipAnnotationVisitor v = new SkipAnnotationVisitor();
+        new ClassReader(classBytes).accept(
+                v, ClassReader.SKIP_CODE | ClassReader.SKIP_DEBUG | ClassReader.SKIP_FRAMES);
+        return v.found;
+    }
+
+    /**
+     * Loads the raw class-file bytes for {@code internalName} from the given
+     * class loader's resource stream, falling back to the system class loader.
+     * Returns {@code null} if the resource is not found.
+     */
+    private static byte[] loadClassBytes(String internalName, ClassLoader loader) {
+        String resource = internalName + ".class";
+        // Walk the loader chain so user-jar classes and JDK classes both resolve.
+        ClassLoader effective = loader != null ? loader
+                : SafeClassWriter.class.getClassLoader();
+        for (ClassLoader l = effective; l != null; l = l.getParent()) {
+            try (java.io.InputStream in = l.getResourceAsStream(resource)) {
+                if (in != null) {
+                    return in.readAllBytes();
+                }
+            } catch (java.io.IOException ignored) {
+            }
+        }
+        try (java.io.InputStream in = ClassLoader.getSystemResourceAsStream(resource)) {
+            if (in != null) {
+                return in.readAllBytes();
+            }
+        } catch (java.io.IOException ignored) {
+        }
+        return null;
+    }
+
+    private static final class SkipAnnotationVisitor extends ClassVisitor {
+        boolean found;
+
+        SkipAnnotationVisitor() {
             super(Opcodes.ASM9);
         }
 
         @Override
         public AnnotationVisitor visitAnnotation(String descriptor, boolean visible) {
-            if (CROCHET_INSTRUMENTED_DESC.equals(descriptor)) {
+            if (CROCHET_SKIP_DESC.equals(descriptor)) {
                 found = true;
             }
             return null;

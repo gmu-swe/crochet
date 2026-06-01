@@ -1,0 +1,40 @@
+==> Run output: results/primary-w50-3rep-5min
+==> Budget=300s reps=3 iter_levels=50
+==> [03:08:43] mode=baseline_perIter iters=50 rep=1 seed=107
+[run-one] mode=baseline_perIter budget=300s seed=107 iters=50 out=results/primary-w50-3rep-5min/baseline_perIter-w50-s107.csv
+[run-one] done: results/primary-w50-3rep-5min/baseline_perIter-w50-s107.json
+==> [03:13:43] mode=baseline_perIter iters=50 rep=2 seed=207
+[run-one] mode=baseline_perIter budget=300s seed=207 iters=50 out=results/primary-w50-3rep-5min/baseline_perIter-w50-s207.csv
+[run-one] done: results/primary-w50-3rep-5min/baseline_perIter-w50-s207.json
+==> [03:18:43] mode=baseline_perIter iters=50 rep=3 seed=307
+[run-one] mode=baseline_perIter budget=300s seed=307 iters=50 out=results/primary-w50-3rep-5min/baseline_perIter-w50-s307.csv
+[run-one] done: results/primary-w50-3rep-5min/baseline_perIter-w50-s307.json
+==> [03:23:43] mode=baseline_shared iters=50 rep=1 seed=107
+[run-one] mode=baseline_shared budget=300s seed=107 iters=50 out=results/primary-w50-3rep-5min/baseline_shared-w50-s107.csv
+[run-one] done: results/primary-w50-3rep-5min/baseline_shared-w50-s107.json
+==> [03:28:44] mode=baseline_shared iters=50 rep=2 seed=207
+[run-one] mode=baseline_shared budget=300s seed=207 iters=50 out=results/primary-w50-3rep-5min/baseline_shared-w50-s207.csv
+[run-one] done: results/primary-w50-3rep-5min/baseline_shared-w50-s207.json
+==> [03:33:44] mode=baseline_shared iters=50 rep=3 seed=307
+[run-one] mode=baseline_shared budget=300s seed=307 iters=50 out=results/primary-w50-3rep-5min/baseline_shared-w50-s307.csv
+[run-one] done: results/primary-w50-3rep-5min/baseline_shared-w50-s307.json
+==> [03:38:44] mode=crochet_scoped iters=50 rep=1 seed=107
+[run-one] mode=crochet_scoped budget=300s seed=107 iters=50 out=results/primary-w50-3rep-5min/crochet_scoped-w50-s107.csv
+[run-one] done: results/primary-w50-3rep-5min/crochet_scoped-w50-s107.json
+==> [03:43:45] mode=crochet_scoped iters=50 rep=2 seed=207
+[run-one] mode=crochet_scoped budget=300s seed=207 iters=50 out=results/primary-w50-3rep-5min/crochet_scoped-w50-s207.csv
+[run-one] done: results/primary-w50-3rep-5min/crochet_scoped-w50-s207.json
+==> [03:48:45] mode=crochet_scoped iters=50 rep=3 seed=307
+[run-one] mode=crochet_scoped budget=300s seed=307 iters=50 out=results/primary-w50-3rep-5min/crochet_scoped-w50-s307.csv
+[run-one] done: results/primary-w50-3rep-5min/crochet_scoped-w50-s307.json
+==> [03:53:45] mode=crochet_rollback iters=50 rep=1 seed=107
+[run-one] mode=crochet_rollback budget=300s seed=107 iters=50 out=results/primary-w50-3rep-5min/crochet_rollback-w50-s107.csv
+[run-one] done: results/primary-w50-3rep-5min/crochet_rollback-w50-s107.json
+==> [03:58:46] mode=crochet_rollback iters=50 rep=2 seed=207
+[run-one] mode=crochet_rollback budget=300s seed=207 iters=50 out=results/primary-w50-3rep-5min/crochet_rollback-w50-s207.csv
+[run-one] done: results/primary-w50-3rep-5min/crochet_rollback-w50-s207.json
+==> [04:03:46] mode=crochet_rollback iters=50 rep=3 seed=307
+[run-one] mode=crochet_rollback budget=300s seed=307 iters=50 out=results/primary-w50-3rep-5min/crochet_rollback-w50-s307.csv
+[run-one] done: results/primary-w50-3rep-5min/crochet_rollback-w50-s307.json
+==> Total wall time: 3603s (60 min)
+==> Aggregate with: python3 scripts/aggregate.py results/primary-w50-3rep-5min

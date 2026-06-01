@@ -1,0 +1,29 @@
+{
+  "bug": "Closure-148",
+  "condition": "C1",
+  "started_at": "2026-05-21T12:50:35+00:00",
+  "duration_seconds": 156,
+  "tool_calls": 24,
+  "compile_fail": false,
+  "primary_pass": true,
+  "test_pass": true,
+  "baseline_failing_count": 5,
+  "agent_induced_regressions": [],
+  "regressed_tests": [],
+  "diagnosis_quality": 2,
+  "agent_exit_code": 0,
+  "bug_reproduced_pretest": true,
+  "agent_patch": "diff --git a/build.xml b/build.xml\nindex 262193460..e5677325f 100644\n--- a/build.xml\n+++ b/build.xml\n@@ -14,8 +14,8 @@\n  limitations under the License.\n -->\n <project name=\"compiler\" basedir=\".\" default=\"jar\">\n-<property name=\"ant.build.javac.target\" value=\"1.6\"/>\n-<property name=\"ant.build.javac.source\" value=\"1.6\"/>\n+<property name=\"ant.build.javac.target\" value=\"1.8\"/>\n+<property name=\"ant.build.javac.source\" value=\"1.8\"/>\n \n   <!-- define other variables -->\n   <property name=\"src.dir\" value=\"${basedir}/src\" />\ndiff --git a/src/com/google/javascript/jscomp/PeepholeFoldConstants.java b/src/com/google/javascript/jscomp/PeepholeFoldConstants.java\nindex 1df9098b5..f3d958362 100644\n--- a/src/com/google/javascript/jscomp/PeepholeFoldConstants.java\n+++ b/src/com/google/javascript/jscomp/PeepholeFoldConstants.java\n@@ -179,6 +179,9 @@ public class PeepholeFoldConstants extends AbstractPeepholeOptimization {\n       case Token.ARRAYLIT:\n         typeNameString = \"object\";\n         break;\n+      case Token.VOID:\n+        typeNameString = \"undefined\";\n+        break;\n       case Token.NAME:\n         // We assume here that programs don't change the value of the\n         // keyword undefined to something other than the value undefined.\n",
+  "agent_log": "{\"type\":\"result\",\"subtype\":\"success\",\"is_error\":false,\"api_error_status\":null,\"duration_ms\":155170,\"duration_api_ms\":138428,\"ttft_ms\":3458,\"num_turns\":24,\"result\":\"Test passes.\\n\\nDIAGNOSIS COMPLETE\\n\\nThe root cause was that `PeepholeFoldConstants.tryFoldTypeof` did not handle the `Token.VOID` case in its switch statement. The expression `void 0` always evaluates to `undefined`, so `typeof void 0` should fold to the string `\\\"undefined\\\"`. However, since `Token.VOID` was missing from the switch, `typeNameString` remained null and the typeof expression was left unfolded. `NodeUtil.isImmutableValue` already treats `VOID` as immutable (so `isLiteralValue` lets it pass the early-return guard), but the switch failed to assign a type name for it. The fix adds a `case Token.VOID:` arm that sets `typeNameString = \\\"undefined\\\"`, matching the existing handling for the `NAME` \\\"undefined\\\".\",\"stop_reason\":\"end_turn\",\"session_id\":\"825e7a4b-b90b-eaf8-567f-3d7b1a5ad975\",\"total_cost_usd\":0.6876367499999999,\"usage\":{\"input_tokens\":28,\"cache_creation_input_tokens\":20937,\"cache_read_input_tokens\":743581,\"output_tokens\":7394,\"server_tool_use\":{\"web_search_requests\":0,\"web_fetch_requests\":0},\"service_tier\":\"standard\",\"cache_creation\":{\"ephemeral_1h_input_tokens\":20937,\"ephemeral_5m_input_tokens\":0},\"inference_geo\":\"\",\"iterations\":[{\"input_tokens\":1,\"output_tokens\":282,\"cache_read_input_tokens\":39210,\"cache_creation_input_tokens\":226,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":226},\"type\":\"message\"}],\"speed\":\"standard\"},\"modelUsage\":{\"claude-opus-4-7[1m]\":{\"inputTokens\":28,\"outputTokens\":7394,\"cacheReadInputTokens\":743581,\"cacheCreationInputTokens\":20937,\"webSearchRequests\":0,\"costUSD\":0.6876367499999999,\"contextWindow\":1000000,\"maxOutputTokens\":64000}},\"permission_denials\":[],\"terminal_reason\":\"completed\",\"fast_mode_state\":\"off\",\"uuid\":\"1ebd67fb-5744-49d1-939c-07a11041ab2d\"}\n",
+  "agent_stderr": "",
+  "judge_reasoning": "The ground-truth root cause concerns unsafe folding of typeof on potentially undeclared NAME variables (folding when it shouldn't), but the agent diagnosed the opposite problem: a missing VOID case causing under-folding of `typeof void 0`. The agent identified the right method (tryFoldTypeof in PeepholeFoldConstants) but misidentified the actual bug, addressing a different switch-case gap rather than the unsafe NAME handling.\n",
+  "verify_log": "Running ant (compile.tests)................................................ OK\nRunning ant (run.dev.tests)................................................ OK\nFailing tests: 1\n  - com.google.javascript.jscomp.PeepholeFoldConstantsTest::testFoldTypeof\n",
+  "baseline_failing_tests": [
+    "com.google.javascript.jscomp.SourceMapTest::testGoldenOutput0",
+    "com.google.javascript.jscomp.SourceMapTest::testGoldenOutput1",
+    "com.google.javascript.jscomp.SourceMapTest::testGoldenOutput2",
+    "com.google.javascript.jscomp.SourceMapTest::testGoldenOutput3",
+    "com.google.javascript.jscomp.SourceMapTest::testGoldenOutput4"
+  ],
+  "compile_log": "Running ant (compile)...................................................... OK\nRunning ant (compile.tests)................................................ OK\n"
+}

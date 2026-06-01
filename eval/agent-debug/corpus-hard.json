@@ -1,0 +1,240 @@
+{
+  "description": "Phase II hard corpus — 12 bugs handpicked from II.1 prescreen + II.2 fix-locality analysis",
+  "methodology": "Bugs selected for high canonical-file counts, real test failures (not timeout), and discriminating potential across C1/C2/C3 conditions. Ordering: Jsoup-87 first (marquee), then remaining Jsoup, then JacksonDatabind, then Closure.",
+  "defects4j_version": "8c16da8230843cdc918eaf4ddb449637f02b83c6",
+  "jdk_compatibility_notes": {
+    "required_jdk": "21",
+    "JAVA_HOME": "/usr/lib/jvm/java-21-openjdk-amd64"
+  },
+  "bugs": [
+    {
+      "id": "Jsoup-87",
+      "project": "Jsoup",
+      "bug_number": 87,
+      "buggy_sha": "LOOKUP_FROM_CSV",
+      "failing_test": "org.jsoup.parser.HtmlParserTest::preservedCaseLinksCantNest",
+      "fix_summary": "HTML parser in case-preserving mode incorrectly allows link elements to nest inside other link elements; the tree builder state for <a> elements does not apply the standard HTML5 adoption agency algorithm in case-preserving mode",
+      "canonical_fix_files": [
+        "src/main/java/org/jsoup/parser/HtmlTreeBuilder.java",
+        "src/main/java/org/jsoup/parser/HtmlTreeBuilderState.java",
+        "src/main/java/org/jsoup/parser/Parser.java",
+        "src/main/java/org/jsoup/parser/TreeBuilder.java"
+      ],
+      "expected_difficulty": "hard",
+      "ttd_suited_rationale": "Marquee discriminating bug: C1 prescreen 0/2 (both real test failures, not timeout). Does C2/C3 solve it where C1 fails? Four-class fix; case-preserving mode bypasses adoption agency algorithm.",
+      "checkout_command": "defects4j checkout -p Jsoup -v 87b -w <workdir>",
+      "test_command": "defects4j test -t org.jsoup.parser.HtmlParserTest::preservedCaseLinksCantNest",
+      "build_fix": "bump source/target from 1.7 to 1.8 in maven-build.xml",
+      "c1_prescreen_result": "0/2 (both real test failures)"
+    },
+    {
+      "id": "Jsoup-58",
+      "project": "Jsoup",
+      "bug_number": 58,
+      "buggy_sha": "LOOKUP_FROM_CSV",
+      "failing_test": "org.jsoup.safety.CleanerTest::testIsValidBodyHtml",
+      "fix_summary": "Cleaner.isValidBodyHtml produces wrong results for input that contains valid body HTML — the validation logic applies the whitelist check at the wrong structural level, flagging some valid elements as invalid",
+      "canonical_fix_files": [
+        "src/main/java/org/jsoup/safety/Cleaner.java",
+        "src/main/java/org/jsoup/safety/Whitelist.java",
+        "src/main/java/org/jsoup/parser/HtmlTreeBuilder.java"
+      ],
+      "expected_difficulty": "hard",
+      "ttd_suited_rationale": "C1 prescreen 1/2 (one real fail). Three-class fix; whitelist check applied at wrong structural level.",
+      "checkout_command": "defects4j checkout -p Jsoup -v 58b -w <workdir>",
+      "test_command": "defects4j test -t org.jsoup.safety.CleanerTest::testIsValidBodyHtml",
+      "build_fix": "bump source/target from 1.7 to 1.8 in maven-build.xml",
+      "c1_prescreen_result": "1/2 (one real fail)"
+    },
+    {
+      "id": "Jsoup-56",
+      "project": "Jsoup",
+      "bug_number": 56,
+      "buggy_sha": "LOOKUP_FROM_CSV",
+      "failing_test": "org.jsoup.nodes.DocumentTypeTest::testRoundTrip",
+      "fix_summary": "DocumentType node round-trips incorrectly because the output serializer omits the system identifier when the public identifier is present but the system identifier is empty string vs null; the distinction is not preserved through parse→serialize",
+      "canonical_fix_files": [
+        "src/main/java/org/jsoup/nodes/DocumentType.java",
+        "src/main/java/org/jsoup/parser/TreeBuilder.java",
+        "src/main/java/org/jsoup/parser/HtmlTreeBuilder.java",
+        "src/main/java/org/jsoup/parser/HtmlTreeBuilderState.java",
+        "src/main/java/org/jsoup/parser/Token.java"
+      ],
+      "expected_difficulty": "hard",
+      "ttd_suited_rationale": "C1 prescreen 2/2 pass. Richest fix-locality (5 canonical files spanning parser + node layers). Does C3 get more of the 5 files than C1?",
+      "checkout_command": "defects4j checkout -p Jsoup -v 56b -w <workdir>",
+      "test_command": "defects4j test -t org.jsoup.nodes.DocumentTypeTest::testRoundTrip",
+      "build_fix": "bump source/target from 1.7 to 1.8 in maven-build.xml",
+      "c1_prescreen_result": "2/2 pass"
+    },
+    {
+      "id": "Jsoup-71",
+      "project": "Jsoup",
+      "bug_number": 71,
+      "buggy_sha": "LOOKUP_FROM_CSV",
+      "failing_test": "org.jsoup.select.SelectorTest::splitOnBr",
+      "fix_summary": "CSS selector with :split-on-br pseudo-element does not correctly split text nodes on <br> boundaries because the pseudo-class evaluator does not account for the PseudoTextElement type introduced for inline text splitting",
+      "canonical_fix_files": [
+        "src/main/java/org/jsoup/nodes/PseudoTextElement.java",
+        "src/main/java/org/jsoup/select/Evaluator.java",
+        "src/main/java/org/jsoup/select/QueryParser.java"
+      ],
+      "expected_difficulty": "medium",
+      "ttd_suited_rationale": "C1 prescreen 2/2. Three-class fix; new node type added without updating evaluators.",
+      "checkout_command": "defects4j checkout -p Jsoup -v 71b -w <workdir>",
+      "test_command": "defects4j test -t org.jsoup.select.SelectorTest::splitOnBr",
+      "build_fix": "bump source/target from 1.7 to 1.8 in maven-build.xml",
+      "c1_prescreen_result": "2/2 pass"
+    },
+    {
+      "id": "Jsoup-52",
+      "project": "Jsoup",
+      "bug_number": 52,
+      "buggy_sha": "LOOKUP_FROM_CSV",
+      "failing_test": "org.jsoup.nodes.DocumentTest::testMetaCharsetUpdateXmlNoCharset",
+      "fix_summary": "Document.updateMetaCharsetElement() for XML mode fails to correctly set the charset declaration when no charset attribute exists — the method finds the xml declaration node but uses the wrong update path, leaving the declaration unchanged",
+      "canonical_fix_files": [
+        "src/main/java/org/jsoup/nodes/Document.java",
+        "src/main/java/org/jsoup/nodes/XmlDeclaration.java",
+        "src/main/java/org/jsoup/nodes/Attribute.java"
+      ],
+      "expected_difficulty": "medium",
+      "ttd_suited_rationale": "Three-class fix; wrong update path for XML declaration charset. XML vs HTML mode distinction non-obvious.",
+      "checkout_command": "defects4j checkout -p Jsoup -v 52b -w <workdir>",
+      "test_command": "defects4j test -t org.jsoup.nodes.DocumentTest::testMetaCharsetUpdateXmlNoCharset",
+      "build_fix": "bump source/target from 1.7 to 1.8 in maven-build.xml",
+      "c1_prescreen_result": "from candidates"
+    },
+    {
+      "id": "Jsoup-28",
+      "project": "Jsoup",
+      "bug_number": 28,
+      "buggy_sha": "LOOKUP_FROM_CSV",
+      "failing_test": "org.jsoup.nodes.EntitiesTest::unescape",
+      "fix_summary": "HTML entity unescaping produces wrong output for certain numeric character references and named entities because the entity trie lookup has incorrect handling for the boundary between decimal and hexadecimal references",
+      "canonical_fix_files": [
+        "src/main/java/org/jsoup/nodes/Entities.java",
+        "src/main/java/org/jsoup/parser/Tokeniser.java",
+        "src/main/java/org/jsoup/parser/TokeniserState.java"
+      ],
+      "expected_difficulty": "medium",
+      "ttd_suited_rationale": "Three-class fix; entity trie boundary bug only manifests for specific sequences. HTML5 tokenization spec required.",
+      "checkout_command": "defects4j checkout -p Jsoup -v 28b -w <workdir>",
+      "test_command": "defects4j test -t org.jsoup.nodes.EntitiesTest::unescape",
+      "build_fix": "bump source/target from 1.7 to 1.8 in maven-build.xml",
+      "c1_prescreen_result": "from candidates"
+    },
+    {
+      "id": "Jsoup-22",
+      "project": "Jsoup",
+      "bug_number": 22,
+      "buggy_sha": "LOOKUP_FROM_CSV",
+      "failing_test": "org.jsoup.nodes.ElementTest::elementIsNotASiblingOfItself",
+      "fix_summary": "Element.siblingElements() includes the element itself in the returned sibling list; the sibling traversal incorrectly includes the element being queried because the self-exclusion check compares by position rather than identity",
+      "canonical_fix_files": [
+        "src/main/java/org/jsoup/nodes/Element.java",
+        "src/main/java/org/jsoup/nodes/Node.java",
+        "src/main/java/org/jsoup/select/Elements.java"
+      ],
+      "expected_difficulty": "medium",
+      "ttd_suited_rationale": "Three-class fix; position-based vs identity-based comparison is subtle. Good locality discriminator.",
+      "checkout_command": "defects4j checkout -p Jsoup -v 22b -w <workdir>",
+      "test_command": "defects4j test -t org.jsoup.nodes.ElementTest::elementIsNotASiblingOfItself",
+      "build_fix": "bump source/target from 1.7 to 1.8 in maven-build.xml",
+      "c1_prescreen_result": "from candidates"
+    },
+    {
+      "id": "JacksonDatabind-79",
+      "project": "JacksonDatabind",
+      "bug_number": 79,
+      "buggy_sha": "LOOKUP_FROM_CSV",
+      "failing_test": "com.fasterxml.jackson.databind.objectid.AlwaysAsReferenceFirstTest::testIssue1607",
+      "fix_summary": "ObjectIdGenerator with ALWAYS_AS_REFERENCE_FIRST policy fails when the first reference comes before the definition in the JSON stream — the id resolver does not defer the reference lookup and instead throws UnresolvedForwardReference too early",
+      "canonical_fix_files": [
+        "src/main/java/com/fasterxml/jackson/databind/introspect/JacksonAnnotationIntrospector.java",
+        "src/main/java/com/fasterxml/jackson/databind/introspect/ObjectIdInfo.java",
+        "src/main/java/com/fasterxml/jackson/databind/ser/std/BeanSerializerBase.java"
+      ],
+      "expected_difficulty": "hard",
+      "ttd_suited_rationale": "Three-class fix in object-id subsystem; UnresolvedForwardReference looks like ordering problem but root cause is ALWAYS_AS_REFERENCE_FIRST annotation handling.",
+      "checkout_command": "defects4j checkout -p JacksonDatabind -v 79b -w <workdir>",
+      "test_command": "defects4j test -t com.fasterxml.jackson.databind.objectid.AlwaysAsReferenceFirstTest::testIssue1607",
+      "build_fix": "bump source/target from 1.6 to 1.8 in maven-build.xml",
+      "c1_prescreen_result": "from candidates"
+    },
+    {
+      "id": "JacksonDatabind-53",
+      "project": "JacksonDatabind",
+      "bug_number": 53,
+      "buggy_sha": "LOOKUP_FROM_CSV",
+      "failing_test": "com.fasterxml.jackson.databind.jsontype.TypeRefinementForMap1215Test::testMapRefinement",
+      "fix_summary": "Type refinement for Map types does not correctly handle the case where a declared Map subtype is narrowed via @JsonDeserialize(as=), causing the refined type to be ignored and the wrong deserializer to be selected",
+      "canonical_fix_files": [
+        "src/main/java/com/fasterxml/jackson/databind/type/MapType.java",
+        "src/main/java/com/fasterxml/jackson/databind/ObjectMapper.java"
+      ],
+      "expected_difficulty": "hard",
+      "ttd_suited_rationale": "C1 prescreen 1/2 timeout. Two-class fix; type refinement vs coercion distinction is subtle. 900s timeout should reduce confound.",
+      "checkout_command": "defects4j checkout -p JacksonDatabind -v 53b -w <workdir>",
+      "test_command": "defects4j test -t com.fasterxml.jackson.databind.jsontype.TypeRefinementForMap1215Test::testMapRefinement",
+      "build_fix": "bump source/target from 1.6 to 1.8 in maven-build.xml",
+      "c1_prescreen_result": "1/2 timeout"
+    },
+    {
+      "id": "Closure-155",
+      "project": "Closure",
+      "bug_number": 155,
+      "buggy_sha": "LOOKUP_FROM_CSV",
+      "failing_test": "com.google.javascript.jscomp.InlineVariablesTest::testArgumentsModifiedInInnerFunction",
+      "fix_summary": "InlineVariables incorrectly inlines a variable across a closure boundary when the variable's value depends on the 'arguments' object, which is function-scoped and can be modified by an inner function",
+      "canonical_fix_files": [
+        "src/com/google/javascript/jscomp/InlineVariables.java",
+        "src/com/google/javascript/jscomp/ReferenceCollectingCallback.java",
+        "src/com/google/javascript/jscomp/FlowSensitiveInlineVariables.java"
+      ],
+      "expected_difficulty": "hard",
+      "ttd_suited_rationale": "Three-class fix; incorrect inline only manifests when arguments escapes closure boundary. Requires understanding alias analysis failure mode.",
+      "checkout_command": "defects4j checkout -p Closure -v 155b -w <workdir>",
+      "test_command": "defects4j test -t com.google.javascript.jscomp.InlineVariablesTest::testArgumentsModifiedInInnerFunction",
+      "build_fix": "bump source/target in build.xml and lib/rhino/build.properties; bump ant.build.javac.* properties in build.xml",
+      "c1_prescreen_result": "from candidates"
+    },
+    {
+      "id": "Closure-137",
+      "project": "Closure",
+      "bug_number": 137,
+      "buggy_sha": "LOOKUP_FROM_CSV",
+      "failing_test": "com.google.javascript.jscomp.MakeDeclaredNamesUniqueTest::testOnlyInversion3",
+      "fix_summary": "MakeDeclaredNamesUnique ContextualRenameInverter extends the wrong callback interface (ScopedCallback instead of AbstractPostOrderCallback), causing it to be invoked at scope entry/exit in addition to node visits, which corrupts the rename-inversion state machine",
+      "canonical_fix_files": [
+        "src/com/google/javascript/jscomp/MakeDeclaredNamesUnique.java",
+        "src/com/google/javascript/jscomp/RenameVars.java",
+        "src/com/google/javascript/jscomp/NodeTraversal.java"
+      ],
+      "expected_difficulty": "hard",
+      "ttd_suited_rationale": "Three-class fix; wrong callback interface causes state corruption only under inversion, not forward pass. Subtle invariant.",
+      "checkout_command": "defects4j checkout -p Closure -v 137b -w <workdir>",
+      "test_command": "defects4j test -t com.google.javascript.jscomp.MakeDeclaredNamesUniqueTest::testOnlyInversion3",
+      "build_fix": "bump source/target in build.xml and lib/rhino/build.properties; bump ant.build.javac.* properties in build.xml",
+      "c1_prescreen_result": "from candidates"
+    },
+    {
+      "id": "Closure-110",
+      "project": "Closure",
+      "bug_number": 110,
+      "buggy_sha": "LOOKUP_FROM_CSV",
+      "failing_test": "com.google.javascript.jscomp.ScopedAliasesTest::testHoistedFunctionDeclaration",
+      "fix_summary": "ScopedAliases transformation fails to handle hoisted function declarations inside goog.scope blocks, producing a wrong-scope binding when function declarations are lifted above their alias context",
+      "canonical_fix_files": [
+        "src/com/google/javascript/jscomp/ScopedAliases.java",
+        "src/com/google/javascript/jscomp/NodeUtil.java"
+      ],
+      "expected_difficulty": "hard",
+      "ttd_suited_rationale": "C1 prescreen 1/2 timeout. Two-class fix; hoisting interaction with scope transformation only manifests for declarations, not expressions. 900s timeout reduces confound.",
+      "checkout_command": "defects4j checkout -p Closure -v 110b -w <workdir>",
+      "test_command": "defects4j test -t com.google.javascript.jscomp.ScopedAliasesTest::testHoistedFunctionDeclaration",
+      "build_fix": "bump source/target in build.xml and lib/rhino/build.properties; bump ant.build.javac.* properties in build.xml",
+      "c1_prescreen_result": "1/2 timeout"
+    }
+  ]
+}

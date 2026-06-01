@@ -12,6 +12,7 @@ import java.lang.annotation.Target;
  * (pre-scan skip on re-entry) but not reified into reflection metadata.
  * The transformer detects presence via ASM's {@code ClassReader}.
  */
+@Internal
 @Retention(RetentionPolicy.CLASS)
 @Target(ElementType.TYPE)
 public @interface CrochetInstrumented {

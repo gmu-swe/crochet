@@ -1,0 +1,79 @@
+========================================================================
+A.1 Snap-Memory Analysis
+========================================================================
+
+[h2]
+  trial1: fastAccess=27,074  sfHelperFor=132,813  top10_conc=100.0%
+  trial2: fastAccess=38,779  sfHelperFor=132,813  top10_conc=100.0%
+  trial3: fastAccess=41,579  sfHelperFor=132,813  top10_conc=100.0%
+
+  fastAccess  : median=38,779  p95=38,779  IQR=14,505
+  sfHelperFor : median=132,813  p95=132,813  IQR=0
+  top10 conc  : median=100.0%
+
+  Top-10 classes by aggregate fastAccess (of 107,432 total):
+       101,530  ( 94.5%)  java.lang.Thread$$crochetFast/0x0000000800208400
+         5,890  (  5.5%)  java.lang.ref.Reference$ReferenceHandler$$crochetFast/0x0000000800208c00
+             3  (  0.0%)  jdk.internal.loader.ClassLoaders$AppClassLoader$$crochetFast/0x000000080020a000
+             3  (  0.0%)  jdk.internal.loader.URLClassPath$$crochetFast/0x000000080020ac00
+             3  (  0.0%)  java.lang.ref.SoftReference$$crochetFast/0x000000080020b800
+             3  (  0.0%)  java.util.concurrent.ConcurrentHashMap$$crochetFast/0x000000080020b000
+
+[h2o]
+  trial1: fastAccess=4,369  sfHelperFor=2,945,055  top10_conc=100.0%
+  trial2: fastAccess=4,311  sfHelperFor=2,945,055  top10_conc=100.0%
+  trial3: fastAccess=4,454  sfHelperFor=2,945,055  top10_conc=100.0%
+  trial4: fastAccess=4,376  sfHelperFor=2,945,055  top10_conc=100.0%
+  trial5: fastAccess=4,424  sfHelperFor=2,945,055  top10_conc=100.0%
+
+  fastAccess  : median=4,376  p95=4,424  IQR=99
+  sfHelperFor : median=2,945,055  p95=2,945,055  IQR=0
+  top10 conc  : median=100.0%
+
+  Top-10 classes by aggregate fastAccess (of 21,934 total):
+        21,934  (100.0%)  java.lang.Thread$$crochetFast/0x00000008000c4c00
+
+[microbench]
+  trial1: fastAccess=2,421  sfHelperFor=20  top10_conc=100.0%
+  trial2: fastAccess=2,421  sfHelperFor=20  top10_conc=100.0%
+  trial3: fastAccess=2,421  sfHelperFor=20  top10_conc=100.0%
+  trial4: fastAccess=2,421  sfHelperFor=20  top10_conc=100.0%
+  trial5: fastAccess=2,421  sfHelperFor=20  top10_conc=100.0%
+
+  fastAccess  : median=2,421  p95=2,421  IQR=0
+  sfHelperFor : median=20  p95=20  IQR=0
+  top10 conc  : median=100.0%
+
+  Top-10 classes by aggregate fastAccess (of 12,105 total):
+        11,905  ( 98.3%)  java.util.HashMap$Node$$crochetFast/0x00000008000c5c00
+           200  (  1.7%)  java.util.HashMap$$crochetFast/0x00000008000c4000
+
+========================================================================
+F.2 Go/No-Go Threshold Analysis
+========================================================================
+
+  [h2]
+    fastAccess median = 38,779  (threshold: >100,000) -> FAIL
+    top10_conc median = 100.0%  (threshold: <50%)     -> FAIL
+    Decision: NO-GO (defer F.2)
+
+  [h2o]
+    fastAccess median = 4,376  (threshold: >100,000) -> FAIL
+    top10_conc median = 100.0%  (threshold: <50%)     -> FAIL
+    Decision: NO-GO (defer F.2)
+
+  [microbench]
+    fastAccess median = 2,421  (threshold: >100,000) -> FAIL
+    top10_conc median = 100.0%  (threshold: <50%)     -> FAIL
+    Decision: NO-GO (defer F.2)
+
+  OVERALL DECISION (0/3 workloads say GO):
+  -> DEFER F.2
+
+  NUMERIC THRESHOLD (from METHOD.md):
+  Build F.2 only if F.1 guards ≥50% of fastAccess calls on ≥2/3 workloads.
+  Equivalently: build F.2 if the top-10-class concentration is <50%
+  (meaning the working set is broad enough that dirty-bit alone is insufficient).
+
+========================================================================
+Analysis complete.

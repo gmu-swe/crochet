@@ -1,0 +1,60 @@
+{
+  "bug": "JacksonDatabind-53",
+  "condition": "C2",
+  "model": "claude-haiku-4-5",
+  "model_default_used": false,
+  "started_at": "2026-06-01T03:51:19+00:00",
+  "duration_seconds": 320,
+  "tool_calls": 81,
+  "compile_fail": false,
+  "primary_pass": false,
+  "test_pass": false,
+  "baseline_failing_count": 12,
+  "agent_induced_regressions": [],
+  "regressed_tests": [],
+  "diagnosis_quality": 1,
+  "agent_exit_code": 1,
+  "bug_reproduced_pretest": true,
+  "agent_patch": "diff --git a/maven-build.xml b/maven-build.xml\nindex f63ead930..ae38d6342 100644\n--- a/maven-build.xml\n+++ b/maven-build.xml\n@@ -83,10 +83,10 @@\n            debug=\"true\" \n            optimize=\"true\" \n            deprecation=\"true\" \n-           target=\"1.6\" \n+           target=\"1.8\" \n            verbose=\"false\" \n            fork=\"false\" \n-           source=\"1.6\">\n+           source=\"1.8\">\n       <src>\n         <pathelement location=\"${maven.build.srcDir.0}\"/>\n       </src>\n@@ -111,10 +111,10 @@\n            debug=\"true\" \n            optimize=\"true\" \n            deprecation=\"true\" \n-           target=\"1.6\" \n+           target=\"1.8\" \n            verbose=\"false\" \n            fork=\"false\" \n-           source=\"1.6\">\n+           source=\"1.8\">\n       <src>\n         <pathelement location=\"${maven.build.testDir.0}\"/>\n       </src>\ndiff --git a/pom.xml b/pom.xml\nindex 5fbc6d064..c920a3ff0 100644\n--- a/pom.xml\n+++ b/pom.xml\n@@ -30,8 +30,8 @@\n         like we have some issues with Mockito tests if we try to go \"full 1.7\"...\n         So that is why... this:\n       -->\n-    <javac.src.version>1.6</javac.src.version>\n-    <javac.target.version>1.6</javac.target.version>\n+    <javac.src.version>1.8</javac.src.version>\n+    <javac.target.version>1.8</javac.target.version>\n \n     <!-- Can not use default, since group id != Java package name here -->\n     <osgi.export>com.fasterxml.jackson.databind.*;version=${project.version}</osgi.export>\ndiff --git a/src/main/java/com/fasterxml/jackson/databind/cfg/PackageVersion.java b/src/main/java/com/fasterxml/jackson/databind/cfg/PackageVersion.java\ndeleted file mode 100644\nindex d4d3039e9..000000000\n--- a/src/main/java/com/fasterxml/jackson/databind/cfg/PackageVersion.java\n+++ /dev/null\n@@ -1,20 +0,0 @@\n-package com.fasterxml.jackson.databind.cfg;\n-\n-import com.fasterxml.jackson.core.Version;\n-import com.fasterxml.jackson.core.Versioned;\n-import com.fasterxml.jackson.core.util.VersionUtil;\n-\n-/**\n- * Automatically generated from PackageVersion.java.in during\n- * packageVersion-generate execution of maven-replacer-plugin in\n- * pom.xml.\n- */\n-public final class PackageVersion implements Versioned {\n-    public final static Version VERSION = VersionUtil.parseVersion(\n-        \"2.7.6-SNAPSHOT\", \"com.fasterxml.jackson.core\", \"jackson-databind\");\n-\n-    @Override\n-    public Version version() {\n-        return VERSION;\n-    }\n-}\ndiff --git a/src/main/java/com/fasterxml/jackson/databind/deser/impl/CreatorCollector.java b/src/main/java/com/fasterxml/jackson/databind/deser/impl/CreatorCollector.java\nindex 8e38f5dec..cef3a5956 100644\n--- a/src/main/java/com/fasterxml/jackson/databind/deser/impl/CreatorCollector.java\n+++ b/src/main/java/com/fasterxml/jackson/databind/deser/impl/CreatorCollector.java\n@@ -282,7 +282,22 @@ public class CreatorCollector\n                 }\n             }\n         }\n-        return creator.getParameterType(ix);\n+        JavaType pt = creator.getParameterType(ix);\n+        // [databind#1215]: Need to resolve type variables using the target type's bindings\n+        if (pt != null && _beanDesc instanceof com.fasterxml.jackson.databind.introspect.BasicBeanDescription) {\n+            java.lang.reflect.Type genType = creator.getGenericParameterType(ix);\n+            System.err.println(\"DEBUG: genType=\" + genType + \", beanDesc=\" + _beanDesc.getType());\n+            System.err.println(\"DEBUG: beanDesc bindings=\" + _beanDesc.getType().getBindings());\n+            if (genType != null) {\n+                JavaType resolved = _beanDesc.resolveType(genType);\n+                System.err.println(\"DEBUG: resolved=\" + resolved);\n+                if (resolved != null) {\n+                    pt = resolved;\n+                }\n+            }\n+        }\n+        System.err.println(\"DEBUG: final delegateType=\" + pt);\n+        return pt;\n     }\n \n     private <T extends AnnotatedMember> T _fixAccess(T member)\n",
+  "agent_log": "{\"type\":\"result\",\"subtype\":\"error_max_turns\",\"duration_ms\":318567,\"duration_api_ms\":197995,\"is_error\":true,\"num_turns\":81,\"stop_reason\":\"tool_use\",\"session_id\":\"1bd25506-e980-4b45-875f-10d38b70c06c\",\"total_cost_usd\":0.6949344000000001,\"usage\":{\"input_tokens\":82,\"cache_creation_input_tokens\":76778,\"cache_read_input_tokens\":5121549,\"output_tokens\":17345,\"server_tool_use\":{\"web_search_requests\":0,\"web_fetch_requests\":0},\"service_tier\":\"standard\",\"cache_creation\":{\"ephemeral_1h_input_tokens\":76778,\"ephemeral_5m_input_tokens\":0},\"inference_geo\":\"not_available\",\"iterations\":[{\"input_tokens\":0,\"output_tokens\":632,\"cache_read_input_tokens\":88498,\"cache_creation_input_tokens\":795,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":795},\"type\":\"message\"}],\"speed\":\"standard\"},\"modelUsage\":{\"claude-haiku-4-5\":{\"inputTokens\":82,\"outputTokens\":17345,\"cacheReadInputTokens\":5121549,\"cacheCreationInputTokens\":76778,\"webSearchRequests\":0,\"costUSD\":0.6949344000000001,\"contextWindow\":200000,\"maxOutputTokens\":32000}},\"permission_denials\":[],\"terminal_reason\":\"max_turns\",\"fast_mode_state\":\"off\",\"uuid\":\"e485c518-2d3e-4dd0-9135-fc222b0e7b17\",\"errors\":[\"Reached maximum number of turns (80)\"]}\n",
+  "agent_stderr": "",
+  "judge_reasoning": "The agent's final diagnosis is empty \u2014 no root cause was identified, no method/line/variable cited, and no fix described. An absent diagnosis provides no useful information and cannot match any aspect of the ground-truth type-refinement fix.\n",
+  "verify_log": "Running ant (compile.tests)................................................ OK\nRunning ant (run.dev.tests)................................................ OK\nFailing tests: 1\n  - com.fasterxml.jackson.databind.jsontype.TypeRefinementForMap1215Test::testMapRefinement\n",
+  "baseline_failing_tests": [
+    "com.fasterxml.jackson.databind.deser.TestExceptionDeserialization::testIOException",
+    "com.fasterxml.jackson.databind.deser.TestExceptionDeserialization::testJDK7SuppressionProperty",
+    "com.fasterxml.jackson.databind.deser.TestExceptionDeserialization::testNoArgsException",
+    "com.fasterxml.jackson.databind.deser.TestExceptionDeserialization::testSingleValueArrayDeserializationException",
+    "com.fasterxml.jackson.databind.deser.TestExceptionDeserialization::testWithCreator",
+    "com.fasterxml.jackson.databind.deser.TestExceptionDeserialization::testWithNullMessage",
+    "com.fasterxml.jackson.databind.deser.TestJdkTypes::testStackTraceElementWithCustom",
+    "com.fasterxml.jackson.databind.deser.TestJdkTypes::testStringBuilder",
+    "com.fasterxml.jackson.databind.jsontype.TypeRefinementForMap1215Test::testMapRefinement",
+    "com.fasterxml.jackson.databind.struct.TestFormatForCollections::testListAsObject",
+    "com.fasterxml.jackson.databind.type.TestTypeFactoryWithClassLoader",
+    "com.fasterxml.jackson.databind.util.TestClassUtil::testFindEnumType"
+  ],
+  "compile_log": "Running ant (compile)...................................................... OK\nRunning ant (compile.tests)................................................ OK\n",
+  "agent_modified_files": [
+    "maven-build.xml",
+    "pom.xml",
+    "src/main/java/com/fasterxml/jackson/databind/deser/impl/CreatorCollector.java"
+  ],
+  "canonical_modified_files": [
+    "src/main/java/com/fasterxml/jackson/databind/type/TypeBindings.java",
+    "src/main/java/com/fasterxml/jackson/databind/type/TypeFactory.java"
+  ],
+  "agent_modified_prod_files": [
+    "src/main/java/com/fasterxml/jackson/databind/deser/impl/CreatorCollector.java"
+  ],
+  "file_overlap": [],
+  "missed_canonical": [
+    "src/main/java/com/fasterxml/jackson/databind/type/TypeBindings.java",
+    "src/main/java/com/fasterxml/jackson/databind/type/TypeFactory.java"
+  ],
+  "extra_prod_files": [
+    "src/main/java/com/fasterxml/jackson/databind/deser/impl/CreatorCollector.java"
+  ],
+  "fix_locality_score": 0.0,
+  "test_pass_strict": false
+}

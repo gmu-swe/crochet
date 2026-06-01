@@ -5,6 +5,7 @@
  */
 package net.jonbell.crochet.instrument;
 
+import net.jonbell.crochet.annotation.Internal;
 import net.jonbell.crochet.patch.Patcher;
 import net.jonbell.crochet.runtime.Tag;
 import net.jonbell.crochet.transform.CrochetTransformer;
@@ -19,6 +20,7 @@ import java.util.function.Function;
 /**
  * Instances of this class are created via reflection.
  */
+@Internal
 @SuppressWarnings("unused")
 public class CrochetInstrumentation implements Instrumentation {
     private CrochetTransformer transformer;
@@ -84,7 +86,12 @@ public class CrochetInstrumentation implements Instrumentation {
                 || resourceName.startsWith(CrochetTransformer.TRANSFORM_PACKAGE_PREFIX)
                 || resourceName.startsWith("net/jonbell/crochet/annotation/")
                 || resourceName.startsWith("net/jonbell/crochet/patch/")
-                || resourceName.startsWith("net/jonbell/crochet/agent/shaded/");
+                // The shaded ASM package relocated by maven-shade-plugin.
+                // The shadow pattern is org.objectweb.asm → edu.neu.ccs.prl.crochet.agent.shaded.asm,
+                // so the internal-name prefix is edu/neu/ccs/prl/crochet/agent/shaded/.
+                // (The old comment said "net/jonbell/crochet/agent/shaded/" but that path
+                // does not exist in the shaded jar — the correct prefix is below.)
+                || resourceName.startsWith("edu/neu/ccs/prl/crochet/agent/shaded/");
     }
 
     @Override

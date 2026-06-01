@@ -1,0 +1,53 @@
+{
+  "bug": "Jsoup-28",
+  "condition": "C1",
+  "model": "claude-haiku-4-5",
+  "model_default_used": false,
+  "started_at": "2026-06-01T03:36:08+00:00",
+  "duration_seconds": 360,
+  "tool_calls": 81,
+  "compile_fail": false,
+  "primary_pass": true,
+  "test_pass": true,
+  "baseline_failing_count": 4,
+  "agent_induced_regressions": [],
+  "regressed_tests": [],
+  "diagnosis_quality": 1,
+  "agent_exit_code": 1,
+  "bug_reproduced_pretest": true,
+  "agent_patch": "diff --git a/maven-build.xml b/maven-build.xml\nindex 93e81600..f77e8eba 100644\n--- a/maven-build.xml\n+++ b/maven-build.xml\n@@ -68,10 +68,10 @@\n            debug=\"true\" \n            optimize=\"false\" \n            deprecation=\"true\" \n-           target=\"1.6\" \n+           target=\"1.8\" \n            verbose=\"false\" \n            fork=\"false\" \n-           source=\"1.6\">\n+           source=\"1.8\">\n       <src>\n         <pathelement location=\"${maven.build.srcDir.0}\"/>\n       </src>\n@@ -99,10 +99,10 @@\n            debug=\"true\" \n            optimize=\"false\" \n            deprecation=\"true\" \n-           target=\"1.6\" \n+           target=\"1.8\" \n            verbose=\"false\" \n            fork=\"false\" \n-           source=\"1.6\">\n+           source=\"1.8\">\n       <src>\n         <pathelement location=\"${maven.build.testDir.0}\"/>\n       </src>\ndiff --git a/pom.xml b/pom.xml\nindex cba33964..4bc04d70 100644\n--- a/pom.xml\n+++ b/pom.xml\n@@ -37,8 +37,8 @@\n         <artifactId>maven-compiler-plugin</artifactId>\n         <version>2.0.2</version>\n         <configuration>\n-          <source>1.5</source>\n-          <target>1.5</target>\n+          <source>1.8</source>\n+          <target>1.8</target>\n           <encoding>UTF-8</encoding>\n         </configuration>\n       </plugin>\ndiff --git a/src/main/java/org/jsoup/nodes/Entities.java b/src/main/java/org/jsoup/nodes/Entities.java\nindex be73e321..f0231a22 100644\n--- a/src/main/java/org/jsoup/nodes/Entities.java\n+++ b/src/main/java/org/jsoup/nodes/Entities.java\n@@ -100,27 +100,39 @@ public class Entities {\n      * @return\n      */\n     static String unescape(String string, boolean strict) {\n+        if (string.contains(\"mid\") || string.contains(\"wr\")) System.err.println(\"DEBUG unescape: string='\" + string + \"' strict=\" + strict);\n         if (!string.contains(\"&\"))\n             return string;\n         Matcher m = strict? strictUnescapePattern.matcher(string) : unescapePattern.matcher(string);\n+        if (string.contains(\"mid\") || string.contains(\"wr\")) System.err.println(\"DEBUG: using \" + (strict ? \"strict\" : \"non-strict\") + \" pattern\");\n         StringBuffer accum = new StringBuffer(string.length());\n         while (m.find()) {\n             int charval = -1;\n             String num = m.group(3);\n+            String name = null;\n             if (num != null) {\n                 try {\n-                    int base = m.group(2) != null ? 16 : 10;\n-                    charval = Integer.valueOf(num, base);\n+                    int radix = m.group(2) != null ? 16 : 10;\n+                    charval = Integer.valueOf(num, radix);\n                 } catch (NumberFormatException e) {\n                 }\n             } else {\n-                String name = m.group(1);\n+                name = m.group(1);\n                 if (full.containsKey(name))\n                     charval = full.get(name);\n             }\n-            if (charval != -1 || charval > 0xFFFF) {\n-                String c = Character.toString((char) charval);\n-                m.appendReplacement(accum, Matcher.quoteReplacement(c));\n+            boolean valid = charval != -1 && charval <= 0xFFFF;\n+            if (valid) {\n+                boolean isSemicolonTerminated = m.group(0).endsWith(\";\");\n+                boolean isNumeric = num != null;\n+                boolean isInBase = name != null && base.containsKey(name);\n+                boolean shouldReplace = strict || isSemicolonTerminated || isNumeric || isInBase;\n+                if (shouldReplace) {\n+                    String c = Character.toString((char) charval);\n+                    m.appendReplacement(accum, Matcher.quoteReplacement(c));\n+                } else {\n+                    m.appendReplacement(accum, Matcher.quoteReplacement(m.group(0)));\n+                }\n             } else {\n                 m.appendReplacement(accum, Matcher.quoteReplacement(m.group(0)));\n             }\n",
+  "agent_log": "{\"type\":\"result\",\"subtype\":\"error_max_turns\",\"duration_ms\":359194,\"duration_api_ms\":283394,\"is_error\":true,\"num_turns\":81,\"stop_reason\":\"tool_use\",\"session_id\":\"6592273a-fdee-4dc3-91ff-233a9a5defed\",\"total_cost_usd\":0.8525945499999996,\"usage\":{\"input_tokens\":64,\"cache_creation_input_tokens\":96317,\"cache_read_input_tokens\":5795043,\"output_tokens\":30526,\"server_tool_use\":{\"web_search_requests\":0,\"web_fetch_requests\":0},\"service_tier\":\"standard\",\"cache_creation\":{\"ephemeral_1h_input_tokens\":96317,\"ephemeral_5m_input_tokens\":0},\"inference_geo\":\"not_available\",\"iterations\":[{\"input_tokens\":0,\"output_tokens\":251,\"cache_read_input_tokens\":108232,\"cache_creation_input_tokens\":836,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":836},\"type\":\"message\"}],\"speed\":\"standard\"},\"modelUsage\":{\"claude-haiku-4-5\":{\"inputTokens\":64,\"outputTokens\":30526,\"cacheReadInputTokens\":5795043,\"cacheCreationInputTokens\":96317,\"webSearchRequests\":0,\"costUSD\":0.8525945499999996,\"contextWindow\":200000,\"maxOutputTokens\":32000}},\"permission_denials\":[],\"terminal_reason\":\"max_turns\",\"fast_mode_state\":\"off\",\"uuid\":\"c1519dfa-69b0-49f2-8075-cc7d1a34ebe1\",\"errors\":[\"Reached maximum number of turns (80)\"]}\n",
+  "agent_stderr": "",
+  "judge_reasoning": "The agent provided no diagnosis at all\u2014the final diagnosis field is empty\u2014so there is nothing identifying the entity trie lookup, the decimal/hexadecimal boundary handling, or any root cause whatsoever.\n",
+  "verify_log": "Running ant (compile.tests)................................................ OK\nRunning ant (run.dev.tests)................................................ OK\nFailing tests: 1\n  - org.jsoup.nodes.EntitiesTest::unescape\n",
+  "baseline_failing_tests": [
+    "org.jsoup.parser.AttributeParseTest::moreAttributeUnescapes",
+    "org.jsoup.parser.AttributeParseTest::strictAttributeUnescapes",
+    "org.jsoup.parser.HtmlParserTest::doesNotFindShortestMatchingEntity",
+    "org.jsoup.parser.HtmlParserTest::relaxedBaseEntityMatchAndStrictExtendedMatch"
+  ],
+  "compile_log": "Running ant (compile)...................................................... OK\nRunning ant (compile.tests)................................................ OK\n",
+  "agent_modified_files": [
+    "maven-build.xml",
+    "pom.xml",
+    "src/main/java/org/jsoup/nodes/Entities.java"
+  ],
+  "canonical_modified_files": [
+    "src/main/java/org/jsoup/nodes/Entities.java",
+    "src/main/java/org/jsoup/parser/Parser.java",
+    "src/main/java/org/jsoup/parser/Tokeniser.java"
+  ],
+  "agent_modified_prod_files": [
+    "src/main/java/org/jsoup/nodes/Entities.java"
+  ],
+  "file_overlap": [
+    "src/main/java/org/jsoup/nodes/Entities.java"
+  ],
+  "missed_canonical": [
+    "src/main/java/org/jsoup/parser/Parser.java",
+    "src/main/java/org/jsoup/parser/Tokeniser.java"
+  ],
+  "extra_prod_files": [],
+  "fix_locality_score": 0.5,
+  "test_pass_strict": true
+}

@@ -8,6 +8,8 @@ import org.objectweb.asm.MethodVisitor;
 import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.Type;
 
+import net.jonbell.crochet.annotation.Internal;
+
 /**
  * Wraps GETFIELD/PUTFIELD instructions whose owner is an instrumented user
  * class with a preceding call to {@code ownerRef.$$crochetAccess()}. When the
@@ -55,6 +57,7 @@ import org.objectweb.asm.Type;
  * read fields of {@code this} before the super-call), post-super instructions
  * are wrapped the same way as any ordinary method.
  */
+@Internal
 public final class FieldAccessWrapper extends ClassVisitor {
 
     /**
@@ -63,6 +66,15 @@ public final class FieldAccessWrapper extends ClassVisitor {
      * the {@link #ownerIsSuspicious} resolver to decide when to emit it.
      */
     static final String INSTRUMENTED_INTERNAL = "net/jonbell/crochet/runtime/CRIJInstrumented";
+
+    /**
+     * Name of the F.1 dirty-bit field injected by {@link FieldAdder}. The PUTFIELD
+     * pre-hook sets this to {@code 1} on the receiver <em>before</em> calling
+     * {@code $$crochetAccess()} so that any concurrent {@code fastAccess} call that
+     * reads the dirty-bit under the stripe lock observes {@code dirty == 1} and
+     * materializes a shadow rather than incorrectly skipping.
+     */
+    static final String DIRTY_FIELD = FieldAdder.DIRTY_FIELD;
 
     /**
      * Per-owner-name cache of "is this fOwner a type that cannot host an
@@ -191,6 +203,10 @@ public final class FieldAccessWrapper extends ClassVisitor {
         return r;
     }
 
+    /** Descriptor of the {@code @CrochetSkip} annotation. */
+    private static final String CROCHET_SKIP_DESC =
+            "Lnet/jonbell/crochet/annotation/CrochetSkip;";
+
     private static Boolean readSuspectFlags(ClassLoader l, String resource) {
         try (java.io.InputStream in = (l != null
                 ? l.getResourceAsStream(resource)
@@ -208,6 +224,13 @@ public final class FieldAccessWrapper extends ClassVisitor {
             if ("java/lang/Enum".equals(superName)) {
                 return Boolean.TRUE;
             }
+            // @CrochetSkip: classes annotated with this opt out of Crochet
+            // instrumentation, so they won't have a $$crochetAccess() method.
+            // Emit the guarded form (INSTANCEOF CRIJInstrumented + IFEQ skip)
+            // instead of a direct INVOKEVIRTUAL that would fail to link.
+            if (hasAnnotation(reader, CROCHET_SKIP_DESC)) {
+                return Boolean.TRUE;
+            }
             return Boolean.FALSE;
         } catch (java.io.IOException ignored) {
             return null;
@@ -217,6 +240,28 @@ public final class FieldAccessWrapper extends ClassVisitor {
             // INVOKEVIRTUAL fast path.
             return null;
         }
+    }
+
+    /**
+     * Return {@code true} iff the class file read by {@code reader} carries
+     * the named annotation descriptor in its {@code RuntimeVisibleAnnotations}
+     * attribute.
+     */
+    private static boolean hasAnnotation(org.objectweb.asm.ClassReader reader, String desc) {
+        final boolean[] found = {false};
+        reader.accept(new org.objectweb.asm.ClassVisitor(Opcodes.ASM9) {
+            @Override
+            public org.objectweb.asm.AnnotationVisitor visitAnnotation(
+                    String descriptor, boolean visible) {
+                if (desc.equals(descriptor)) {
+                    found[0] = true;
+                }
+                return null;
+            }
+        }, org.objectweb.asm.ClassReader.SKIP_CODE
+                | org.objectweb.asm.ClassReader.SKIP_DEBUG
+                | org.objectweb.asm.ClassReader.SKIP_FRAMES);
+        return found[0];
     }
 
     private static final class WrapAccessesMV extends CtorAwareMv {
@@ -329,6 +374,36 @@ public final class FieldAccessWrapper extends ClassVisitor {
         }
 
         /**
+         * F.1: emit the dirty-bit set for a PUTFIELD receiver.
+         *
+         * <p>On entry the stack top is the receiver reference (1 copy — we will
+         * consume it). On exit the stack top is consumed and nothing is pushed.
+         * The caller must have already DUPed the receiver before this call so
+         * that another copy remains for the subsequent {@link #emitPreHook} call.
+         *
+         * <p>Emits:
+         * <pre>
+         *   INVOKESTATIC CheckpointRollbackAgent.noteDirty(Ljava/lang/Object;)V
+         * </pre>
+         *
+         * which sets {@code $$crochetDirty = 1} on the receiver via its
+         * per-class VarHandle, tolerating null and pre-F.1 classes. The
+         * INVOKESTATIC is cheaper than the inline INSTANCEOF + PUTFIELD
+         * alternative because the noteDirty body is a simple null-check +
+         * VarHandle.set, JIT-inlined to ~4 instructions on the hot path after
+         * the class loader resolves the VersionHandles.dirty handle.
+         *
+         * <p>Timing: this fires BEFORE {@link #emitPreHook}, establishing
+         * the pre-hook timing invariant: "dirty==1 before any concurrent
+         * fastAccess can observe the object" (SOUNDNESS.md §5).
+         */
+        private static void emitDirtySet(MethodVisitor mv) {
+            mv.visitMethodInsn(Opcodes.INVOKESTATIC,
+                    "net/jonbell/crochet/runtime/CheckpointRollbackAgent",
+                    "noteDirty", "(Ljava/lang/Object;)V", false);
+        }
+
+        /**
          * Emit the {@code GETSTATIC VERSION_GATE; IFEQ skip} prefix. Caller
          * supplies the {@code skip} label and emits the pre-hook body between
          * it and the label.
@@ -371,6 +446,13 @@ public final class FieldAccessWrapper extends ClassVisitor {
                     // stack: [..., value, objref]
                     mv.visitInsn(Opcodes.DUP);
                     // stack: [..., value, objref, objref]
+                    // F.1: set dirty bit BEFORE calling $$crochetAccess so that any
+                    // concurrent fastAccess observes dirty==1 and materializes a shadow
+                    // (SOUNDNESS.md §5: pre-hook timing invariant).
+                    emitDirtySet(mv);
+                    // stack: [..., value, objref]
+                    mv.visitInsn(Opcodes.DUP);
+                    // stack: [..., value, objref, objref]
                     emitPreHook(mv, fOwner);
                     // stack: [..., value, objref]
                     mv.visitInsn(Opcodes.SWAP);
@@ -390,6 +472,11 @@ public final class FieldAccessWrapper extends ClassVisitor {
                 emitGatePrefix(mv, skip);
                 // stack: [..., objref, v_hi, v_lo]
                 locals.emitVarInsn(storeOp, slot);
+                // stack: [..., objref]
+                mv.visitInsn(Opcodes.DUP);
+                // stack: [..., objref, objref]
+                // F.1: set dirty bit BEFORE calling $$crochetAccess.
+                emitDirtySet(mv);
                 // stack: [..., objref]
                 mv.visitInsn(Opcodes.DUP);
                 // stack: [..., objref, objref]

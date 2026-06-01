@@ -1,0 +1,53 @@
+{
+  "bug": "Jsoup-28",
+  "condition": "C2",
+  "model": "claude-haiku-4-5",
+  "model_default_used": false,
+  "started_at": "2026-06-01T03:37:01+00:00",
+  "duration_seconds": 323,
+  "tool_calls": 76,
+  "compile_fail": false,
+  "primary_pass": true,
+  "test_pass": true,
+  "baseline_failing_count": 4,
+  "agent_induced_regressions": [],
+  "regressed_tests": [],
+  "diagnosis_quality": 2,
+  "agent_exit_code": 0,
+  "bug_reproduced_pretest": true,
+  "agent_patch": "diff --git a/maven-build.xml b/maven-build.xml\nindex 93e81600..f77e8eba 100644\n--- a/maven-build.xml\n+++ b/maven-build.xml\n@@ -68,10 +68,10 @@\n            debug=\"true\" \n            optimize=\"false\" \n            deprecation=\"true\" \n-           target=\"1.6\" \n+           target=\"1.8\" \n            verbose=\"false\" \n            fork=\"false\" \n-           source=\"1.6\">\n+           source=\"1.8\">\n       <src>\n         <pathelement location=\"${maven.build.srcDir.0}\"/>\n       </src>\n@@ -99,10 +99,10 @@\n            debug=\"true\" \n            optimize=\"false\" \n            deprecation=\"true\" \n-           target=\"1.6\" \n+           target=\"1.8\" \n            verbose=\"false\" \n            fork=\"false\" \n-           source=\"1.6\">\n+           source=\"1.8\">\n       <src>\n         <pathelement location=\"${maven.build.testDir.0}\"/>\n       </src>\ndiff --git a/pom.xml b/pom.xml\nindex cba33964..4bc04d70 100644\n--- a/pom.xml\n+++ b/pom.xml\n@@ -37,8 +37,8 @@\n         <artifactId>maven-compiler-plugin</artifactId>\n         <version>2.0.2</version>\n         <configuration>\n-          <source>1.5</source>\n-          <target>1.5</target>\n+          <source>1.8</source>\n+          <target>1.8</target>\n           <encoding>UTF-8</encoding>\n         </configuration>\n       </plugin>\ndiff --git a/src/main/java/org/jsoup/nodes/Entities.java b/src/main/java/org/jsoup/nodes/Entities.java\nindex be73e321..ec5edc2b 100644\n--- a/src/main/java/org/jsoup/nodes/Entities.java\n+++ b/src/main/java/org/jsoup/nodes/Entities.java\n@@ -115,10 +115,17 @@ public class Entities {\n                 }\n             } else {\n                 String name = m.group(1);\n-                if (full.containsKey(name))\n-                    charval = full.get(name);\n+                boolean hasSemicolon = m.group(0).endsWith(\";\");\n+                if (hasSemicolon) {\n+                    if (full.containsKey(name))\n+                        charval = full.get(name);\n+                    else if (base.containsKey(name))\n+                        charval = base.get(name);\n+                } else if (base.containsKey(name)) {\n+                    charval = base.get(name);\n+                }\n             }\n-            if (charval != -1 || charval > 0xFFFF) {\n+            if (charval != -1 && charval <= 0xFFFF) {\n                 String c = Character.toString((char) charval);\n                 m.appendReplacement(accum, Matcher.quoteReplacement(c));\n             } else {\n",
+  "agent_log": "{\"type\":\"result\",\"subtype\":\"success\",\"is_error\":false,\"api_error_status\":null,\"duration_ms\":322526,\"duration_api_ms\":249578,\"ttft_ms\":1968,\"num_turns\":76,\"result\":\"Perfect! The target test is passing. Now let me verify my understanding of the root cause:\\n\\nDIAGNOSIS COMPLETE\\n\\nThe root cause of the bug was a logical error in the Entities.unescape method's entity validation condition. The original code used an OR operator (`||`) when it should have used AND (`&&`), combined with insufficient validation of entity format:\\n\\nOriginal buggy code:\\n```java\\nif (charval != -1 || charval > 0xFFFF) {\\n    // ... replace\\n}\\n```\\n\\nThe fix addresses two issues:\\n\\n1. **Logic operator fix**: Changed `||` to `&&` to properly validate that a character code is both found (not -1) AND within valid Unicode range (\u2264 0xFFFF).\\n\\n2. **Semicolon validation for named entities**: Added a check to distinguish between:\\n   - Named entities **with** semicolon (e.g., `&angst;`): These can be from the full entity set\\n   - Named entities **without** semicolon (e.g., `&angst`): These are only unescaped if they're in the base (common) entity set\\n   - Named entities with semicolon but not found: Fall back to check base entities\\n\\nThis prevents the incorrect unescaping of `&angst` (without semicolon), which is an extended entity that should only be recognized with its trailing semicolon in non-strict parsing mode. The base entities like `&reg` and `&LT` (without semicolons) continue to be unescaped as expected, matching HTML's lenient parsing behavior for common entities.\",\"stop_reason\":\"end_turn\",\"session_id\":\"0a1e91b6-283f-47e5-b6b6-a2a53f4b93aa\",\"total_cost_usd\":0.6774975,\"usage\":{\"input_tokens\":111,\"cache_creation_input_tokens\":69418,\"cache_read_input_tokens\":4793140,\"output_tokens\":22260,\"server_tool_use\":{\"web_search_requests\":0,\"web_fetch_requests\":0},\"service_tier\":\"standard\",\"cache_creation\":{\"ephemeral_1h_input_tokens\":69418,\"ephemeral_5m_input_tokens\":0},\"inference_geo\":\"not_available\",\"iterations\":[{\"input_tokens\":0,\"output_tokens\":365,\"cache_read_input_tokens\":81630,\"cache_creation_input_tokens\":368,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":368},\"type\":\"message\"}],\"speed\":\"standard\"},\"modelUsage\":{\"claude-haiku-4-5\":{\"inputTokens\":111,\"outputTokens\":22260,\"cacheReadInputTokens\":4793140,\"cacheCreationInputTokens\":69418,\"webSearchRequests\":0,\"costUSD\":0.6774975,\"contextWindow\":200000,\"maxOutputTokens\":32000}},\"permission_denials\":[],\"terminal_reason\":\"completed\",\"fast_mode_state\":\"off\",\"uuid\":\"984a334b-2e91-4725-bcf0-32aed7cd26a6\"}\n",
+  "agent_stderr": "",
+  "judge_reasoning": "The ground-truth root cause is incorrect handling of the boundary between decimal and hexadecimal numeric character references in the entity trie lookup, but the agent focused on a logic operator bug (`||` vs `&&`) and semicolon validation for named entities. The agent is in the right component (Entities.unescape) and its semicolon-handling discussion touches the named-entity side, but it entirely misses the decimal/hex numeric reference boundary that is the actual cause, suggesting a fix that addresses symptoms without understanding the real mechanism.\n",
+  "verify_log": "Running ant (compile.tests)................................................ OK\nRunning ant (run.dev.tests)................................................ OK\nFailing tests: 1\n  - org.jsoup.nodes.EntitiesTest::unescape\n",
+  "baseline_failing_tests": [
+    "org.jsoup.parser.AttributeParseTest::moreAttributeUnescapes",
+    "org.jsoup.parser.AttributeParseTest::strictAttributeUnescapes",
+    "org.jsoup.parser.HtmlParserTest::doesNotFindShortestMatchingEntity",
+    "org.jsoup.parser.HtmlParserTest::relaxedBaseEntityMatchAndStrictExtendedMatch"
+  ],
+  "compile_log": "Running ant (compile)...................................................... OK\nRunning ant (compile.tests)................................................ OK\n",
+  "agent_modified_files": [
+    "maven-build.xml",
+    "pom.xml",
+    "src/main/java/org/jsoup/nodes/Entities.java"
+  ],
+  "canonical_modified_files": [
+    "src/main/java/org/jsoup/nodes/Entities.java",
+    "src/main/java/org/jsoup/parser/Parser.java",
+    "src/main/java/org/jsoup/parser/Tokeniser.java"
+  ],
+  "agent_modified_prod_files": [
+    "src/main/java/org/jsoup/nodes/Entities.java"
+  ],
+  "file_overlap": [
+    "src/main/java/org/jsoup/nodes/Entities.java"
+  ],
+  "missed_canonical": [
+    "src/main/java/org/jsoup/parser/Parser.java",
+    "src/main/java/org/jsoup/parser/Tokeniser.java"
+  ],
+  "extra_prod_files": [],
+  "fix_locality_score": 0.5,
+  "test_pass_strict": true
+}

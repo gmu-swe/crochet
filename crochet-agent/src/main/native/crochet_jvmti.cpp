@@ -277,6 +277,251 @@ Java_net_jonbell_crochet_runtime_StackRoots_collectAllStackObjects(
     return result;
 }
 
+// ---------------------------------------------------------------------------
+// STW heap iteration for HeapWalker.iterateAndCheckpoint(int, Class[]).
+// ---------------------------------------------------------------------------
+//
+// Implementation strategy (two-phase tagging):
+//
+// JVMTI's IterateOverInstancesOfClass callback (jvmtiHeapObjectCallback)
+// does NOT provide a jobject — only class_tag, size, tag_ptr, user_data.
+// To obtain actual jobject references so we can call $$crochetCheckpoint(V)
+// via JNI, we use:
+//
+//   Phase A (inside STW, IterateOverInstancesOfClass):
+//     Set *tag_ptr = g_heap_walk_tag on every found instance.
+//
+//   Phase B (still inside STW, after all classes iterated):
+//     GetObjectsWithTags({g_heap_walk_tag}) -> jobject[] for each tagged obj.
+//     Call $$crochetCheckpoint(V) on each via CallVoidMethod.
+//     SetTag(obj, 0) to clear tag after processing.
+//
+// Both phases run inside the STW window so the frozen heap is maintained.
+// See designs/E.1/SOUNDNESS.md §2 for the correctness argument.
+
+// Sentinel tag used to mark CRIJInstrumented instances during the walk.
+// Any non-zero jlong value works; this spells "CRIJLIVE" in ASCII.
+static const jlong g_heap_walk_tag = 0x4352494A4C495645LL;
+
+// Phase A callback: tag every found instance with g_heap_walk_tag.
+// jvmtiHeapObjectCallback signature: (class_tag, size, tag_ptr, user_data).
+static jvmtiIterationControl JNICALL tag_crij_instance(
+        jlong   /*class_tag*/,
+        jlong   /*size*/,
+        jlong*  tag_ptr,
+        void*   user_data) {
+    if (tag_ptr != nullptr) {
+        *tag_ptr = g_heap_walk_tag;
+    }
+    if (user_data != nullptr) {
+        (*reinterpret_cast<int*>(user_data))++;
+    }
+    return JVMTI_ITERATION_CONTINUE;
+}
+
+// Native entry point:  boolean HeapWalker.iterateAndCheckpoint(int, Class[])
+//
+// Algorithm:
+//   1. Resolve $$crochetCheckpoint(int) method ID on CRIJInstrumented.
+//   2. GetAllThreads; build suspension list (everyone except caller).
+//   3. SuspendThreadList — STW begins.
+//   4. Phase A: for each class in the `classes` array, call
+//      IterateOverInstancesOfClass(..., tag_crij_instance) to tag instances.
+//   5. Phase B: GetObjectsWithTags({g_heap_walk_tag}) -> jobject[].
+//      Call $$crochetCheckpoint(V) on each. Clear tags.
+//   6. ResumeThreadList — STW ends.
+//   7. Return true iff no errors.
+extern "C" JNIEXPORT jboolean JNICALL
+Java_net_jonbell_crochet_runtime_HeapWalker_iterateAndCheckpoint(
+        JNIEnv* env, jclass /*cls*/, jint version, jobjectArray classes) {
+    if (g_jvmti == nullptr) return JNI_FALSE;
+    if (classes == nullptr) return JNI_FALSE;
+
+    std::lock_guard<std::mutex> lock(g_walk_mutex);
+
+    // Resolve $$crochetCheckpoint(int) on the CRIJInstrumented interface.
+    jclass crij_cls = env->FindClass("net/jonbell/crochet/runtime/CRIJInstrumented");
+    if (crij_cls == nullptr) {
+        if (env->ExceptionCheck()) env->ExceptionClear();
+        fprintf(stderr, "[crochet-jvmti] HeapWalker: could not find CRIJInstrumented\n");
+        return JNI_FALSE;
+    }
+    jmethodID checkpoint_mid = env->GetMethodID(crij_cls, "$$crochetCheckpoint", "(I)V");
+    if (checkpoint_mid == nullptr) {
+        if (env->ExceptionCheck()) env->ExceptionClear();
+        fprintf(stderr, "[crochet-jvmti] HeapWalker: could not find $$crochetCheckpoint\n");
+        return JNI_FALSE;
+    }
+
+    // Build suspension list (everyone except the iteration thread).
+    jthread caller = nullptr;
+    g_jvmti->GetCurrentThread(&caller);
+
+    jint thread_count = 0;
+    jthread* threads = nullptr;
+    jvmtiError err = g_jvmti->GetAllThreads(&thread_count, &threads);
+    if (err != JVMTI_ERROR_NONE || threads == nullptr) {
+        fprintf(stderr, "[crochet-jvmti] HeapWalker: GetAllThreads failed: %d\n", err);
+        return JNI_FALSE;
+    }
+
+    std::vector<jthread> targets;
+    targets.reserve(thread_count);
+    for (jint i = 0; i < thread_count; ++i) {
+        if (env->IsSameObject(threads[i], caller)) continue;
+        targets.push_back(threads[i]);
+    }
+
+    std::vector<jvmtiError> suspend_results(targets.size(), JVMTI_ERROR_NONE);
+    if (!targets.empty()) {
+        err = g_jvmti->SuspendThreadList(
+                static_cast<jint>(targets.size()),
+                targets.data(),
+                suspend_results.data());
+        // Inspect per-thread results.  JVMTI_ERROR_THREAD_SUSPENDED is benign
+        // (thread was already suspended by another agent or a prior call).
+        // Any other non-NONE result means the thread is running and the STW
+        // guarantee cannot be honoured for it — abort to preserve §1.
+        bool partial_failure = false;
+        for (size_t i = 0; i < targets.size(); ++i) {
+            jvmtiError r = suspend_results[i];
+            if (r != JVMTI_ERROR_NONE && r != JVMTI_ERROR_THREAD_SUSPENDED) {
+                char* name = nullptr;
+                g_jvmti->GetErrorName(r, &name);
+                fprintf(stderr, "[crochet-jvmti] HeapWalker: SuspendThreadList"
+                        " partial failure: thread[%zu] error %d (%s);"
+                        " aborting STW walk to preserve §1 guarantee.\n",
+                        i, r, name ? name : "?");
+                if (name) g_jvmti->Deallocate(reinterpret_cast<unsigned char*>(name));
+                partial_failure = true;
+            }
+        }
+        if (partial_failure) {
+            // Resume the threads we DID successfully suspend before bailing out.
+            // A thread with JVMTI_ERROR_THREAD_SUSPENDED was already suspended
+            // before we arrived — we must NOT resume it, as we didn't suspend it.
+            // A thread with JVMTI_ERROR_NONE was suspended by us — resume it.
+            std::vector<jthread> to_resume;
+            to_resume.reserve(targets.size());
+            for (size_t i = 0; i < targets.size(); ++i) {
+                if (suspend_results[i] == JVMTI_ERROR_NONE) {
+                    to_resume.push_back(targets[i]);
+                }
+            }
+            if (!to_resume.empty()) {
+                std::vector<jvmtiError> resume_results(to_resume.size(), JVMTI_ERROR_NONE);
+                g_jvmti->ResumeThreadList(
+                        static_cast<jint>(to_resume.size()),
+                        to_resume.data(),
+                        resume_results.data());
+            }
+            g_jvmti->Deallocate(reinterpret_cast<unsigned char*>(threads));
+            // Surface as an exception so CrochetWorldSafe can throw
+            // IllegalStateException to the caller.
+            env->ThrowNew(
+                env->FindClass("java/lang/IllegalStateException"),
+                "checkpointWorldSafe: SuspendThreadList partial failure;"
+                " STW guarantee cannot be honored");
+            return JNI_FALSE;
+        }
+    }
+
+    // ===================== STW window begins =====================
+
+    // Phase A: tag every live CRIJInstrumented instance.
+    int total_tagged = 0;
+    int phase_a_errors = 0;
+    jint num_classes = env->GetArrayLength(classes);
+    for (jint ci = 0; ci < num_classes; ++ci) {
+        jobject cls_obj = env->GetObjectArrayElement(classes, ci);
+        if (cls_obj == nullptr) continue;
+        jclass klass = reinterpret_cast<jclass>(cls_obj);
+        int class_tagged = 0;
+        jvmtiError iter_err = g_jvmti->IterateOverInstancesOfClass(
+                klass,
+                JVMTI_HEAP_OBJECT_EITHER,
+                tag_crij_instance,
+                &class_tagged);
+        total_tagged += class_tagged;
+        if (iter_err != JVMTI_ERROR_NONE) {
+            char* name = nullptr;
+            g_jvmti->GetErrorName(iter_err, &name);
+            fprintf(stderr, "[crochet-jvmti] HeapWalker: IterateOverInstancesOfClass"
+                    " error %d (%s) for class[%d]\n",
+                    iter_err, name ? name : "?", ci);
+            if (name) g_jvmti->Deallocate(reinterpret_cast<unsigned char*>(name));
+            phase_a_errors++;
+        }
+        env->DeleteLocalRef(cls_obj);
+    }
+
+    // Phase B: retrieve tagged jobjects and call $$crochetCheckpoint.
+    int checkpoint_count = 0;
+    int checkpoint_errors = 0;
+
+    if (total_tagged > 0) {
+        jlong tags[1] = { g_heap_walk_tag };
+        jint  out_count = 0;
+        jobject* out_objs = nullptr;
+        jlong*   out_tags = nullptr;
+
+        jvmtiError get_err = g_jvmti->GetObjectsWithTags(
+                1, tags, &out_count, &out_objs, &out_tags);
+
+        if (get_err == JVMTI_ERROR_NONE && out_objs != nullptr) {
+            for (jint i = 0; i < out_count; ++i) {
+                jobject obj = out_objs[i];
+                if (obj == nullptr) continue;
+                env->CallVoidMethod(obj, checkpoint_mid, version);
+                if (env->ExceptionCheck()) {
+                    env->ExceptionClear();
+                    checkpoint_errors++;
+                } else {
+                    checkpoint_count++;
+                }
+                // Clear tag so it doesn't pollute future walks.
+                g_jvmti->SetTag(obj, 0L);
+                env->DeleteLocalRef(obj);
+            }
+            g_jvmti->Deallocate(reinterpret_cast<unsigned char*>(out_objs));
+            if (out_tags != nullptr) {
+                g_jvmti->Deallocate(reinterpret_cast<unsigned char*>(out_tags));
+            }
+        } else if (get_err != JVMTI_ERROR_NONE) {
+            char* name = nullptr;
+            g_jvmti->GetErrorName(get_err, &name);
+            fprintf(stderr, "[crochet-jvmti] HeapWalker: GetObjectsWithTags"
+                    " error %d (%s)\n", get_err, name ? name : "?");
+            if (name) g_jvmti->Deallocate(reinterpret_cast<unsigned char*>(name));
+            checkpoint_errors += total_tagged;
+        }
+    }
+
+    // ===================== STW window ends =====================
+
+    if (!targets.empty()) {
+        std::vector<jvmtiError> resume_results(targets.size(), JVMTI_ERROR_NONE);
+        g_jvmti->ResumeThreadList(
+                static_cast<jint>(targets.size()),
+                targets.data(),
+                resume_results.data());
+    }
+
+    g_jvmti->Deallocate(reinterpret_cast<unsigned char*>(threads));
+
+    int total_errors = phase_a_errors + checkpoint_errors;
+    if (total_errors > 0) {
+        fprintf(stderr, "[crochet-jvmti] HeapWalker: %d errors"
+                " (checkpointed %d/%d instances)\n",
+                total_errors, checkpoint_count, total_tagged);
+    }
+    return (total_errors == 0) ? JNI_TRUE : JNI_FALSE;
+}
+
+// ---------------------------------------------------------------------------
+// VMInit callback: engage StackRoots AND HeapWalker.
+// ---------------------------------------------------------------------------
+
 void JNICALL VMInitCallback(jvmtiEnv* /*jvmti*/, JNIEnv* env, jthread /*thread*/) {
     // VM is fully booted; safe to load StackRoots and flip its engaged flag.
     jclass cls = env->FindClass("net/jonbell/crochet/runtime/StackRoots");
@@ -297,7 +542,29 @@ void JNICALL VMInitCallback(jvmtiEnv* /*jvmti*/, JNIEnv* env, jthread /*thread*/
         env->ExceptionClear();
         return;
     }
-    fprintf(stderr, "[crochet-jvmti] engaged\n");
+    fprintf(stderr, "[crochet-jvmti] StackRoots engaged\n");
+
+    // Also engage HeapWalker for the STW heap-iteration path (E.1).
+    jclass hw_cls = env->FindClass("net/jonbell/crochet/runtime/HeapWalker");
+    if (hw_cls == nullptr) {
+        if (env->ExceptionCheck()) env->ExceptionClear();
+        fprintf(stderr, "[crochet-jvmti] could not find HeapWalker class"
+                " (load libcrochet-jvmti.so AFTER the javaagent)\n");
+        return;
+    }
+    jmethodID hw_mark = env->GetStaticMethodID(hw_cls, "markEngaged", "()V");
+    if (hw_mark == nullptr) {
+        if (env->ExceptionCheck()) env->ExceptionClear();
+        fprintf(stderr, "[crochet-jvmti] could not find HeapWalker.markEngaged\n");
+        return;
+    }
+    env->CallStaticVoidMethod(hw_cls, hw_mark);
+    if (env->ExceptionCheck()) {
+        env->ExceptionDescribe();
+        env->ExceptionClear();
+        return;
+    }
+    fprintf(stderr, "[crochet-jvmti] HeapWalker engaged\n");
 }
 
 }  // namespace
@@ -316,6 +583,8 @@ Agent_OnLoad(JavaVM* vm, char* /*options*/, void* /*reserved*/) {
     caps.can_access_local_variables = 1;
     caps.can_get_source_file_name = 0;
     caps.can_suspend = 1;
+    // Required for IterateOverInstancesOfClass + GetObjectsWithTags (E.1).
+    caps.can_tag_objects = 1;
     check(jvmti->AddCapabilities(&caps), "AddCapabilities");
 
     jvmtiEventCallbacks cbs;

@@ -1,11 +1,14 @@
 package net.jonbell.crochet.runtime;
 
+import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.VarHandle;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 
 import sun.misc.Unsafe;
+
+import net.jonbell.crochet.annotation.Internal;
 
 /**
  * Per-user-class metadata that the legacy CROCHET attached by monkey-patching
@@ -19,6 +22,7 @@ import sun.misc.Unsafe;
  * guarantees — any thread observing a non-null binding sees both fields fully
  * constructed even without a volatile read.
  */
+@Internal
 public final class ClassMeta {
 
     private static final ClassValue<ClassMeta> CACHE = new ClassValue<>() {
@@ -37,6 +41,44 @@ public final class ClassMeta {
 
     public static ClassMeta of(Class<?> userClass) {
         return CACHE.get(userClass);
+    }
+
+    /**
+     * Force this class's {@code <clinit>} to complete now, while
+     * {@code RuntimeReady.VERSION_GATE == 0}. Invoked from
+     * {@link net.jonbell.crochet.agent.CrochetAgent#premain} to prevent the
+     * following cycle observed under the instrumented JDK after the first
+     * {@code Crochet.checkpoint()} call lifts VERSION_GATE:
+     *
+     * <pre>
+     *   instrumented-JDK PUTFIELD
+     *     → noteDirty(obj)
+     *       → ClassMeta.of(obj.getClass())     // first reference: triggers <clinit>
+     *         → ClassMeta.<clinit> runs
+     *           → new ClassValue&lt;&gt;() { ... }   // constructs anonymous subclass
+     *             → ClassValue.&lt;init&gt; PUTFIELDs (instrumented under Gap 7)
+     *               → noteDirty(thisClassValue)
+     *                 → ClassMeta.of(...)        // CACHE still null → NPE
+     * </pre>
+     *
+     * <p>Per JLS §12.4.1, invoking a static method triggers {@code <clinit>}
+     * for free, but {@code <clinit>} alone is not enough: the body also
+     * needs to drive {@code CACHE.get(...)} once so that
+     * {@code java.lang.ClassValue$ClassValueMap} loads here, while
+     * {@code VERSION_GATE == 0}. Without that, the first user-code
+     * {@code ClassMeta.of(...)} after a checkpoint lifts VERSION_GATE
+     * fires instrumented PUTFIELDs during the mid-load
+     * {@code ClassValueMap.<clinit>}, producing a {@link ClassCircularityError}.
+     *
+     * <p>We then cleanly remove the synthetic {@code Object.class} entry
+     * from {@link CheckpointRollbackAgent#TOUCHED_CLASSES} that the
+     * {@code computeValue} side-effect added — {@code Object} is in the
+     * transformer's skip-list, has no {@code $$crochet*} surface, and must
+     * not appear as a checkpointAll root.
+     */
+    public static void warmup() {
+        CACHE.get(Object.class);
+        CheckpointRollbackAgent.TOUCHED_CLASSES.remove(Object.class);
     }
 
     /**
@@ -75,18 +117,30 @@ public final class ClassMeta {
 
     /**
      * Cached {@link VarHandle} accessors for the injected {@code $$crochetVersion}
-     * field. Resolved via the user class's own {@code $$crochetLookup()} so
-     * that the handle carries private-member access — the field is emitted
-     * {@code ACC_PRIVATE | ACC_SYNTHETIC | ACC_TRANSIENT} and is otherwise
-     * unreachable from outside the class. Published via {@code final} fields
-     * on this immutable holder, so any non-null observation of
+     * and {@code $$crochetDirty} fields. Resolved via the user class's own
+     * {@code $$crochetLookup()} so that the handles carry private-member access —
+     * both fields are emitted {@code ACC_PRIVATE | ACC_SYNTHETIC | ACC_TRANSIENT}
+     * and are otherwise unreachable from outside the class. Published via
+     * {@code final} fields on this immutable holder, so any non-null observation of
      * {@link ClassMeta#versionHandles} guarantees all slots are fully initialised.
+     *
+     * <p>The {@code dirty} VarHandle backs the F.1 dirty-bit optimization.
+     * {@code $$crochetDirty} is set to 1 by the PUTFIELD pre-hook (in
+     * {@code FieldAccessWrapper}) and read/cleared by {@code FastProxySupport.fastAccess}
+     * under the stripe lock. Volatile access semantics on the read side (via
+     * {@link VarHandle#getVolatile}) pair with the stripe-lock release-acquire to
+     * establish happens-before between the dirty-bit clear at one checkpoint and the
+     * dirty-bit read at the next checkpoint.
      */
     public static final class VersionHandles {
         public final VarHandle version;
+        /** VarHandle for {@code $$crochetDirty} (F.1 dirty-bit). May be null if the
+         *  user class predates F.1 instrumentation (fallback: treat as always dirty). */
+        public final VarHandle dirty;
 
-        VersionHandles(VarHandle version) {
+        VersionHandles(VarHandle version, VarHandle dirty) {
             this.version = version;
+            this.dirty = dirty;
         }
     }
 
@@ -99,7 +153,12 @@ public final class ClassMeta {
     private volatile FieldOffsets fieldOffsets;
     private volatile VersionHandles versionHandles;
 
-    /** Cached bytecode-emitting {@link MethodHandles.Lookup} for this class. */
+    /** Cached bytecode-emitting {@link MethodHandles.Lookup} for this class.
+     *  Populated by {@link #resolveLookup()} the first time it is called.
+     *  See {@link #resolveLookup()} for the {@code @CallerSensitive} hazard
+     *  that forces the Lookup to be captured inside the user-class frame
+     *  (via {@code CheckpointRollbackAgent.PUBLISHED_LOOKUP_MAP}) rather
+     *  than obtained reflectively. */
     volatile MethodHandles.Lookup lookup;
 
     /* ---- Gap 3 (bytecode): static-field helper fields ---- */
@@ -131,19 +190,48 @@ public final class ClassMeta {
         if (l != null) {
             return l;
         }
+        // Side-table publication (from user-class clinit) is the preferred
+        // source — its Lookup was captured inside the user class's own frame
+        // and has the correct lookupClass(). The reflective fallback below
+        // is only reached on classes whose clinit didn't run our emit (JDK
+        // internals reached during very early boot before agent install).
+        l = CheckpointRollbackAgent.publishedLookup(userClass);
+        if (l != null) {
+            lookup = l;
+            return l;
+        }
         try {
+            // Resolve via a MethodHandle rather than {@link
+            // java.lang.reflect.Method#invoke}. {@code MethodHandles.lookup()}
+            // inside the user class's {@code $$crochetLookup} body is
+            // {@code @CallerSensitive}: when reached through
+            // {@code Method.invoke}, the JVM's caller-class resolution
+            // identifies {@code jdk.internal.reflect.DirectMethodHandleAccessor}
+            // (the reflection accessor introduced in JDK 18) as the caller,
+            // not the user class — so the returned Lookup has
+            // {@code lookupClass() == DirectMethodHandleAccessor}. Any
+            // subsequent {@code findVarHandle} then fails with
+            // "symbolic reference class is not accessible: class
+            // DirectMethodHandleAccessor, from class
+            // net.jonbell.crochet.runtime.ClassMeta (module java.base)"
+            // because that accessor is qualified-exported only to a
+            // hardcoded set of modules. Invoking through
+            // {@link MethodHandle} preserves the user-class frame, so
+            // {@code lookupClass() == userClass} as intended. The agent
+            // jar's {@link MethodHandles#lookup} call below is fine: it
+            // gives ClassMeta the right to {@link MethodHandles.Lookup#unreflect}
+            // any setAccessible-cleared {@link Method}.
             Method m = userClass.getDeclaredMethod("$$crochetLookup");
-            // Package-private classes (e.g. org.apache.commons.cli.Util) still
-            // reject reflective invocation of their public members from outside
-            // the package without setAccessible. The injected $$crochetLookup is
-            // ACC_PUBLIC ACC_STATIC but the enclosing class access controls
-            // whether callers can actually reach it.
             m.setAccessible(true);
-            Object result = m.invoke(null);
+            MethodHandle handle = MethodHandles.lookup().unreflect(m);
+            Object result = handle.invoke();
             l = (MethodHandles.Lookup) result;
             lookup = l;
             return l;
-        } catch (ReflectiveOperationException e) {
+        } catch (Throwable e) {
+            if (e instanceof Error err) {
+                throw err;
+            }
             throw new IllegalStateException(
                     "User class " + userClass.getName()
                             + " was not instrumented with $$crochetLookup; was the Java agent attached?",
@@ -269,7 +357,18 @@ public final class ClassMeta {
             try {
                 MethodHandles.Lookup lookup = resolveLookup();
                 VarHandle vh = lookup.findVarHandle(userClass, "$$crochetVersion", int.class);
-                h = new VersionHandles(vh);
+                // F.1: also resolve $$crochetDirty if present. Classes instrumented
+                // before F.1 (or classes that failed dirty-field injection) will not have
+                // this field; we tolerate that by storing null and treating dirty as
+                // "always dirty" at checkpoint time (safe fallback — just no optimization).
+                VarHandle dirtyVh = null;
+                try {
+                    dirtyVh = lookup.findVarHandle(userClass, "$$crochetDirty", int.class);
+                } catch (NoSuchFieldException ignored) {
+                    // Pre-F.1 class or special class that didn't get the dirty field.
+                    // dirtyVh stays null; fastAccess will treat dirty as 1 (always shadow).
+                }
+                h = new VersionHandles(vh, dirtyVh);
                 versionHandles = h;
                 return h;
             } catch (NoSuchFieldException | IllegalAccessException e) {

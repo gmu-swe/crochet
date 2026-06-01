@@ -1,0 +1,32 @@
+{
+  "bug": "Time-11",
+  "condition": "C1",
+  "model": "claude-haiku-4-5",
+  "model_default_used": false,
+  "started_at": "2026-05-21T23:03:23+00:00",
+  "duration_seconds": 81,
+  "tool_calls": 19,
+  "compile_fail": false,
+  "primary_pass": true,
+  "test_pass": true,
+  "baseline_failing_count": 6,
+  "agent_induced_regressions": [],
+  "regressed_tests": [],
+  "diagnosis_quality": 1,
+  "agent_exit_code": 0,
+  "bug_reproduced_pretest": true,
+  "agent_patch": "diff --git a/maven-build.xml b/maven-build.xml\nindex 21b233c1..f73ad386 100644\n--- a/maven-build.xml\n+++ b/maven-build.xml\n@@ -72,10 +72,10 @@\n            debug=\"true\" \n            optimize=\"true\" \n            deprecation=\"false\" \n-           target=\"1.6\" \n+           target=\"1.8\" \n            verbose=\"true\" \n            fork=\"true\" \n-           source=\"1.6\">\n+           source=\"1.8\">\n       <src>\n         <pathelement location=\"${maven.build.srcDir.0}\"/>\n       </src>\n@@ -111,10 +111,10 @@\n            debug=\"true\" \n            optimize=\"true\" \n            deprecation=\"false\" \n-           target=\"1.6\" \n+           target=\"1.8\" \n            verbose=\"true\" \n            fork=\"true\" \n-           source=\"1.6\">\n+           source=\"1.8\">\n       <src>\n         <pathelement location=\"${maven.build.testDir.0}\"/>\n       </src>\ndiff --git a/pom.xml b/pom.xml\nindex 214c9439..8cda0dbf 100644\n--- a/pom.xml\n+++ b/pom.xml\n@@ -187,8 +187,8 @@\n           <verbose>true</verbose>\n           <fork>true</fork>\n           <compilerVersion>1.5</compilerVersion>\n-          <source>1.5</source>\n-          <target>1.5</target>\n+          <source>1.8</source>\n+          <target>1.8</target>\n           <debug>true</debug>\n           <debuglevel>lines,source</debuglevel>\n           <optimize>true</optimize>\ndiff --git a/src/main/java/org/joda/time/tz/ZoneInfoCompiler.java b/src/main/java/org/joda/time/tz/ZoneInfoCompiler.java\nindex 6efe0716..61b3439e 100644\n--- a/src/main/java/org/joda/time/tz/ZoneInfoCompiler.java\n+++ b/src/main/java/org/joda/time/tz/ZoneInfoCompiler.java\n@@ -75,7 +75,11 @@ public class ZoneInfoCompiler {\n      * @return true to log verbosely\n      */\n     public static boolean verbose() {\n-        return cVerbose.get();\n+        Boolean value = cVerbose.get();\n+        if (value == null) {\n+            value = Boolean.FALSE;\n+        }\n+        return value;\n     }\n \n     //-----------------------------------------------------------------------\n",
+  "agent_log": "{\"type\":\"result\",\"subtype\":\"success\",\"is_error\":false,\"api_error_status\":null,\"duration_ms\":79230,\"duration_api_ms\":44858,\"ttft_ms\":2127,\"num_turns\":19,\"result\":\"DIAGNOSIS COMPLETE\\n\\nThe root cause of the failing test was a **ThreadLocal value not being inherited by child threads**. The `ZoneInfoCompiler.verbose()` method uses a static ThreadLocal field `cVerbose` that is initialized with `Boolean.FALSE` in the main thread during class loading. However, when a new thread is spawned (as happens in the test at line 92-97 of TestCompiler), that thread does not inherit the ThreadLocal value from the parent thread. When the child thread calls `verbose()`, `cVerbose.get()` returns null, and the method attempts to auto-unbox null to a primitive boolean, which throws a NullPointerException.\\n\\nThe fix checks if `cVerbose.get()` returns null and defaults to `Boolean.FALSE` in that case, allowing child threads to safely query the verbose flag without crashing. This is a minimal, thread-safe fix that preserves the default behavior (verbose=false) across all threads.\",\"stop_reason\":\"end_turn\",\"session_id\":\"fa80be9b-3657-4cfb-af8b-1a27f979a022\",\"total_cost_usd\":0.13634055,\"usage\":{\"input_tokens\":135,\"cache_creation_input_tokens\":26247,\"cache_read_input_tokens\":811968,\"output_tokens\":4440,\"server_tool_use\":{\"web_search_requests\":0,\"web_fetch_requests\":0},\"service_tier\":\"standard\",\"cache_creation\":{\"ephemeral_1h_input_tokens\":26247,\"ephemeral_5m_input_tokens\":0},\"inference_geo\":\"\",\"iterations\":[{\"input_tokens\":7,\"output_tokens\":447,\"cache_read_input_tokens\":50574,\"cache_creation_input_tokens\":440,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":440},\"type\":\"message\"}],\"speed\":\"standard\"},\"modelUsage\":{\"claude-haiku-4-5\":{\"inputTokens\":135,\"outputTokens\":4440,\"cacheReadInputTokens\":811968,\"cacheCreationInputTokens\":26247,\"webSearchRequests\":0,\"costUSD\":0.13634055,\"contextWindow\":200000,\"maxOutputTokens\":32000}},\"permission_denials\":[],\"terminal_reason\":\"completed\",\"fast_mode_state\":\"off\",\"uuid\":\"d1cdb7df-da6b-4f6b-a390-1dd4a3252278\"}\n",
+  "agent_stderr": "",
+  "judge_reasoning": "The ground-truth root cause is in DateTimeZoneBuilder's handling of recurrence transitions producing wrong zone offsets. The agent's diagnosis instead focuses on a ThreadLocal/NullPointerException issue in ZoneInfoCompiler.verbose(), which is completely unrelated to the actual bug in zone offset computation.\n",
+  "verify_log": "Running ant (compile.tests)................................................ OK\nRunning ant (run.dev.tests)................................................ OK\nFailing tests: 1\n  - org.joda.time.tz.TestCompiler::testDateTimeZoneBuilder\n",
+  "baseline_failing_tests": [
+    "org.joda.time.TestDateMidnight_Properties::testPropertyGetMonthOfYear",
+    "org.joda.time.TestDateTime_Properties::testPropertyGetMonthOfYear",
+    "org.joda.time.TestMonthDay_Properties::testPropertyGetMonthOfYear",
+    "org.joda.time.TestMutableDateTime_Properties::testPropertyGetMonthOfYear",
+    "org.joda.time.convert.TestCalendarConverter::testGetChronology_Object_Zone",
+    "org.joda.time.convert.TestCalendarConverter::testGetChronology_Object_nullChronology"
+  ],
+  "compile_log": "Running ant (compile)...................................................... OK\nRunning ant (compile.tests)................................................ OK\n"
+}

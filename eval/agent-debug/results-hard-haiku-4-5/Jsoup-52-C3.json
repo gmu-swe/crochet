@@ -1,0 +1,46 @@
+{
+  "bug": "Jsoup-52",
+  "condition": "C3",
+  "model": "claude-haiku-4-5",
+  "model_default_used": false,
+  "started_at": "2026-06-01T03:36:05+00:00",
+  "duration_seconds": 168,
+  "tool_calls": 56,
+  "compile_fail": false,
+  "primary_pass": true,
+  "test_pass": true,
+  "baseline_failing_count": 0,
+  "agent_induced_regressions": [],
+  "regressed_tests": [],
+  "diagnosis_quality": 2,
+  "agent_exit_code": 0,
+  "bug_reproduced_pretest": true,
+  "agent_patch": "diff --git a/src/main/java/org/jsoup/nodes/XmlDeclaration.java b/src/main/java/org/jsoup/nodes/XmlDeclaration.java\nindex 24a9f164..4b7f89f9 100644\n--- a/src/main/java/org/jsoup/nodes/XmlDeclaration.java\n+++ b/src/main/java/org/jsoup/nodes/XmlDeclaration.java\n@@ -21,8 +21,33 @@ public class XmlDeclaration extends Node {\n     public XmlDeclaration(String name, String baseUri, boolean isProcessingInstruction) {\n         super(baseUri);\n         Validate.notNull(name);\n-        this.name = name;\n+\n+        // Strip trailing ? if present\n+        String cleanName = name;\n+        if (cleanName.endsWith(\"?\")) {\n+            cleanName = cleanName.substring(0, cleanName.length() - 1).trim();\n+        }\n+\n+        // Parse the declaration name and attributes\n+        String[] parts = cleanName.split(\"\\\\s+\", 2);\n+        this.name = parts[0];\n         this.isProcessingInstruction = isProcessingInstruction;\n+\n+        // Parse attributes if present\n+        if (parts.length > 1) {\n+            parseAttributes(parts[1]);\n+        }\n+    }\n+\n+    private void parseAttributes(String attrString) {\n+        // Simple parser for attributes in the form: version='1' encoding='UTF-8'\n+        java.util.regex.Pattern pattern = java.util.regex.Pattern.compile(\"(\\\\w+)\\\\s*=\\\\s*['\\\"]([^'\\\"]*)['\\\"]\");\n+        java.util.regex.Matcher matcher = pattern.matcher(attrString);\n+        while (matcher.find()) {\n+            String key = matcher.group(1);\n+            String value = matcher.group(2);\n+            attr(key, value);\n+        }\n     }\n \n     public String nodeName() {\n@@ -44,15 +69,15 @@ public class XmlDeclaration extends Node {\n      */\n     public String getWholeDeclaration() {\n         final String decl = this.name;\n-        if(decl.equals(\"xml\") && attributes.size() > 1 ) {\n-            StringBuilder sb = new StringBuilder(decl);\n-            final String version = attributes.get(\"version\");\n-            if( version != null ) {\n-                sb.append(\" version=\\\"\").append(version).append(\"\\\"\");\n-            }\n-            final String encoding = attributes.get(\"encoding\");\n-            if( encoding != null ) {\n-                sb.append(\" encoding=\\\"\").append(encoding).append(\"\\\"\");\n+        if(decl.equals(\"xml\") && attributes.size() > 0 ) {\n+            StringBuilder sb = new StringBuilder();\n+            boolean first = true;\n+            for (Attribute attr : attributes) {\n+                if (!first) {\n+                    sb.append(\" \");\n+                }\n+                sb.append(attr.getKey()).append(\"=\\\"\").append(attr.getValue()).append(\"\\\"\");\n+                first = false;\n             }\n             return sb.toString();\n         }\n@@ -65,8 +90,16 @@ public class XmlDeclaration extends Node {\n         accum\n             .append(\"<\")\n             .append(isProcessingInstruction ? \"!\" : \"?\")\n-                .append(getWholeDeclaration())\n-            .append(\">\");\n+            .append(name);\n+\n+        if (name.equals(\"xml\") && attributes.size() > 0) {\n+            accum.append(\" \");\n+            accum.append(getWholeDeclaration());\n+        }\n+\n+        if (!isProcessingInstruction)\n+            accum.append(\"?\");\n+        accum.append(\">\");\n     }\n \n \tvoid outerHtmlTail(Appendable accum, int depth, Document.OutputSettings out) {}\n",
+  "agent_log": "{\"type\":\"result\",\"subtype\":\"success\",\"is_error\":false,\"api_error_status\":null,\"duration_ms\":167637,\"duration_api_ms\":135650,\"ttft_ms\":3199,\"num_turns\":56,\"result\":\"---\\n\\n## DIAGNOSIS COMPLETE\\n\\n**Root Cause:** The `XmlDeclaration` class had three critical bugs:\\n\\n1. **Missing trailing `?` in XML declarations**: The `outerHtmlHead()` method was not outputting the closing `?` for XML declarations (e.g., `<?xml...?>` instead of just `<?xml...>`).\\n\\n2. **Unparsed attributes in constructor**: When the parser passed the entire declaration string to the `XmlDeclaration` constructor (e.g., `xml version='1' encoding='UTF-8'?`), the constructor was storing the entire string as the `name` field without parsing out the attributes. This prevented the attributes from being recognized and stored in the `attributes` object.\\n\\n3. **Incomplete attribute output in `getWholeDeclaration()`**: The method was only including `version` and `encoding` attributes, ignoring other attributes that might be present.\\n\\n**The Fix:**\\n- Modified the `XmlDeclaration` constructor to:\\n  - Strip the trailing `?` character if present\\n  - Parse the declaration name (e.g., `xml`) from the rest of the string\\n  - Extract all attributes using regex pattern matching and store them properly\\n  \\n- Updated `getWholeDeclaration()` to iterate over all attributes and output them in the correct format (without the `xml` prefix, which is added by `outerHtmlHead()`)\\n\\n- Fixed `outerHtmlHead()` to:\\n  - Output the declaration name (`xml`) followed by attributes\\n  - Add the closing `?` for XML declarations (but not for processing instructions)\\n\\nThe fix ensures XML declarations are properly parsed and output in the correct format: `<?xml version=\\\"1.0\\\" encoding=\\\"UTF-8\\\"?>`.\",\"stop_reason\":\"end_turn\",\"session_id\":\"e8e2fbd4-5ed5-4ad2-bd77-549aefc3d728\",\"total_cost_usd\":0.4748149000000001,\"usage\":{\"input_tokens\":86,\"cache_creation_input_tokens\":65026,\"cache_read_input_tokens\":3351764,\"output_tokens\":11654,\"server_tool_use\":{\"web_search_requests\":0,\"web_fetch_requests\":0},\"service_tier\":\"standard\",\"cache_creation\":{\"ephemeral_1h_input_tokens\":65026,\"ephemeral_5m_input_tokens\":0},\"inference_geo\":\"not_available\",\"iterations\":[{\"input_tokens\":0,\"output_tokens\":402,\"cache_read_input_tokens\":76362,\"cache_creation_input_tokens\":113,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":113},\"type\":\"message\"}],\"speed\":\"standard\"},\"modelUsage\":{\"claude-haiku-4-5\":{\"inputTokens\":86,\"outputTokens\":11654,\"cacheReadInputTokens\":3351764,\"cacheCreationInputTokens\":65026,\"webSearchRequests\":0,\"costUSD\":0.4748149000000001,\"contextWindow\":200000,\"maxOutputTokens\":32000}},\"permission_denials\":[],\"terminal_reason\":\"completed\",\"fast_mode_state\":\"off\",\"uuid\":\"f0eef6a2-39e4-4365-8be9-33db6cda974a\"}\n",
+  "agent_stderr": "",
+  "judge_reasoning": "The ground-truth bug is in Document.updateMetaCharsetElement() taking the wrong update path for XML mode when no charset attribute exists, but the agent diagnosed unrelated bugs in the XmlDeclaration class (trailing '?', constructor parsing, getWholeDeclaration output). The agent stayed in the right general area (XML declaration handling) and its fixes may incidentally affect charset output, but it never identified the actual faulty method or its wrong update path.\n",
+  "verify_log": "Running ant (compile.tests)................................................ OK\nRunning ant (run.dev.tests)................................................ OK\nFailing tests: 1\n  - org.jsoup.nodes.DocumentTest::testMetaCharsetUpdateXmlNoCharset\n",
+  "baseline_failing_tests": [],
+  "compile_log": "Running ant (compile)...................................................... OK\nRunning ant (compile.tests)................................................ OK\n",
+  "agent_modified_files": [
+    "src/main/java/org/jsoup/nodes/XmlDeclaration.java"
+  ],
+  "canonical_modified_files": [
+    "src/main/java/org/jsoup/helper/DataUtil.java",
+    "src/main/java/org/jsoup/nodes/XmlDeclaration.java",
+    "src/main/java/org/jsoup/parser/XmlTreeBuilder.java"
+  ],
+  "agent_modified_prod_files": [
+    "src/main/java/org/jsoup/nodes/XmlDeclaration.java"
+  ],
+  "file_overlap": [
+    "src/main/java/org/jsoup/nodes/XmlDeclaration.java"
+  ],
+  "missed_canonical": [
+    "src/main/java/org/jsoup/helper/DataUtil.java",
+    "src/main/java/org/jsoup/parser/XmlTreeBuilder.java"
+  ],
+  "extra_prod_files": [],
+  "fix_locality_score": 0.5,
+  "test_pass_strict": true
+}

@@ -1,0 +1,59 @@
+{
+  "bug": "JacksonDatabind-79",
+  "condition": "C2",
+  "started_at": "2026-05-21T18:18:54+00:00",
+  "duration_seconds": 159,
+  "tool_calls": 19,
+  "compile_fail": false,
+  "primary_pass": true,
+  "test_pass": true,
+  "baseline_failing_count": 13,
+  "agent_induced_regressions": [],
+  "regressed_tests": [],
+  "diagnosis_quality": 1,
+  "agent_exit_code": 0,
+  "bug_reproduced_pretest": true,
+  "agent_patch": "diff --git a/maven-build.xml b/maven-build.xml\nindex db3349c7a..9d8f34898 100644\n--- a/maven-build.xml\n+++ b/maven-build.xml\n@@ -83,10 +83,10 @@\n            debug=\"true\" \n            optimize=\"true\" \n            deprecation=\"true\" \n-           target=\"1.6\" \n+           target=\"1.8\" \n            verbose=\"false\" \n            fork=\"false\" \n-           source=\"1.6\">\n+           source=\"1.8\">\n       <src>\n         <pathelement location=\"${maven.build.srcDir.0}\"/>\n       </src>\n@@ -111,10 +111,10 @@\n            debug=\"true\" \n            optimize=\"true\" \n            deprecation=\"true\" \n-           target=\"1.6\" \n+           target=\"1.8\" \n            verbose=\"false\" \n            fork=\"false\" \n-           source=\"1.6\">\n+           source=\"1.8\">\n       <src>\n         <pathelement location=\"${maven.build.testDir.0}\"/>\n       </src>\ndiff --git a/src/main/java/com/fasterxml/jackson/databind/ser/std/BeanSerializerBase.java b/src/main/java/com/fasterxml/jackson/databind/ser/std/BeanSerializerBase.java\nindex 1f1d2e3e2..cd610f722 100644\n--- a/src/main/java/com/fasterxml/jackson/databind/ser/std/BeanSerializerBase.java\n+++ b/src/main/java/com/fasterxml/jackson/databind/ser/std/BeanSerializerBase.java\n@@ -430,7 +430,8 @@ public abstract class BeanSerializerBase\n                 // no ObjectId override, but maybe ObjectIdRef?\n                 if (oiw != null) {\n                     objectIdInfo = intr.findObjectReferenceInfo(accessor,\n-                            new ObjectIdInfo(NAME_FOR_OBJECT_REF, null, null, null));\n+                            new ObjectIdInfo(NAME_FOR_OBJECT_REF, null, null, null)\n+                                .withAlwaysAsId(oiw.alwaysAsId));\n                         oiw = _objectIdWriter.withAlwaysAsId(objectIdInfo.getAlwaysAsId());\n                 }\n             } else {\n",
+  "agent_log": "{\"type\":\"result\",\"subtype\":\"success\",\"is_error\":false,\"api_error_status\":null,\"duration_ms\":157306,\"duration_api_ms\":140162,\"ttft_ms\":2022,\"num_turns\":19,\"result\":\"Both tests pass.\\n\\nDIAGNOSIS COMPLETE\\n\\nThe root cause was in `BeanSerializerBase.createContextual` (`src/main/java/com/fasterxml/jackson/databind/ser/std/BeanSerializerBase.java:431-434`). When contextualizing a bean serializer for a property whose **value type** carries `@JsonIdentityReference(alwaysAsId=true)` at the class level (as on `Value1607ViaClass`), the code looks for a `@JsonIdentityReference` annotation on the *property accessor*. To do so it builds a seed `ObjectIdInfo` via `new ObjectIdInfo(NAME_FOR_OBJECT_REF, null, null, null)`, which defaults `alwaysAsId` to `false`. If the property itself has no `@JsonIdentityReference`, `findObjectReferenceInfo` returns that seed unchanged, and the very next line \u2014 `oiw = _objectIdWriter.withAlwaysAsId(objectIdInfo.getAlwaysAsId())` \u2014 unconditionally overwrites the writer's `alwaysAsId` flag with `false`, discarding the value that had been correctly inherited from the class-level annotation in `BeanSerializerFactory.constructObjectIdHandler`. As a result the first reference was being serialized as the full POJO (`{\\\"id\\\":1,\\\"value\\\":13}`) instead of just the id (`1`). The fix seeds the placeholder `ObjectIdInfo` with `oiw.alwaysAsId` so the existing class-level setting is preserved unless the property explicitly overrides it.\",\"stop_reason\":\"end_turn\",\"session_id\":\"e51ef2b4-bb14-45b6-938f-193fccb76f09\",\"total_cost_usd\":0.8601032499999999,\"usage\":{\"input_tokens\":23,\"cache_creation_input_tokens\":36835,\"cache_read_input_tokens\":773639,\"output_tokens\":9718,\"server_tool_use\":{\"web_search_requests\":0,\"web_fetch_requests\":0},\"service_tier\":\"standard\",\"cache_creation\":{\"ephemeral_1h_input_tokens\":36835,\"ephemeral_5m_input_tokens\":0},\"inference_geo\":\"\",\"iterations\":[{\"input_tokens\":1,\"output_tokens\":541,\"cache_read_input_tokens\":55062,\"cache_creation_input_tokens\":272,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":272},\"type\":\"message\"}],\"speed\":\"standard\"},\"modelUsage\":{\"claude-opus-4-7[1m]\":{\"inputTokens\":23,\"outputTokens\":9718,\"cacheReadInputTokens\":773639,\"cacheCreationInputTokens\":36835,\"webSearchRequests\":0,\"costUSD\":0.8601032499999999,\"contextWindow\":1000000,\"maxOutputTokens\":64000}},\"permission_denials\":[],\"terminal_reason\":\"completed\",\"fast_mode_state\":\"off\",\"uuid\":\"980d6889-6465-4693-8aac-1cf03388bc2b\"}\n",
+  "agent_stderr": "",
+  "judge_reasoning": "The ground-truth fix concerns ObjectIdGenerator with ALWAYS_AS_REFERENCE_FIRST policy and the id resolver throwing UnresolvedForwardReference too early when a reference precedes its definition. The agent's diagnosis is about a completely different mechanism \u2014 alwaysAsId flag being clobbered in BeanSerializerBase.createContextual due to class-level @JsonIdentityReference inheritance \u2014 which has nothing to do with forward-reference resolution or deserialization timing.\n",
+  "verify_log": "Running ant (compile.tests)................................................ OK\nRunning ant (run.dev.tests)................................................ OK\nFailing tests: 1\n  - com.fasterxml.jackson.databind.objectid.AlwaysAsReferenceFirstTest::testIssue1607\n",
+  "baseline_failing_tests": [
+    "com.fasterxml.jackson.databind.creators.ArrayDelegatorCreatorForCollectionTest::testUnmodifiable",
+    "com.fasterxml.jackson.databind.deser.TestExceptionDeserialization::testIOException",
+    "com.fasterxml.jackson.databind.deser.TestExceptionDeserialization::testJDK7SuppressionProperty",
+    "com.fasterxml.jackson.databind.deser.TestExceptionDeserialization::testNoArgsException",
+    "com.fasterxml.jackson.databind.deser.TestExceptionDeserialization::testSingleValueArrayDeserializationException",
+    "com.fasterxml.jackson.databind.deser.TestExceptionDeserialization::testWithCreator",
+    "com.fasterxml.jackson.databind.deser.TestExceptionDeserialization::testWithNullMessage",
+    "com.fasterxml.jackson.databind.deser.TestJdkTypes::testStackTraceElementWithCustom",
+    "com.fasterxml.jackson.databind.deser.TestJdkTypes::testStringBuilder",
+    "com.fasterxml.jackson.databind.misc.AccessFixTest::testCauseOfThrowableIgnoral",
+    "com.fasterxml.jackson.databind.struct.TestFormatForCollections::testListAsObject",
+    "com.fasterxml.jackson.databind.type.TestTypeFactoryWithClassLoader",
+    "com.fasterxml.jackson.databind.util.TestClassUtil::testFindEnumType"
+  ],
+  "compile_log": "Running ant (compile)...................................................... OK\nRunning ant (compile.tests)................................................ OK\n",
+  "agent_modified_files": [
+    "maven-build.xml",
+    "src/main/java/com/fasterxml/jackson/databind/ser/std/BeanSerializerBase.java"
+  ],
+  "canonical_modified_files": [
+    "src/main/java/com/fasterxml/jackson/databind/introspect/JacksonAnnotationIntrospector.java",
+    "src/main/java/com/fasterxml/jackson/databind/introspect/ObjectIdInfo.java",
+    "src/main/java/com/fasterxml/jackson/databind/ser/std/BeanSerializerBase.java"
+  ],
+  "agent_modified_prod_files": [
+    "src/main/java/com/fasterxml/jackson/databind/ser/std/BeanSerializerBase.java"
+  ],
+  "file_overlap": [
+    "src/main/java/com/fasterxml/jackson/databind/ser/std/BeanSerializerBase.java"
+  ],
+  "missed_canonical": [
+    "src/main/java/com/fasterxml/jackson/databind/introspect/JacksonAnnotationIntrospector.java",
+    "src/main/java/com/fasterxml/jackson/databind/introspect/ObjectIdInfo.java"
+  ],
+  "extra_prod_files": [],
+  "fix_locality_score": 0.5,
+  "test_pass_strict": true
+}

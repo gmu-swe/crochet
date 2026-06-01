@@ -15,6 +15,21 @@
 
     <description>End-to-end integration tests that run against a Crochet-instrumented JDK produced by the Maven plugin.</description>
 
+    <properties>
+        <!-- Path to the instrumented JDK image. Defaults to the running JAVA_HOME
+             so CI works without a pre-built instrumented JDK. Override with:
+             -DjdkInst=/path/to/instrumented-jdk -->
+        <jdkInst>${env.JAVA_HOME}</jdkInst>
+        <!-- Path to the crochet-agent shaded jar. Defaults to the local
+             Maven repository install from the current build. -->
+        <crochetAgentJar>${settings.localRepository}/edu/neu/ccs/prl/crochet/crochet-agent/${project.version}/crochet-agent-${project.version}.jar</crochetAgentJar>
+        <!-- Integration tests exercise Java 21 APIs (virtual threads, sealed types).
+             The crochet-agent module compiles to Java 17 (source/target only, not
+             release), but the IT module must target Java 21 to reference
+             Thread.ofVirtual() and pattern-match on sealed CheckpointEvent subtypes. -->
+        <maven.compiler.release>21</maven.compiler.release>
+    </properties>
+
     <dependencies>
         <dependency>
             <groupId>edu.neu.ccs.prl.crochet</groupId>
@@ -32,6 +47,16 @@
         <plugins>
             <plugin>
                 <artifactId>maven-failsafe-plugin</artifactId>
+                <configuration>
+                    <!-- Run ITs under the instrumented JDK. -->
+                    <jvm>${jdkInst}/bin/java</jvm>
+                    <argLine>
+                        --add-reads java.base=jdk.unsupported
+                        -javaagent:${crochetAgentJar}
+                        --add-exports java.base/jdk.internal.vm=ALL-UNNAMED
+                        --add-opens java.base/jdk.internal.vm=ALL-UNNAMED
+                    </argLine>
+                </configuration>
                 <executions>
                     <execution>
                         <goals>

@@ -1,0 +1,23 @@
+{
+  "bug": "Math-27",
+  "condition": "C1",
+  "started_at": "2026-05-21T02:06:08+00:00",
+  "duration_seconds": 55,
+  "tool_calls": 11,
+  "compile_fail": false,
+  "primary_pass": true,
+  "test_pass": true,
+  "baseline_failing_count": 0,
+  "agent_induced_regressions": [],
+  "regressed_tests": [],
+  "diagnosis_quality": 5,
+  "agent_exit_code": 0,
+  "bug_reproduced_pretest": true,
+  "agent_patch": "diff --git a/build.xml b/build.xml\nindex a836fbe9b..0de0bf811 100644\n--- a/build.xml\n+++ b/build.xml\n@@ -99,8 +99,8 @@\n   <property name=\"compile.optimize\"        value=\"true\"/>\n     \n   <!-- JDK level -->\n-  <property name=\"compile.source\"          value=\"1.6\"/>\n-  <property name=\"compile.target\"          value=\"1.6\"/>\n+  <property name=\"compile.source\"          value=\"1.8\"/>\n+  <property name=\"compile.target\"          value=\"1.8\"/>\n \n   <!-- Base compile classpath -->\n   <path id=\"compile.classpath\">\ndiff --git a/src/main/java/org/apache/commons/math3/fraction/Fraction.java b/src/main/java/org/apache/commons/math3/fraction/Fraction.java\nindex f84218ebd..f81ff0a94 100644\n--- a/src/main/java/org/apache/commons/math3/fraction/Fraction.java\n+++ b/src/main/java/org/apache/commons/math3/fraction/Fraction.java\n@@ -594,7 +594,7 @@ public class Fraction\n      * @return the fraction percentage as a <tt>double</tt>.\n      */\n     public double percentageValue() {\n-        return multiply(100).doubleValue();\n+        return 100 * doubleValue();\n     }\n \n     /**\n",
+  "agent_log": "{\"type\":\"result\",\"subtype\":\"success\",\"is_error\":false,\"api_error_status\":null,\"duration_ms\":53637,\"duration_api_ms\":40155,\"ttft_ms\":2202,\"num_turns\":11,\"result\":\"Test passes. The task is complete and small enough that task tracking isn't needed.\\n\\nDIAGNOSIS COMPLETE\\n\\nThe root cause was that `Fraction.percentageValue()` was implemented as `multiply(100).doubleValue()`, which performed the multiplication by 100 in `int` arithmetic before converting to double. For the test input `numer = Integer.MAX_VALUE / 99 = 21,691,754`, multiplying by 100 yields 2,169,175,400, which overflows the 32-bit signed `int` range (max 2,147,483,647) and wraps around to a negative value. The `multiply(int)` path also goes through `BigInteger`-based overflow checks and reduction, but ultimately the resulting `Fraction` carried the overflowed numerator, producing a wildly wrong percentage. The fix is to perform the multiplication in `double` arithmetic instead: `100 * doubleValue()`, which avoids any intermediate integer overflow and matches the expected formula `100 * ((double) numer) / denom` used in the test.\",\"stop_reason\":\"end_turn\",\"session_id\":\"d5aeb7e4-b6e5-4b17-be9d-e139b5e12318\",\"total_cost_usd\":0.34072975000000005,\"usage\":{\"input_tokens\":15,\"cache_creation_input_tokens\":17229,\"cache_read_input_tokens\":357447,\"output_tokens\":2170,\"server_tool_use\":{\"web_search_requests\":0,\"web_fetch_requests\":0},\"service_tier\":\"standard\",\"cache_creation\":{\"ephemeral_1h_input_tokens\":17229,\"ephemeral_5m_input_tokens\":0},\"inference_geo\":\"\",\"iterations\":[{\"input_tokens\":1,\"output_tokens\":352,\"cache_read_input_tokens\":35370,\"cache_creation_input_tokens\":358,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":358},\"type\":\"message\"}],\"speed\":\"standard\"},\"modelUsage\":{\"claude-opus-4-7[1m]\":{\"inputTokens\":15,\"outputTokens\":2170,\"cacheReadInputTokens\":357447,\"cacheCreationInputTokens\":17229,\"webSearchRequests\":0,\"costUSD\":0.34072975000000005,\"contextWindow\":1000000,\"maxOutputTokens\":64000}},\"permission_denials\":[],\"terminal_reason\":\"completed\",\"fast_mode_state\":\"off\",\"uuid\":\"0b68635b-a4c3-4fc4-b77f-d9b026d4558c\"}\n",
+  "agent_stderr": "",
+  "judge_reasoning": "The agent precisely identifies the root cause: `percentageValue()` calls `multiply(100)` which performs int arithmetic, and for numerator = Integer.MAX_VALUE/99 the product 2,169,175,400 overflows the signed 32-bit range, yielding a wrong negative result. This matches the ground-truth summary exactly, including the specific method, the overflow mechanism, and the input that triggers it.\n",
+  "verify_log": "Running ant (compile.tests)................................................ OK\nRunning ant (run.dev.tests)................................................ OK\nFailing tests: 1\n  - org.apache.commons.math3.fraction.FractionTest::testMath835\n",
+  "baseline_failing_tests": [],
+  "compile_log": "Running ant (compile)...................................................... OK\nRunning ant (compile.tests)................................................ OK\n"
+}

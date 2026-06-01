@@ -1,0 +1,44 @@
+{
+  "bug": "Closure-110",
+  "condition": "C3",
+  "started_at": "2026-05-21T18:52:05+00:00",
+  "duration_seconds": 105,
+  "tool_calls": 17,
+  "compile_fail": false,
+  "primary_pass": true,
+  "test_pass": true,
+  "baseline_failing_count": 0,
+  "agent_induced_regressions": [],
+  "regressed_tests": [],
+  "diagnosis_quality": 5,
+  "agent_exit_code": 0,
+  "bug_reproduced_pretest": true,
+  "agent_patch": "diff --git a/build.xml b/build.xml\nindex ff96be798..09695dd59 100644\n--- a/build.xml\n+++ b/build.xml\n@@ -28,8 +28,8 @@\n   <property name=\"test.fork\" value=\"true\"/>\n \n   <!-- Force java 6 -->\n-  <property name=\"ant.build.javac.source\" value=\"1.6\" />\n-  <property name=\"ant.build.javac.target\" value=\"1.6\" />\n+  <property name=\"ant.build.javac.source\" value=\"1.8\" />\n+  <property name=\"ant.build.javac.target\" value=\"1.8\" />\n \n   <!-- define other variables -->\n   <property name=\"javac.debug\" value=\"on\" />\ndiff --git a/lib/rhino/build.properties b/lib/rhino/build.properties\nindex e5503e720..c7f1bca36 100644\n--- a/lib/rhino/build.properties\n+++ b/lib/rhino/build.properties\n@@ -21,8 +21,8 @@ classes: ${build.dir}/classes\n \n # compilation settings\n debug: on\n-target-jvm 1.6\n-source-level 1.6\n+target-jvm 1.8\n+source-level 1.8\n \n # jar generation settings\n jar-compression: true\ndiff --git a/src/com/google/javascript/jscomp/ScopedAliases.java b/src/com/google/javascript/jscomp/ScopedAliases.java\nindex 7e9c8b89a..fbd46d338 100644\n--- a/src/com/google/javascript/jscomp/ScopedAliases.java\n+++ b/src/com/google/javascript/jscomp/ScopedAliases.java\n@@ -355,6 +355,7 @@ class ScopedAliases implements HotSwapCompilerPass {\n         Node n = v.getNode();\n         Node parent = n.getParent();\n         boolean isVar = parent.isVar();\n+        boolean isFunctionDecl = NodeUtil.isFunctionDeclaration(parent);\n         if (isVar && n.getFirstChild() != null && n.getFirstChild().isQualifiedName()) {\n           recordAlias(v);\n         } else if (v.isBleedingFunction()) {\n@@ -363,12 +364,13 @@ class ScopedAliases implements HotSwapCompilerPass {\n         } else if (parent.getType() == Token.LP) {\n           // Parameters of the scope function also get a BAD_PARAMETERS\n           // error.\n-        } else if (isVar) {\n+        } else if (isVar || isFunctionDecl) {\n+          boolean isHoisted = NodeUtil.isHoistedFunctionDeclaration(parent);\n           Node grandparent = parent.getParent();\n-          Node value = n.hasChildren() ?\n-              v.getInitialValue().detachFromParent() :\n+          Node value = v.getInitialValue() != null ?\n+              v.getInitialValue() :\n               null;\n-          Node varNode = parent;\n+          Node varNode = null;\n \n           String name = n.getString();\n           int nameCount = scopedAliasNames.count(name);\n@@ -380,7 +382,9 @@ class ScopedAliases implements HotSwapCompilerPass {\n \n           // First, we need to free up the function expression (EXPR)\n           // to be used in another expression.\n+          if (isFunctionDecl) {\n             // Replace \"function NAME() { ... }\" with \"var NAME;\".\n+            Node existingName = v.getNameNode();\n \n             // We can't keep the local name on the function expression,\n             // because IE is buggy and will leak the name into the global\n@@ -389,9 +393,19 @@ class ScopedAliases implements HotSwapCompilerPass {\n             //\n             // This will only cause problems if this is a hoisted, recursive\n             // function, and the programmer is using the hoisting.\n+            Node newName = IR.name(\"\").useSourceInfoFrom(existingName);\n+            value.replaceChild(existingName, newName);\n \n+            varNode = IR.var(existingName).useSourceInfoFrom(existingName);\n+            grandparent.replaceChild(parent, varNode);\n+          } else {\n+            if (value != null) {\n               // If this is a VAR, we can just detach the expression and\n               // the tree will still be valid.\n+              value.detachFromParent();\n+            }\n+            varNode = parent;\n+          }\n \n           // Add $jscomp.scope.name = EXPR;\n           // Make sure we copy over all the jsdoc and debug info.\n@@ -405,7 +419,11 @@ class ScopedAliases implements HotSwapCompilerPass {\n             NodeUtil.setDebugInformation(\n                 newDecl.getFirstChild().getFirstChild(), n, name);\n \n+            if (isHoisted) {\n+              grandparent.addChildToFront(newDecl);\n+            } else {\n               grandparent.addChildBefore(newDecl, varNode);\n+            }\n           }\n \n           // Rewrite \"var name = EXPR;\" to \"var name = $jscomp.scope.name;\"\n",
+  "agent_log": "{\"type\":\"result\",\"subtype\":\"success\",\"is_error\":false,\"api_error_status\":null,\"duration_ms\":103671,\"duration_api_ms\":88061,\"ttft_ms\":2381,\"num_turns\":17,\"result\":\"That's fine \u2014 the format requires `::method`. The targeted test passes.\\n\\nDIAGNOSIS COMPLETE\\n\\nThe root cause was in `ScopedAliases.findAliases` (src/com/google/javascript/jscomp/ScopedAliases.java:352). The method only handled `var` declarations inside `goog.scope(...)`; when it encountered a function declaration like `function f() {}`, it fell into the final `else` branch and reported `GOOG_SCOPE_NON_ALIAS_LOCAL` rather than rewriting the symbol. The fix adds a parallel `isFunctionDecl` branch: when the Var's parent is a function declaration, we first rewrite `function NAME() { ... }` into `var NAME;` (clearing the function expression's name to avoid IE's name-leak bug), then emit `$jscomp.scope.NAME = function () { ... };`. Because a hoisted function declaration must remain visible to earlier statements in the block (e.g. `g(f); function f() {}`), the newly synthesized assignment is inserted at the front of the grandparent block via `NodeUtil.isHoistedFunctionDeclaration` + `addChildToFront`, instead of immediately before the (now `var`) node \u2014 preserving the hoisting semantics expected by the original source.\",\"stop_reason\":\"end_turn\",\"session_id\":\"0364e8d9-9197-455d-9d54-75dba2c766af\",\"total_cost_usd\":0.6319704999999999,\"usage\":{\"input_tokens\":21,\"cache_creation_input_tokens\":26922,\"cache_read_input_tokens\":636356,\"output_tokens\":5817,\"server_tool_use\":{\"web_search_requests\":0,\"web_fetch_requests\":0},\"service_tier\":\"standard\",\"cache_creation\":{\"ephemeral_1h_input_tokens\":26922,\"ephemeral_5m_input_tokens\":0},\"inference_geo\":\"\",\"iterations\":[{\"input_tokens\":1,\"output_tokens\":431,\"cache_read_input_tokens\":45129,\"cache_creation_input_tokens\":292,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":292},\"type\":\"message\"}],\"speed\":\"standard\"},\"modelUsage\":{\"claude-opus-4-7[1m]\":{\"inputTokens\":21,\"outputTokens\":5817,\"cacheReadInputTokens\":636356,\"cacheCreationInputTokens\":26922,\"webSearchRequests\":0,\"costUSD\":0.6319704999999999,\"contextWindow\":1000000,\"maxOutputTokens\":64000}},\"permission_denials\":[],\"terminal_reason\":\"completed\",\"fast_mode_state\":\"off\",\"uuid\":\"1288771c-d5e8-489f-8313-e69f55379c7b\"}\n",
+  "agent_stderr": "",
+  "judge_reasoning": "The agent precisely identifies the root cause: ScopedAliases.findAliases at line 352 doesn't handle function declarations inside goog.scope, falling through to the non-alias error. The diagnosis also correctly notes the hoisting semantics requirement (inserting at front of grandparent block) which matches the ground-truth's emphasis on hoisted function declarations being lifted above their alias context.\n",
+  "verify_log": "Running ant (compile.tests)................................................ OK\nRunning ant (run.dev.tests)................................................ OK\nFailing tests: 1\n  - com.google.javascript.jscomp.ScopedAliasesTest::testHoistedFunctionDeclaration\n",
+  "baseline_failing_tests": [],
+  "compile_log": "Running ant (compile)...................................................... OK\nRunning ant (compile.tests)................................................ OK\n",
+  "agent_modified_files": [
+    "build.xml",
+    "lib/rhino/build.properties",
+    "src/com/google/javascript/jscomp/ScopedAliases.java"
+  ],
+  "canonical_modified_files": [
+    "src/com/google/javascript/jscomp/ScopedAliases.java",
+    "src/com/google/javascript/rhino/Node.java"
+  ],
+  "agent_modified_prod_files": [
+    "src/com/google/javascript/jscomp/ScopedAliases.java"
+  ],
+  "file_overlap": [
+    "src/com/google/javascript/jscomp/ScopedAliases.java"
+  ],
+  "missed_canonical": [
+    "src/com/google/javascript/rhino/Node.java"
+  ],
+  "extra_prod_files": [],
+  "fix_locality_score": 0.5,
+  "test_pass_strict": true
+}

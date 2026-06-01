@@ -6,6 +6,8 @@ import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.util.ArrayList;
 
+import net.jonbell.crochet.annotation.Internal;
+
 /**
  * Runtime-side reflection filter that hides CROCHET's injected members from
  * user code that enumerates fields / methods / interfaces via
@@ -52,6 +54,7 @@ import java.util.ArrayList;
  * paths, not hot-loop fields). Simple {@link ArrayList}-based filtering is
  * sufficient.
  */
+@Internal
 public final class ReflectionFilter {
 
     private ReflectionFilter() {}

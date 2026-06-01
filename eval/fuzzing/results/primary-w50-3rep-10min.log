@@ -1,0 +1,5 @@
+==> Run output: results/primary-w50-3rep-10min
+==> Budget=600s reps=3 iter_levels=50
+==> [03:03:08] mode=baseline_perIter iters=50 rep=1 seed=107
+[run-one] mode=baseline_perIter budget=600s seed=107 iters=50 out=results/primary-w50-3rep-10min/baseline_perIter-w50-s107.csv
+scripts/run-one.sh: line 41: 2530775 Killed                  "$JDK_INST/bin/java" "${JFLAGS[@]}" -cp "$CP" eval.fuzzing.FuzzHarness "$MODE" "$BUDGET" "$SEED" "$JSON" > "$CSV" 2> "$LOG"

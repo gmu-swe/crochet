@@ -53,6 +53,14 @@
             <plugin>
                 <artifactId>maven-compiler-plugin</artifactId>
                 <configuration>
+                    <!-- proc=none prevents javac from loading our own APT
+                         (CrochetCheckpointProcessor) during self-compilation —
+                         the processor class hasn't been compiled yet at that
+                         point, so javac would fail with "Provider not found".
+                         Downstream projects that want compile-time validation
+                         should add crochet-agent as an annotation-processor
+                         dependency without this override. -->
+                    <proc>none</proc>
                     <compilerArgs>
                         <arg>--add-exports</arg>
                         <arg>java.base/jdk.internal.vm.annotation=ALL-UNNAMED</arg>

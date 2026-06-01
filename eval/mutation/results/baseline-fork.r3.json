@@ -1,0 +1,1 @@
+{"summary":true,"mode":"baseline-fork","target":"org.apache.commons.lang3.math.Fraction","run":"r3","mutants":267,"killed":215,"survived":37,"noCoverage":5,"timedOut":10,"memoryErr":0,"runErr":0,"sweepNs":124432206969,"peakRssKb":-1,"reportDir":"/home/jon/crochet/.claude/worktrees/agent-ac31e5bfa99c136f5/eval/mutation/results/pit-report-fork-r3"}
