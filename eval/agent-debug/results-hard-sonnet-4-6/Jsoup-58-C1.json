@@ -1,0 +1,28 @@
+{
+  "bug": "Jsoup-58",
+  "condition": "C1",
+  "model": "claude-sonnet-4-6",
+  "model_default_used": false,
+  "started_at": "2026-06-01T04:26:05+00:00",
+  "duration_seconds": 468,
+  "tool_calls": 29,
+  "compile_fail": false,
+  "primary_pass": false,
+  "test_pass": false,
+  "baseline_failing_count": 2,
+  "agent_induced_regressions": [],
+  "regressed_tests": [],
+  "diagnosis_quality": 0,
+  "agent_exit_code": 1,
+  "bug_reproduced_pretest": true,
+  "agent_patch": "diff --git a/maven-build.xml b/maven-build.xml\nindex 849871c7..73b0656d 100644\n--- a/maven-build.xml\n+++ b/maven-build.xml\n@@ -71,10 +71,10 @@\n            debug=\"true\" \n            optimize=\"false\" \n            deprecation=\"true\" \n-           target=\"1.6\" \n+           target=\"1.8\" \n            verbose=\"false\" \n            fork=\"false\" \n-           source=\"1.6\">\n+           source=\"1.8\">\n       <src>\n         <pathelement location=\"${maven.build.srcDir.0}\"/>\n       </src>\n@@ -110,10 +110,10 @@\n            debug=\"true\" \n            optimize=\"false\" \n            deprecation=\"true\" \n-           target=\"1.6\" \n+           target=\"1.8\" \n            verbose=\"false\" \n            fork=\"false\" \n-           source=\"1.6\">\n+           source=\"1.8\">\n       <src>\n         <pathelement location=\"${maven.build.testDir.0}\"/>\n       </src>\ndiff --git a/src/main/java/org/jsoup/safety/Cleaner.java b/src/main/java/org/jsoup/safety/Cleaner.java\nindex 7e0eb28d..434fadba 100644\n--- a/src/main/java/org/jsoup/safety/Cleaner.java\n+++ b/src/main/java/org/jsoup/safety/Cleaner.java\n@@ -75,6 +75,11 @@ public class Cleaner {\n \n         Document clean = Document.createShell(dirtyDocument.baseUri());\n         int numDiscarded = copySafeNodes(dirtyDocument.body(), clean.body());\n+        try {\n+            java.io.PrintWriter pw = new java.io.PrintWriter(new java.io.FileWriter(\"/tmp/crochet_debug.txt\", true));\n+            pw.println(\"DEBUG isValid: body=[\" + dirtyDocument.body().html() + \"] head=[\" + dirtyDocument.head().html() + \"] docChildNodes=\" + dirtyDocument.childNodeSize() + \" numDiscarded=\" + numDiscarded + \" result=\" + (numDiscarded == 0));\n+            pw.flush(); pw.close();\n+        } catch (Exception e) { e.printStackTrace(); }\n         return numDiscarded == 0;\n     }\n \n",
+  "agent_log": "{\"type\":\"result\",\"subtype\":\"success\",\"is_error\":true,\"api_error_status\":429,\"duration_ms\":466807,\"duration_api_ms\":453145,\"num_turns\":29,\"result\":\"You've hit your session limit \u00b7 resets 5:10am (UTC)\",\"stop_reason\":\"stop_sequence\",\"session_id\":\"7ca0c8d3-df50-4def-a026-41d36a02a374\",\"total_cost_usd\":0.8315841,\"usage\":{\"input_tokens\":25,\"cache_creation_input_tokens\":45500,\"cache_read_input_tokens\":887797,\"output_tokens\":26303,\"server_tool_use\":{\"web_search_requests\":0,\"web_fetch_requests\":0},\"service_tier\":\"standard\",\"cache_creation\":{\"ephemeral_1h_input_tokens\":45500,\"ephemeral_5m_input_tokens\":0},\"inference_geo\":\"not_available\",\"iterations\":[{\"input_tokens\":1,\"output_tokens\":1993,\"cache_read_input_tokens\":58376,\"cache_creation_input_tokens\":383,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":383},\"type\":\"message\"}],\"speed\":\"standard\"},\"modelUsage\":{\"claude-sonnet-4-6\":{\"inputTokens\":25,\"outputTokens\":26303,\"cacheReadInputTokens\":887797,\"cacheCreationInputTokens\":45500,\"webSearchRequests\":0,\"costUSD\":0.8315841,\"contextWindow\":200000,\"maxOutputTokens\":32000}},\"permission_denials\":[],\"terminal_reason\":\"completed\",\"fast_mode_state\":\"off\",\"uuid\":\"14200cf9-b930-4819-913a-d71069e728cc\"}\n",
+  "agent_stderr": "",
+  "judge_reasoning": "judge failed\n",
+  "verify_log": "Running ant (compile.tests)................................................ OK\nRunning ant (run.dev.tests)................................................ OK\nFailing tests: 1\n  - org.jsoup.safety.CleanerTest::testIsValidBodyHtml\n",
+  "baseline_failing_tests": [
+    "org.jsoup.safety.CleanerTest::testIsValidBodyHtml",
+    "org.jsoup.safety.CleanerTest::testIsValidDocument"
+  ],
+  "compile_log": "Running ant (compile)...................................................... OK\nRunning ant (compile.tests)................................................ OK\n"
+}
