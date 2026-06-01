@@ -1,0 +1,18 @@
+{
+  "bug": "Jsoup-56",
+  "condition": "C2",
+  "started_at": "2026-06-01T02:19:36.626277Z",
+  "duration_seconds": 0,
+  "tool_calls": 0,
+  "test_pass": false,
+  "harness_error": "Trial script exited with code 1",
+  "compile_fail": false,
+  "primary_pass": false,
+  "agent_induced_regressions": [],
+  "regressed_tests": [],
+  "diagnosis_quality": 0,
+  "agent_exit_code": 1,
+  "agent_patch": "",
+  "agent_log": "",
+  "judge_reasoning": "Harness error: exit code 1"
+}

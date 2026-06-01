@@ -1,0 +1,18 @@
+{
+  "bug": "Jsoup-71",
+  "condition": "C2",
+  "started_at": "2026-06-01T02:19:45.584379Z",
+  "duration_seconds": 8,
+  "tool_calls": 0,
+  "test_pass": false,
+  "harness_error": "Trial script exited with code 137",
+  "compile_fail": false,
+  "primary_pass": false,
+  "agent_induced_regressions": [],
+  "regressed_tests": [],
+  "diagnosis_quality": 0,
+  "agent_exit_code": 137,
+  "agent_patch": "",
+  "agent_log": "",
+  "judge_reasoning": "Harness error: exit code 137"
+}
