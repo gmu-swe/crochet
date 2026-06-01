@@ -1,0 +1,28 @@
+{
+  "bug": "Jsoup-22",
+  "condition": "C2",
+  "model": "claude-haiku-4-5",
+  "model_default_used": false,
+  "started_at": "2026-06-01T03:42:45+00:00",
+  "duration_seconds": 74,
+  "tool_calls": 26,
+  "compile_fail": false,
+  "primary_pass": true,
+  "test_pass": true,
+  "baseline_failing_count": 2,
+  "agent_induced_regressions": [],
+  "regressed_tests": [],
+  "diagnosis_quality": 4,
+  "agent_exit_code": 0,
+  "bug_reproduced_pretest": true,
+  "agent_patch": "diff --git a/maven-build.xml b/maven-build.xml\nindex 44658237..31a48d32 100644\n--- a/maven-build.xml\n+++ b/maven-build.xml\n@@ -68,10 +68,10 @@\n            debug=\"true\" \n            optimize=\"false\" \n            deprecation=\"true\" \n-           target=\"1.6\" \n+           target=\"1.8\" \n            verbose=\"false\" \n            fork=\"false\" \n-           source=\"1.6\">\n+           source=\"1.8\">\n       <src>\n         <pathelement location=\"${maven.build.srcDir.0}\"/>\n       </src>\n@@ -94,10 +94,10 @@\n            debug=\"true\" \n            optimize=\"false\" \n            deprecation=\"true\" \n-           target=\"1.6\" \n+           target=\"1.8\" \n            verbose=\"false\" \n            fork=\"false\" \n-           source=\"1.6\">\n+           source=\"1.8\">\n       <src>\n         <pathelement location=\"${maven.build.testDir.0}\"/>\n       </src>\ndiff --git a/src/main/java/org/jsoup/nodes/Element.java b/src/main/java/org/jsoup/nodes/Element.java\nindex fd2b542f..582fa760 100644\n--- a/src/main/java/org/jsoup/nodes/Element.java\n+++ b/src/main/java/org/jsoup/nodes/Element.java\n@@ -431,8 +431,13 @@ public class Element extends Node {\n      * @return sibling elements\n      */\n     public Elements siblingElements() {\n-\n-        return parent().children();\n+        List<Element> siblings = parent().children();\n+        Elements out = new Elements();\n+        for (Element el : siblings) {\n+            if (!el.equals(this))\n+                out.add(el);\n+        }\n+        return out;\n     }\n \n     /**\n",
+  "agent_log": "{\"type\":\"result\",\"subtype\":\"success\",\"is_error\":false,\"api_error_status\":null,\"duration_ms\":72721,\"duration_api_ms\":47133,\"ttft_ms\":2176,\"num_turns\":26,\"result\":\"DIAGNOSIS COMPLETE\\n\\nThe root cause of the failing test was in the `siblingElements()` method in the `Element` class at line 433 of `/tmp/trial-Jsoup-22-C2/buggy/src/main/java/org/jsoup/nodes/Element.java`. The method was incorrectly returning all children of the parent element via `parent().children()`, which included the element itself. According to the documentation and test expectations, an element should not be considered a sibling of itself, so the method must exclude the current element from the returned list. The fix iterates through all sibling elements and only includes those that are not equal to the current element (using `!el.equals(this)`), ensuring that the element itself is filtered out while all other siblings are preserved.\",\"stop_reason\":\"end_turn\",\"session_id\":\"6b7dea4d-6c22-48ff-bf3a-8a5c9d8b46b8\",\"total_cost_usd\":0.1974015,\"usage\":{\"input_tokens\":70,\"cache_creation_input_tokens\":42492,\"cache_read_input_tokens\":1245265,\"output_tokens\":3938,\"server_tool_use\":{\"web_search_requests\":0,\"web_fetch_requests\":0},\"service_tier\":\"standard\",\"cache_creation\":{\"ephemeral_1h_input_tokens\":42492,\"ephemeral_5m_input_tokens\":0},\"inference_geo\":\"not_available\",\"iterations\":[{\"input_tokens\":0,\"output_tokens\":177,\"cache_read_input_tokens\":54806,\"cache_creation_input_tokens\":250,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":250},\"type\":\"message\"}],\"speed\":\"standard\"},\"modelUsage\":{\"claude-haiku-4-5\":{\"inputTokens\":70,\"outputTokens\":3938,\"cacheReadInputTokens\":1245265,\"cacheCreationInputTokens\":42492,\"webSearchRequests\":0,\"costUSD\":0.1974015,\"contextWindow\":200000,\"maxOutputTokens\":32000}},\"permission_denials\":[],\"terminal_reason\":\"completed\",\"fast_mode_state\":\"off\",\"uuid\":\"94ba65d8-857b-424d-bc8e-f6ec4a42122f\"}\n",
+  "agent_stderr": "",
+  "judge_reasoning": "The agent correctly identified the method (siblingElements), the exact line, and the core root cause: the element was incorrectly included as its own sibling and must be excluded. It differs slightly on the precise mechanism\u2014ground truth frames it as a faulty self-exclusion check comparing by position rather than identity, while the agent described it as no exclusion at all\u2014and its fix uses equals() (value) rather than strict identity, hence not a full 5.\n",
+  "verify_log": "Running ant (compile.tests)................................................ OK\nRunning ant (run.dev.tests)................................................ OK\nFailing tests: 1\n  - org.jsoup.nodes.ElementTest::elementIsNotASiblingOfItself\n",
+  "baseline_failing_tests": [
+    "org.jsoup.nodes.NodeTest::nodeIsNotASiblingOfItself",
+    "org.jsoup.nodes.NodeTest::orphanNodeReturnsNullForSiblingElements"
+  ],
+  "compile_log": "Running ant (compile)...................................................... OK\nRunning ant (compile.tests)................................................ OK\n"
+}
