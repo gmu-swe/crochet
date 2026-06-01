@@ -1,50 +1,18 @@
 {
   "bug": "Jsoup-87",
   "condition": "C1",
-  "model": "claude-haiku-4-5",
-  "model_default_used": false,
-  "started_at": "2026-05-21T23:58:23+00:00",
-  "duration_seconds": 206,
-  "tool_calls": 56,
+  "started_at": "2026-06-01T02:19:35.991633Z",
+  "duration_seconds": 14,
+  "tool_calls": 0,
+  "test_pass": false,
+  "harness_error": "Trial script exited with code 137",
   "compile_fail": false,
-  "primary_pass": true,
-  "test_pass": true,
-  "baseline_failing_count": 0,
+  "primary_pass": false,
   "agent_induced_regressions": [],
   "regressed_tests": [],
-  "diagnosis_quality": 5,
-  "agent_exit_code": 0,
-  "bug_reproduced_pretest": true,
-  "agent_patch": "diff --git a/maven-build.xml b/maven-build.xml\nindex 26f86396..9ac77d10 100644\n--- a/maven-build.xml\n+++ b/maven-build.xml\n@@ -78,10 +78,10 @@\n            debug=\"true\" \n            optimize=\"false\" \n            deprecation=\"true\" \n-           target=\"1.7\" \n+           target=\"1.8\" \n            verbose=\"false\" \n            fork=\"false\" \n-           source=\"1.7\">\n+           source=\"1.8\">\n       <src>\n         <pathelement location=\"${maven.build.srcDir.0}\"/>\n       </src>\n@@ -117,10 +117,10 @@\n            debug=\"true\" \n            optimize=\"false\" \n            deprecation=\"true\" \n-           target=\"1.7\" \n+           target=\"1.8\" \n            verbose=\"false\" \n            fork=\"false\" \n-           source=\"1.7\">\n+           source=\"1.8\">\n       <src>\n         <pathelement location=\"${maven.build.testDir.0}\"/>\n       </src>\ndiff --git a/pom.xml b/pom.xml\nindex 52e5858e..46446b34 100644\n--- a/pom.xml\n+++ b/pom.xml\n@@ -38,8 +38,8 @@\n         <artifactId>maven-compiler-plugin</artifactId>\n         <version>3.5.1</version>\n         <configuration>\n-          <source>1.7</source>\n-          <target>1.7</target>\n+          <source>1.8</source>\n+          <target>1.8</target>\n           <encoding>UTF-8</encoding>\n         </configuration>\n       </plugin>\ndiff --git a/src/main/java/org/jsoup/parser/HtmlTreeBuilder.java b/src/main/java/org/jsoup/parser/HtmlTreeBuilder.java\nindex 1bffec76..fa908555 100644\n--- a/src/main/java/org/jsoup/parser/HtmlTreeBuilder.java\n+++ b/src/main/java/org/jsoup/parser/HtmlTreeBuilder.java\n@@ -312,7 +312,7 @@ public class HtmlTreeBuilder extends TreeBuilder {\n     Element getFromStack(String elName) {\n         for (int pos = stack.size() -1; pos >= 0; pos--) {\n             Element next = stack.get(pos);\n-            if (next.nodeName().equals(elName)) {\n+            if (next.nodeName().equalsIgnoreCase(elName)) {\n                 return next;\n             }\n         }\n@@ -334,7 +334,7 @@ public class HtmlTreeBuilder extends TreeBuilder {\n         for (int pos = stack.size() -1; pos >= 0; pos--) {\n             Element next = stack.get(pos);\n             stack.remove(pos);\n-            if (next.nodeName().equals(elName))\n+            if (next.nodeName().equalsIgnoreCase(elName))\n                 break;\n         }\n     }\n@@ -352,7 +352,7 @@ public class HtmlTreeBuilder extends TreeBuilder {\n     void popStackToBefore(String elName) {\n         for (int pos = stack.size() -1; pos >= 0; pos--) {\n             Element next = stack.get(pos);\n-            if (next.nodeName().equals(elName)) {\n+            if (next.nodeName().equalsIgnoreCase(elName)) {\n                 break;\n             } else {\n                 stack.remove(pos);\n@@ -375,7 +375,7 @@ public class HtmlTreeBuilder extends TreeBuilder {\n     private void clearStackToContext(String... nodeNames) {\n         for (int pos = stack.size() -1; pos >= 0; pos--) {\n             Element next = stack.get(pos);\n-            if (StringUtil.in(next.nodeName(), nodeNames) || next.nodeName().equals(\"html\"))\n+            if (StringUtil.in(next.nodeName(), nodeNames) || next.nodeName().equalsIgnoreCase(\"html\"))\n                 break;\n             else\n                 stack.remove(pos);\n@@ -566,7 +566,7 @@ public class HtmlTreeBuilder extends TreeBuilder {\n      process, then the UA must perform the above steps as if that element was not in the above list.\n      */\n     void generateImpliedEndTags(String excludeTag) {\n-        while ((excludeTag != null && !currentElement().nodeName().equals(excludeTag)) &&\n+        while ((excludeTag != null && !currentElement().nodeName().equalsIgnoreCase(excludeTag)) &&\n                 inSorted(currentElement().nodeName(), TagSearchEndTags))\n             pop();\n     }\n@@ -686,7 +686,7 @@ public class HtmlTreeBuilder extends TreeBuilder {\n             Element next = formattingElements.get(pos);\n             if (next == null) // scope marker\n                 break;\n-            else if (next.nodeName().equals(nodeName))\n+            else if (next.nodeName().equalsIgnoreCase(nodeName))\n                 return next;\n         }\n         return null;\n",
-  "agent_log": "{\"type\":\"result\",\"subtype\":\"success\",\"is_error\":false,\"api_error_status\":null,\"duration_ms\":205977,\"duration_api_ms\":155532,\"ttft_ms\":2504,\"num_turns\":56,\"result\":\"DIAGNOSIS COMPLETE\\n\\nThe root cause of the bug was a case-sensitivity mismatch in the HTML tree builder when ParseSettings.preserveCase is enabled. When case-preserving mode is used, element node names preserve their original case (e.g., \\\"A\\\" instead of normalized \\\"a\\\"). However, six critical methods in HtmlTreeBuilder were performing case-sensitive string comparisons between element node names and query parameters that were always in lowercase. This caused the parser to fail to recognize that a new `<A>` element was nested inside an existing `<A>` element, since \\\"A\\\".equals(\\\"a\\\") returns false. According to HTML5 parsing rules, link elements (`<a>` or `<A>`) cannot nest inside other link elements and should be closed first via the adoption agency algorithm. The fix changes six comparison methods to use `.equalsIgnoreCase()` instead of `.equals()` so that tag name comparisons work correctly regardless of whether case-preserving mode is enabled. The affected methods are: `getActiveFormattingElement()`, `getFromStack()`, `popStackToClose()`, `popStackToBefore()`, `clearStackToContext()`, and `generateImpliedEndTags()`. These methods now properly match element tag names case-insensitively, allowing the adoption agency algorithm to correctly close nested link elements in case-preserving mode.\",\"stop_reason\":\"end_turn\",\"session_id\":\"0877e73b-2d97-49e6-8b83-b6f154b222e6\",\"total_cost_usd\":0.4812880499999999,\"usage\":{\"input_tokens\":394,\"cache_creation_input_tokens\":54889,\"cache_read_input_tokens\":3453678,\"output_tokens\":13383,\"server_tool_use\":{\"web_search_requests\":0,\"web_fetch_requests\":0},\"service_tier\":\"standard\",\"cache_creation\":{\"ephemeral_1h_input_tokens\":54889,\"ephemeral_5m_input_tokens\":0},\"inference_geo\":\"\",\"iterations\":[{\"input_tokens\":7,\"output_tokens\":331,\"cache_read_input_tokens\":78966,\"cache_creation_input_tokens\":690,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":690},\"type\":\"message\"}],\"speed\":\"standard\"},\"modelUsage\":{\"claude-haiku-4-5\":{\"inputTokens\":394,\"outputTokens\":13383,\"cacheReadInputTokens\":3453678,\"cacheCreationInputTokens\":54889,\"webSearchRequests\":0,\"costUSD\":0.4812880499999999,\"contextWindow\":200000,\"maxOutputTokens\":32000}},\"permission_denials\":[],\"terminal_reason\":\"completed\",\"fast_mode_state\":\"off\",\"uuid\":\"8fdaeab9-c613-443d-a937-2a49db3f82a6\"}\n",
-  "agent_stderr": "",
-  "judge_reasoning": "The agent correctly identified the root cause: case-sensitive string comparisons in HtmlTreeBuilder methods fail when ParseSettings.preserveCase is enabled, preventing the adoption agency algorithm from recognizing nested <A> elements. The diagnosis names the specific affected methods and explains the mechanism (\"A\".equals(\"a\") returning false), matching the ground-truth summary about the tree builder state for <a> elements not applying the adoption agency algorithm in case-preserving mode.\n",
-  "verify_log": "Running ant (compile.tests)................................................ OK\nRunning ant (run.dev.tests)................................................ OK\nFailing tests: 1\n  - org.jsoup.parser.HtmlParserTest::preservedCaseLinksCantNest\n",
-  "baseline_failing_tests": [],
-  "compile_log": "Running ant (compile)...................................................... OK\nRunning ant (compile.tests)................................................ OK\n",
-  "agent_modified_files": [
-    "maven-build.xml",
-    "pom.xml",
-    "src/main/java/org/jsoup/parser/HtmlTreeBuilder.java"
-  ],
-  "canonical_modified_files": [
-    "src/main/java/org/jsoup/nodes/Element.java",
-    "src/main/java/org/jsoup/parser/HtmlTreeBuilder.java",
-    "src/main/java/org/jsoup/parser/HtmlTreeBuilderState.java",
-    "src/main/java/org/jsoup/parser/Tag.java"
-  ],
-  "agent_modified_prod_files": [
-    "src/main/java/org/jsoup/parser/HtmlTreeBuilder.java"
-  ],
-  "file_overlap": [
-    "src/main/java/org/jsoup/parser/HtmlTreeBuilder.java"
-  ],
-  "missed_canonical": [
-    "src/main/java/org/jsoup/nodes/Element.java",
-    "src/main/java/org/jsoup/parser/HtmlTreeBuilderState.java",
-    "src/main/java/org/jsoup/parser/Tag.java"
-  ],
-  "extra_prod_files": [],
-  "fix_locality_score": 0.5,
-  "test_pass_strict": true
+  "diagnosis_quality": 0,
+  "agent_exit_code": 137,
+  "agent_patch": "",
+  "agent_log": "",
+  "judge_reasoning": "Harness error: exit code 137"
 }
