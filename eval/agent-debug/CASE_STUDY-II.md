@@ -1,3 +1,11 @@
+> **DEPRECATED — see `CASE_STUDY-VI.md`.** This case study's prompts
+> contained `{{FIX_SUMMARY}}`, the corpus-curated one-sentence root-cause
+> description, which leaked the answer to every agent. The pass-rate numbers
+> below measure how well an LLM can _apply_ a fix when given the diagnosis,
+> not how well it can _find_ one. Phase VI re-runs Phase II on Haiku 4.5 and
+> Sonnet 4.6 with the leak removed; cite those numbers instead. Text below
+> is preserved for historical reference.
+
 # Phase II Case Study: Crochet TTD for LLM-Assisted Java Debugging
 
 **Experiment:** Does Crochet time-travel debugging help a Claude Sonnet agent debug real Java bugs

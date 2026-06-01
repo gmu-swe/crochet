@@ -1,3 +1,12 @@
+> **DEPRECATED — see `CASE_STUDY-VI.md`.** This case study's prompts
+> contained `{{FIX_SUMMARY}}`, the corpus-curated one-sentence root-cause
+> description, which leaked the answer to every agent. The cross-model
+> conclusions below (Opus / Sonnet / Haiku × Phase I / II × C1 / C2 / C3)
+> measure how well an LLM can _apply_ a fix when given the diagnosis, not
+> how well it can _find_ one. Phase VI re-runs Phase I and Phase II on
+> Haiku 4.5 and Sonnet 4.6 with the leak removed; cite those numbers
+> instead. Text below is preserved for historical reference.
+
 # Phase III Case Study: Does TTD Help Cheaper Models More?
 
 **Experiment:** Phases I and II evaluated Crochet TTD against a Claude Opus 4.7 agent and

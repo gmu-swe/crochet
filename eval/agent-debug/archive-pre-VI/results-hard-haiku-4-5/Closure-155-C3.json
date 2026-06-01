@@ -1,0 +1,51 @@
+{
+  "bug": "Closure-155",
+  "condition": "C3",
+  "model": "claude-haiku-4-5",
+  "model_default_used": false,
+  "started_at": "2026-05-22T00:45:39+00:00",
+  "duration_seconds": 244,
+  "tool_calls": 81,
+  "compile_fail": false,
+  "primary_pass": false,
+  "test_pass": false,
+  "baseline_failing_count": 7,
+  "agent_induced_regressions": [],
+  "regressed_tests": [],
+  "diagnosis_quality": 1,
+  "agent_exit_code": 1,
+  "bug_reproduced_pretest": true,
+  "agent_patch": "diff --git a/build.xml b/build.xml\nindex e9f85364d..0bbf2827c 100644\n--- a/build.xml\n+++ b/build.xml\n@@ -16,8 +16,8 @@\n <project name=\"compiler\" basedir=\".\" default=\"jar\" xmlns:artifact=\"antlib:org.apache.maven.artifact.ant\">\n \n   <!-- Force java 6 -->\n-  <property name=\"ant.build.javac.source\" value=\"1.6\" />\n-  <property name=\"ant.build.javac.target\" value=\"1.6\" />\n+  <property name=\"ant.build.javac.source\" value=\"1.8\" />\n+  <property name=\"ant.build.javac.target\" value=\"1.8\" />\n \n   <!-- define other variables -->\n   <property name=\"src.dir\" value=\"${basedir}/src\" />\n",
+  "agent_log": "{\"type\":\"result\",\"subtype\":\"error_max_turns\",\"duration_ms\":243153,\"duration_api_ms\":240355,\"is_error\":true,\"num_turns\":81,\"stop_reason\":\"tool_use\",\"session_id\":\"ddc96c1e-177f-4abd-879f-8c2b037de3f4\",\"total_cost_usd\":0.7768742,\"usage\":{\"input_tokens\":562,\"cache_creation_input_tokens\":74252,\"cache_read_input_tokens\":5893472,\"output_tokens\":18830,\"server_tool_use\":{\"web_search_requests\":0,\"web_fetch_requests\":0},\"service_tier\":\"standard\",\"cache_creation\":{\"ephemeral_1h_input_tokens\":74252,\"ephemeral_5m_input_tokens\":0},\"inference_geo\":\"\",\"iterations\":[{\"input_tokens\":7,\"output_tokens\":302,\"cache_read_input_tokens\":98850,\"cache_creation_input_tokens\":169,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":169},\"type\":\"message\"}],\"speed\":\"standard\"},\"modelUsage\":{\"claude-haiku-4-5\":{\"inputTokens\":562,\"outputTokens\":18830,\"cacheReadInputTokens\":5893472,\"cacheCreationInputTokens\":74252,\"webSearchRequests\":0,\"costUSD\":0.7768742,\"contextWindow\":200000,\"maxOutputTokens\":32000}},\"permission_denials\":[],\"terminal_reason\":\"max_turns\",\"fast_mode_state\":\"off\",\"uuid\":\"cef0871e-50b9-4fc3-8467-1fa2e3e8ef0c\",\"errors\":[\"Reached maximum number of turns (80)\"]}\n",
+  "agent_stderr": "",
+  "judge_reasoning": "The agent provided no diagnosis at all \u2014 the 'Agent's final diagnosis' field is empty. With no content to evaluate, it cannot match the ground-truth root cause about InlineVariables incorrectly inlining across closure boundaries when values depend on 'arguments'.\n",
+  "verify_log": "Running ant (compile.tests)................................................ OK\nRunning ant (run.dev.tests)................................................ OK\nFailing tests: 1\n  - com.google.javascript.jscomp.InlineVariablesTest::testArgumentsModifiedInInnerFunction\n",
+  "baseline_failing_tests": [
+    "com.google.javascript.jscomp.InlineVariablesTest::testArgumentsModifiedInInnerFunction",
+    "com.google.javascript.jscomp.InlineVariablesTest::testArgumentsModifiedInOuterFunction",
+    "com.google.javascript.jscomp.InlineVariablesTest::testIssue378EscapedArguments1",
+    "com.google.javascript.jscomp.InlineVariablesTest::testIssue378EscapedArguments2",
+    "com.google.javascript.jscomp.InlineVariablesTest::testIssue378EscapedArguments4",
+    "com.google.javascript.jscomp.InlineVariablesTest::testIssue378ModifiedArguments1",
+    "com.google.javascript.jscomp.InlineVariablesTest::testIssue378ModifiedArguments2"
+  ],
+  "compile_log": "Running ant (compile)...................................................... OK\nRunning ant (compile.tests)................................................ OK\n",
+  "agent_modified_files": [
+    "build.xml"
+  ],
+  "canonical_modified_files": [
+    "src/com/google/javascript/jscomp/InlineVariables.java",
+    "src/com/google/javascript/jscomp/ReferenceCollectingCallback.java",
+    "src/com/google/javascript/jscomp/Scope.java"
+  ],
+  "agent_modified_prod_files": [],
+  "file_overlap": [],
+  "missed_canonical": [
+    "src/com/google/javascript/jscomp/InlineVariables.java",
+    "src/com/google/javascript/jscomp/ReferenceCollectingCallback.java",
+    "src/com/google/javascript/jscomp/Scope.java"
+  ],
+  "extra_prod_files": [],
+  "fix_locality_score": 0.0,
+  "test_pass_strict": false
+}

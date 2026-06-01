@@ -1,0 +1,49 @@
+{
+  "bug": "Jsoup-87",
+  "condition": "C2",
+  "model": "claude-sonnet-4-6",
+  "model_default_used": false,
+  "started_at": "2026-05-21T19:36:31+00:00",
+  "duration_seconds": 142,
+  "tool_calls": 33,
+  "compile_fail": false,
+  "primary_pass": true,
+  "test_pass": true,
+  "baseline_failing_count": 0,
+  "agent_induced_regressions": [],
+  "regressed_tests": [],
+  "diagnosis_quality": 5,
+  "agent_exit_code": 0,
+  "bug_reproduced_pretest": true,
+  "agent_patch": "diff --git a/maven-build.xml b/maven-build.xml\nindex 26f86396..9ac77d10 100644\n--- a/maven-build.xml\n+++ b/maven-build.xml\n@@ -78,10 +78,10 @@\n            debug=\"true\" \n            optimize=\"false\" \n            deprecation=\"true\" \n-           target=\"1.7\" \n+           target=\"1.8\" \n            verbose=\"false\" \n            fork=\"false\" \n-           source=\"1.7\">\n+           source=\"1.8\">\n       <src>\n         <pathelement location=\"${maven.build.srcDir.0}\"/>\n       </src>\n@@ -117,10 +117,10 @@\n            debug=\"true\" \n            optimize=\"false\" \n            deprecation=\"true\" \n-           target=\"1.7\" \n+           target=\"1.8\" \n            verbose=\"false\" \n            fork=\"false\" \n-           source=\"1.7\">\n+           source=\"1.8\">\n       <src>\n         <pathelement location=\"${maven.build.testDir.0}\"/>\n       </src>\ndiff --git a/src/main/java/org/jsoup/parser/HtmlTreeBuilder.java b/src/main/java/org/jsoup/parser/HtmlTreeBuilder.java\nindex 1bffec76..645fbab2 100644\n--- a/src/main/java/org/jsoup/parser/HtmlTreeBuilder.java\n+++ b/src/main/java/org/jsoup/parser/HtmlTreeBuilder.java\n@@ -312,7 +312,7 @@ public class HtmlTreeBuilder extends TreeBuilder {\n     Element getFromStack(String elName) {\n         for (int pos = stack.size() -1; pos >= 0; pos--) {\n             Element next = stack.get(pos);\n-            if (next.nodeName().equals(elName)) {\n+            if (next.nodeName().equalsIgnoreCase(elName)) {\n                 return next;\n             }\n         }\n@@ -686,7 +686,7 @@ public class HtmlTreeBuilder extends TreeBuilder {\n             Element next = formattingElements.get(pos);\n             if (next == null) // scope marker\n                 break;\n-            else if (next.nodeName().equals(nodeName))\n+            else if (next.nodeName().equalsIgnoreCase(nodeName))\n                 return next;\n         }\n         return null;\n",
+  "agent_log": "{\"type\":\"result\",\"subtype\":\"success\",\"is_error\":false,\"api_error_status\":null,\"duration_ms\":141421,\"duration_api_ms\":126619,\"ttft_ms\":2190,\"num_turns\":33,\"result\":\"All tests pass with no regressions.\\n\\nDIAGNOSIS COMPLETE\\n\\nThe root cause is a case-sensitivity mismatch in two methods of `HtmlTreeBuilder.java`. When the parser runs in case-preserving mode (`ParseSettings.preserveCase`), element node names are stored with their original case (e.g., `\\\"A\\\"` for `<A>`). However, `getActiveFormattingElement(String nodeName)` and `getFromStack(String elName)` both compared using `next.nodeName().equals(nodeName)`, where `nodeName` is always the normalized (lowercase) name passed from `HtmlTreeBuilderState` (via `startTag.normalName()`). This meant `\\\"A\\\".equals(\\\"a\\\")` returned `false`, so when processing a second `<A>` start tag, `getActiveFormattingElement(\\\"a\\\")` couldn't find the already-pushed `A` element in the formatting list, and the adoption agency algorithm (which should close the outer `<A>` before opening a new one) was never triggered \u2014 allowing `<a>` elements to incorrectly nest inside each other in case-preserving mode. The fix changes both comparisons to use `equalsIgnoreCase` so the lookup works regardless of the stored case.\",\"stop_reason\":\"end_turn\",\"session_id\":\"3c1526ac-43c4-435c-86a0-d4b755db1f3f\",\"total_cost_usd\":0.44803289999999996,\"usage\":{\"input_tokens\":33,\"cache_creation_input_tokens\":20560,\"cache_read_input_tokens\":909863,\"output_tokens\":6525,\"server_tool_use\":{\"web_search_requests\":0,\"web_fetch_requests\":0},\"service_tier\":\"standard\",\"cache_creation\":{\"ephemeral_1h_input_tokens\":20560,\"ephemeral_5m_input_tokens\":0},\"inference_geo\":\"\",\"iterations\":[{\"input_tokens\":1,\"output_tokens\":288,\"cache_read_input_tokens\":33716,\"cache_creation_input_tokens\":167,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":167},\"type\":\"message\"}],\"speed\":\"standard\"},\"modelUsage\":{\"claude-sonnet-4-6\":{\"inputTokens\":33,\"outputTokens\":6525,\"cacheReadInputTokens\":909863,\"cacheCreationInputTokens\":20560,\"webSearchRequests\":0,\"costUSD\":0.44803289999999996,\"contextWindow\":200000,\"maxOutputTokens\":32000}},\"permission_denials\":[],\"terminal_reason\":\"completed\",\"fast_mode_state\":\"off\",\"uuid\":\"9580dc47-6ce9-49d4-bda7-2c25dd50a472\"}\n",
+  "agent_stderr": "",
+  "judge_reasoning": "The diagnosis precisely matches the ground-truth: it identifies the case-preserving mode issue, names the specific methods (getActiveFormattingElement and getFromStack in HtmlTreeBuilder.java), explains why the adoption agency algorithm fails to trigger for nested <a> elements, and correctly describes the mechanism (case-sensitive equals vs. normalized lowercase lookup name). The fix (equalsIgnoreCase) directly addresses the root cause rather than a symptom.\n",
+  "verify_log": "Running ant (compile.tests)................................................ OK\nRunning ant (run.dev.tests)................................................ OK\nFailing tests: 1\n  - org.jsoup.parser.HtmlParserTest::preservedCaseLinksCantNest\n",
+  "baseline_failing_tests": [],
+  "compile_log": "Running ant (compile)...................................................... OK\nRunning ant (compile.tests)................................................ OK\n",
+  "agent_modified_files": [
+    "maven-build.xml",
+    "src/main/java/org/jsoup/parser/HtmlTreeBuilder.java"
+  ],
+  "canonical_modified_files": [
+    "src/main/java/org/jsoup/nodes/Element.java",
+    "src/main/java/org/jsoup/parser/HtmlTreeBuilder.java",
+    "src/main/java/org/jsoup/parser/HtmlTreeBuilderState.java",
+    "src/main/java/org/jsoup/parser/Tag.java"
+  ],
+  "agent_modified_prod_files": [
+    "src/main/java/org/jsoup/parser/HtmlTreeBuilder.java"
+  ],
+  "file_overlap": [
+    "src/main/java/org/jsoup/parser/HtmlTreeBuilder.java"
+  ],
+  "missed_canonical": [
+    "src/main/java/org/jsoup/nodes/Element.java",
+    "src/main/java/org/jsoup/parser/HtmlTreeBuilderState.java",
+    "src/main/java/org/jsoup/parser/Tag.java"
+  ],
+  "extra_prod_files": [],
+  "fix_locality_score": 0.5,
+  "test_pass_strict": true
+}
