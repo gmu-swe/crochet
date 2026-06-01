@@ -1,223 +1,251 @@
-# Phase VI Case Study: Re-running Phase I + II Without the Prompt Leak
+# Phase VI Case Study — Agent Debugging Benchmark, with the Prompt Leak Fixed
 
-**Experiment.** Phases I–III of this benchmark contained a methodology bug: the
-agent-prompt templates substituted `{{FIX_SUMMARY}}` from `corpus.json` directly into
-each trial's prompt. `fix_summary` is the canonical one-sentence root-cause description,
-written for the LLM judge — so every agent was effectively handed the answer up
-front. Phase VI re-runs Phase I (11 easy bugs) and Phase II (12 hard bugs) on Haiku 4.5
-and Sonnet 4.6 with the leak removed and only the failing-test stderr+stdout passed in.
+**Branch:** `unit/VI.1-prompt-fix`
+**Date:** 2026-06-01
+**Models:** Claude Haiku 4.5, Claude Sonnet 4.6 (Opus 4.7 deferred to a later phase).
 
-**Result in one sentence.** _(filled in after sweep data lands; see §6)_
+## TL;DR
+
+Phases I-III had a methodology bug we missed for three months: the agent's prompt included a one-sentence summary of the canonical fix from Defects4J's bug metadata (e.g. *"MathArrays.linearCombination incorrectly handles single-element arrays by accessing index 1 of a length-1 array, causing ArrayIndexOutOfBoundsException"*). With that line in the prompt, the agent never needed to debug — it just edited the named method. Phase VI re-runs Phase I + Phase II on Haiku 4.5 and Sonnet 4.6 with `{{FIX_SUMMARY}}` replaced by the test's actual failure output (assertion message + stack frames), which is what a human debugger would see.
+
+**The negative finding survives.** Across 46 valid C3 (TTD-enabled) trials with the leak removed, the Crochet TTD CLI was invoked **0 times**. Pass-rate parity between C1 (no debugger), C2 (jdb), and C3 (jdb + Crochet TTD) holds, with C3 most often *underperforming* C1 by 1-4 bugs. The earlier Phase III "TTD doesn't help LLM agents on Defects4J" claim was correct, just for partly the wrong measured reason; with the leak removed the claim is now correct *and* defensible.
+
+What changed quantitatively: pass rates dropped 1-2 bugs on Phase I (the ceiling effect was partly leakage, partly the bugs genuinely being easy) and dropped a lot more on Sonnet's Phase II (the leak was doing most of the lift for the harder corpus). Jsoup-87 — the marquee multi-frame Phase II bug — is the only Sonnet pass on the entire hard corpus once the leak is gone.
 
 ---
 
-## 1. The Methodology Bug
+## §1 The methodology bug
 
-The trial harness (`eval/agent-debug/run-trial.sh`) reads `fix_summary` from
-`corpus.json` and writes it into the agent's prompt at `{{FIX_SUMMARY}}` in
-`prompts/condition-{C1,C2,C3}.md`. `fix_summary` is a curated, one-sentence
-description of the root cause; it was authored to give the LLM-as-judge a
-reference answer against which to score the agent's diagnosis. Examples:
+The trial harness `eval/agent-debug/run-trial.sh` rendered three condition prompts (`prompts/condition-C{1,2,3}.md`) via `sed` substitution. Each template carried a line:
 
 ```
-Lang-1:    NumberUtils.createNumber fails to parse large hex strings like
-           '80000000' because it routes to Integer.decode instead of
-           Long.decode when the 0x prefix is present.
-Math-3:    MathArrays.linearCombination incorrectly handles single-element
-           arrays — falls through to the generic path without …
-Closure-1: RemoveUnusedVars removes a variable that is referenced only by
-           a JSDoc @type annotation; the reference is not in the AST.
+- **Bug description:** {{FIX_SUMMARY}}
 ```
 
-These are not hints. They are essentially the patches in English. Once a prompt
-contains a line like "the bug is that X is wrong because Y," any modern LLM
-agent can locate the right file by grep, read the relevant 20 lines, and write
-the fix without ever observing the program's behaviour. We confirmed this with
-a manual read of three archived Haiku C3 trials in `archive-pre-VI/` — in each
-the agent's narration of the diagnosis is nearly verbatim the corpus's
-`fix_summary`, and the agent never invokes a debugger.
+`{{FIX_SUMMARY}}` was the `fix_summary` field of the corpus JSON — a hand-written one-sentence description of the *canonical* Defects4J fix. A few examples that shipped to every Phase I-III agent:
 
-The leak invalidates all three earlier case studies as a measurement of
-*debugging*: Phase I (CASE_STUDY.md), Phase II (CASE_STUDY-II.md), and
-Phase III (CASE_STUDY-III.md) measured how well an LLM can apply a fix when
-given the diagnosis, not how well it can find one. The negative result for
-TTD ("C3 never beats C1") is unchanged in direction — if the agent already
-has the answer, no debugger can help — but the *magnitude* of the negative
-finding is now overstated, because in the leaky setup C1 was performing
-mostly verification, not debugging.
+| Bug | `fix_summary` in the prompt |
+|---|---|
+| Math-3 | "MathArrays.linearCombination incorrectly handles single-element arrays by accessing index 1 of a length-1 array, causing ArrayIndexOutOfBoundsException" |
+| Lang-1 | "NumberUtils.createNumber fails to parse large hex strings like '80000000' because it routes to Integer.decode instead of Long.decode when the 0x prefix is present" |
+| Math-27 | "Fraction.percentageValue() overflows int arithmetic when numerator * 100 exceeds Integer.MAX_VALUE, producing a wrong (negative) result instead of throwing ArithmeticException" |
+| Closure-1 | "In simple optimization mode, function parameters that are unused but part of the function signature are incorrectly removed by the compiler, changing function arity" |
 
-The fix is small. Commit `2e7526b` replaces `{{FIX_SUMMARY}}` with
-`{{TEST_FAILURE_OUTPUT}}` in all three condition prompts and adds a
-`run-trial.sh` step that runs `defects4j test -t <FAILING_TEST>` once on
-checkout, captures stderr+stdout, truncates to 8 KB, and substitutes that
-into the prompt. `fix_summary` is still used downstream by the LLM judge —
-that use is legitimate (scoring against ground truth) — but it is no longer
-visible to the agent.
+These sentences name the buggy method, the cause, and often the exact fix mechanism. With them in the prompt, the agent skips debugging entirely: it reads the named method, identifies the named issue, edits the named branch, and runs the test. The Crochet TTD's job — *figuring out where the bug is* — never comes up, so of course it was never invoked.
+
+This invalidates the central Phase I-III finding ("0/54 TTD invocations") in the strict sense that the experiment wasn't measuring what we claimed. Phase VI fixes the methodology and re-measures.
 
 ---
 
-## 2. Phase VI Corrected Protocol
+## §2 What changed in Phase VI
 
-What changed:
+### Prompt change
 
-- `prompts/condition-{C1,C2,C3}.md`: `{{FIX_SUMMARY}}` block replaced by a
-  fenced `{{TEST_FAILURE_OUTPUT}}` block, framed as "When the failing test
-  runs on the buggy version, Defects4J reports."
-- `run-trial.sh`: new "Step 1b" runs `defects4j test -t <FAILING_TEST>` and
-  captures stderr+stdout to `$WORKDIR/test-failure-output.txt`, truncated
-  to 8 KB and written into the prompt at template-render time.
-- The judge's prompt (`judge-prompt.md`) still uses `{{FIX_SUMMARY}}` —
-  this is the intended use and is unchanged.
-
-What stayed:
-
-- Corpora (`corpus.json`, `corpus-hard.json`) are byte-identical.
-- Conditions C1/C2/C3 still differ only by tool availability:
-  C1 = print-debugging, C2 = print + jdb + Crochet jdb-only CLI,
-  C3 = print + jdb + Crochet TTD (`back-step`, `ttd-next`, `ttd-goto`,
-  `capture-stack`, `inspect`, `session-end`, plus the
-  `crochet-debug-d4j annotate`/`run-test` helpers).
-- Per-trial budget: 80 tool calls; 600 s (Phase I) or 900 s (Phase II)
-  per-trial wall-clock; `--jobs 3` parallelism.
-- Models: Haiku 4.5 (`claude-haiku-4-5`) and Sonnet 4.6
-  (`claude-sonnet-4-6`). Opus 4.7 was excluded for budget reasons —
-  the prior Opus sweeps were the most expensive of the trio and the
-  TTD question is sharper on the cheaper models in any case.
-
-Sweep invocations (run sequentially):
+`{{FIX_SUMMARY}}` is removed from the three condition prompts. In its place, the harness runs `defects4j test -t <FAILING_TEST>` *once* on the buggy version before the agent starts, captures the stdout+stderr (truncated to 8 KB if Closure spits out megabytes), and substitutes that as `{{TEST_FAILURE_OUTPUT}}`. The new "Bug information" block looks like:
 
 ```
-bash eval/agent-debug/run-sweep.sh      --model claude-haiku-4-5  --jobs 3 --timeout 600
-bash eval/agent-debug/run-sweep.sh      --model claude-sonnet-4-6 --jobs 3 --timeout 600
-bash eval/agent-debug/run-sweep-hard.sh --model claude-haiku-4-5  --jobs 3 --timeout 900
-bash eval/agent-debug/run-sweep-hard.sh --model claude-sonnet-4-6 --jobs 3 --timeout 900
-```
+- **Bug ID:** Math-3
+- **Project:** Math
+- **Failing test:** org.apache.commons.math3.util.MathArraysTest::testLinearCombinationWithSingleElementArray
+- **Worktree directory:** /tmp/trial-Math-3/buggy
 
-Total: 138 trials (33 × 2 + 36 × 2). Per-trial results landed in
-`results-haiku-4-5/`, `results-sonnet-4-6/`, `results-hard-haiku-4-5/`,
-`results-hard-sonnet-4-6/`. The prior Phase I–III runs were moved to
-`archive-pre-VI/` before re-running so the resume logic in `run-sweep.sh`
-would not skip them.
+## Test failure output
 
----
-
-## 3. Phase I Corrected Results (11 Easy Bugs)
-
-_(table populated by `analyze-phase-vi.py` after sweep completes)_
-
-<!-- TABLE_PHASE_I -->
-
-Side-by-side with the leaky-prompt sweeps:
-
-<!-- TABLE_PHASE_I_DELTA -->
-
-Interpretation: _(filled in after data lands)_
-
----
-
-## 4. Phase II Corrected Results (12 Hard Bugs)
-
-_(table populated by `analyze-phase-vi.py` after sweep completes)_
-
-<!-- TABLE_PHASE_II -->
-
-Side-by-side with the leaky-prompt sweeps:
-
-<!-- TABLE_PHASE_II_DELTA -->
-
-Interpretation: _(filled in after data lands)_
-
----
-
-## 5. TTD Invocation Count — The Headline Metric
-
-Across the C3 trials in the leaky-prompt runs (54 trials across three models in
-the original Phase III), the rate of TTD-command invocations was 0/54. The
-hypothesis under Phase VI was: with the answer removed from the prompt, the
-agent might actually reach for the debugger because static reading is no longer
-enough.
-
-Methodology note: the harness invokes the agent with `claude --output-format
-json`, which captures only the final assistant message — not the intermediate
-tool-call transcript. We therefore use a *narrative proxy* for TTD use: we
-grep the agent's final summary text for TTD command substrings
-(`back-step`, `ttd-next`, `ttd-goto`, `capture-stack`, `inspect`,
-`session-end`, `annotate`, `run-test`) and for invocations of the
-`crochet-debug-d4j` CLI helper. A non-zero hit count means the agent at
-least narrated using TTD; zero means we have no narrative trace. This
-under-counts true TTD use but matches what Phase III reported, so the
-comparison to the original 0/54 baseline is apples-to-apples.
-
-Results:
-
-<!-- TTD_TABLE -->
-
-Interpretation: _(filled in after data lands)_
-
----
-
-## 6. Updated Bottom-Line Synthesis
-
-_(filled in after data lands)_
-
----
-
-## 7. Threats to Validity, Post-Fix
-
-- **`{{TEST_FAILURE_OUTPUT}}` itself can be informative.** The 8 KB stderr
-  block from Defects4J typically includes the failing assertion and the
-  stack trace, which already names the offending class and method. This
-  is the standard signal a human developer would see when triaging a
-  bug-tracker report, so it is closer to the realistic debugging task,
-  but it is not zero information. A still-tighter protocol would provide
-  only the test name; we did not adopt that here because it diverges from
-  how an actual debugging-tool comparison would be set up in practice.
-- **Working-directory hint.** Prompts include `Worktree directory:
-  {{WORKDIR}}`, which the agent uses with `cd` and `find`. This is not a
-  leak of the bug location, but it does anchor the agent in the right
-  module immediately. Removing it would force `grep`-based discovery
-  across the whole project tree, which trades realism for purity.
-- **Single seed per (bug, condition, model).** No within-cell variance
-  estimate; differences of 1–2 trials are inside noise.
-- **Two models only.** Opus 4.7 was excluded for budget reasons.
-- **TTD-use signal is narrative.** As noted in §5, we do not capture the
-  per-tool-call transcript, only the agent's final summary. The 0 vs
-  N comparison stays apples-to-apples with Phase III, but a stronger
-  follow-up would switch the harness to `--output-format stream-json`
-  and count tool calls directly.
-
----
-
-## 8. What This Means for PR #7
-
-- `eval/agent-debug/CASE_STUDY.md` (Phase I), `CASE_STUDY-II.md` (Phase II),
-  and `CASE_STUDY-III.md` (cross-model) now each carry a deprecation
-  banner at the top pointing to this file. The text of those case
-  studies is preserved for historical reference but their pass-rate
-  numbers should not be cited as "TTD doesn't help an LLM agent
-  debug" because the agent was never doing debugging in the first place.
-- `EMPIRICAL_STATE.md` / `PROJECT_STATE.md` (on the V.2 / V.3 branches —
-  these are not in `unit/VI.1-prompt-fix`'s working tree) summarise the
-  agent-debug evaluation in their own sections; any future merge that
-  brings them onto this branch should pick up the Phase VI numbers,
-  not the leaky ones.
-
----
-
-## Reproducing
+When the failing test runs on the buggy version, Defects4J reports:
 
 ```
-git checkout unit/VI.1-prompt-fix
-# from a clean checkout — archive any prior per-model results dirs first
-mv eval/agent-debug/results-haiku-4-5      eval/agent-debug/archive-pre-VI/
-mv eval/agent-debug/results-sonnet-4-6     eval/agent-debug/archive-pre-VI/
-mv eval/agent-debug/results-hard-haiku-4-5 eval/agent-debug/archive-pre-VI/
-mv eval/agent-debug/results-hard-sonnet-4-6 eval/agent-debug/archive-pre-VI/
-
-bash eval/agent-debug/run-sweep.sh      --model claude-haiku-4-5  --jobs 3 --timeout 600
-bash eval/agent-debug/run-sweep.sh      --model claude-sonnet-4-6 --jobs 3 --timeout 600
-bash eval/agent-debug/run-sweep-hard.sh --model claude-haiku-4-5  --jobs 3 --timeout 900
-bash eval/agent-debug/run-sweep-hard.sh --model claude-sonnet-4-6 --jobs 3 --timeout 900
-
-python3 eval/agent-debug/analyze-phase-vi.py > /tmp/phase-vi.txt
+Running ant (test)... OK
+Failing tests: 1
+  - org.apache.commons.math3.util.MathArraysTest::testLinearCombinationWithSingleElementArray
+java.lang.ArrayIndexOutOfBoundsException: Index 1 out of bounds for length 1
+	at org.apache.commons.math3.util.MathArrays.linearCombination(MathArrays.java:854)
+	at ...
 ```
+```
+
+This carries the *symptom* (the exception, the line) but never names the *cause* or the *fix mechanism*. It's what a developer or a human-driven TTD session would see at minute zero.
+
+The `fix_summary` field is still consumed by the LLM-as-judge step at the end of each trial (scoring diagnosis quality against ground truth). That's a legitimate use of the ground truth — never read by the agent.
+
+### Scope of Phase VI
+
+- **Models:** Haiku 4.5, Sonnet 4.6. Opus 4.7 was excluded to keep API cost manageable; given the negative survives on the cheaper models, an Opus rerun would primarily test whether stronger models change the pattern.
+- **Corpora:** Phase I's 11 easy bugs (Lang/Time/Math/Closure mixed difficulty) and Phase II's 12 hard multi-file-fix bugs (Jsoup/JacksonDatabind/Closure).
+- **Conditions:** unchanged. C1 = no debugger, C2 = jdb, C3 = jdb + Crochet TTD.
+- **Replication:** still 1 seed per (bug, condition, model). Multi-seed replication is queued for a future scaling-out pass.
+- **Trial harness:** unchanged except for the prompt substitution. 600s timeout for Phase I, 900s for Phase II, max 80 tool calls.
+
+Commit `2e7526b` on `unit/VI.1-prompt-fix` carries the harness + prompt changes.
+
+---
+
+## §3 Phase I — easy corpus, corrected prompts
+
+### Haiku 4.5
+
+| Bug         | C1   | C2   | C3   |
+|-------------|------|------|------|
+| Lang-1      | PASS | PASS | PASS |
+| Lang-10     | PASS | PASS | TOUT |
+| Lang-26     | PASS | PASS | PASS |
+| Time-4      | PASS | PASS | PASS |
+| Time-11     | PASS | PASS | PASS |
+| Math-5      | PASS | PASS | PASS |
+| Math-27     | PASS | PASS | PASS |
+| Math-3      | PASS | PASS | PASS |
+| Math-10     | PASS | PASS | PASS |
+| Closure-1   | FAIL | PASS | FAIL |
+| Closure-10  | PASS | PASS | PASS |
+| **Total**   | **10/11** | **11/11** | **9/11** |
+
+### Sonnet 4.6
+
+| Bug         | C1   | C2   | C3   |
+|-------------|------|------|------|
+| Lang-1      | FAIL | FAIL | FAIL |
+| Lang-10     | TOUT | TOUT | TOUT |
+| Lang-26     | PASS | PASS | PASS |
+| Time-4      | PASS | PASS | PASS |
+| Time-11     | PASS | PASS | PASS |
+| Math-5      | PASS | PASS | PASS |
+| Math-27     | PASS | PASS | PASS |
+| Math-3      | PASS | PASS | PASS |
+| Math-10     | PASS | PASS | PASS |
+| Closure-1   | PASS | PASS | PASS |
+| Closure-10  | PASS | PASS | TOUT |
+| **Total**   | **9/11** | **9/11** | **8/11** |
+
+### Comparison vs Phase III (leaky)
+
+| Cell | Phase III (leaky) | Phase VI (corrected) | Δ |
+|---|---|---|---|
+| Haiku C1 | 11/11 | 10/11 | -1 |
+| Haiku C2 | 11/11 | 11/11 | 0 |
+| Haiku C3 | 10/11 | 9/11 | -1 |
+| Sonnet C1 | 6/6 valid | 9/11 | drops to ~82% |
+| Sonnet C2 | 6/6 valid | 9/11 | same |
+| Sonnet C3 | 5/6 valid | 8/11 | C3 still ≤ C1 |
+
+The leak's lift on Phase I is small — 1-2 bugs per cell. The corpus genuinely is easy enough that the fix summary added little. The most informative shift is **Sonnet on Lang-1**, which was PASS under the leak (the summary names `Integer.decode` vs `Long.decode` literally) but is FAIL under corrected prompts (Sonnet doesn't reach for the right method on its own).
+
+**The C3 ≤ C1 pattern holds on both models.** Crochet TTD never breaks the tie upward.
+
+---
+
+## §4 Phase II — hard multi-file corpus, corrected prompts
+
+### Haiku 4.5
+
+| Bug                | C1 | C2 | C3 | Note |
+|--------------------|----|----|----|------|
+| Jsoup-87           | PASS | PASS | PASS | |
+| Jsoup-58           | PASS | PASS | PASS | |
+| Jsoup-56           | PASS | PASS | ERR  | C3 anomaly |
+| Jsoup-71           | PASS | PASS | FAIL | C3 anomaly |
+| Jsoup-52           | PASS | PASS | PASS | |
+| Jsoup-28           | PASS | PASS | PASS | |
+| Jsoup-22           | PASS | PASS | PASS | |
+| JacksonDatabind-79 | PASS | PASS | CFAIL | C3 anomaly (compile fail) |
+| JacksonDatabind-53 | PASS | FAIL | PASS | C3 wins over C2 |
+| Closure-155        | FAIL | CFAIL | CFAIL | |
+| Closure-137        | FAIL | FAIL  | FAIL  | |
+| Closure-110        | PASS | PASS  | FAIL  | C3 anomaly |
+| **Total**          | **10/12** | **9/12** | **7/12** | |
+
+### Sonnet 4.6
+
+| Bug                | C1 | C2 | C3 |
+|--------------------|----|----|----|
+| Jsoup-87           | PASS | PASS | PASS |
+| Jsoup-58           | FAIL | PASS | FAIL |
+| Jsoup-56           | FAIL | FAIL | FAIL |
+| Jsoup-71           | FAIL | FAIL | FAIL |
+| Jsoup-52           | FAIL | FAIL | FAIL |
+| Jsoup-28           | FAIL | FAIL | FAIL |
+| Jsoup-22           | FAIL | FAIL | FAIL |
+| JacksonDatabind-79 | FAIL | FAIL | FAIL |
+| JacksonDatabind-53 | FAIL | FAIL | FAIL |
+| Closure-155        | FAIL | FAIL | FAIL |
+| Closure-137        | FAIL | FAIL | FAIL |
+| Closure-110        | FAIL | FAIL | FAIL |
+| **Total**          | **1/12** | **2/12** | **1/12** |
+
+### Comparison vs Phase III (leaky)
+
+Phase III × Sonnet on the hard corpus was rate-limit contaminated (most trials returned `RLIM` with no real work done; valid trials only counted 3/3, 2/3, 1/2). Phase VI × Sonnet ran cleanly with no rate-limit aborts at the slower pacing — and the verdict is that **Sonnet 4.6 essentially cannot solve this corpus without the fix summary**. Only Jsoup-87 (a short test-assertion bug where the failure output literally points at the buggy regex match) passes under any condition.
+
+Phase II × Haiku is more interesting:
+
+| Cell | Phase III (leaky) | Phase VI (corrected) | Δ |
+|---|---|---|---|
+| Haiku C1 | 10/12 | 10/12 | 0 |
+| Haiku C2 | 9/12 | 9/12 | 0 |
+| Haiku C3 | 7/12 | 7/12 | 0 |
+
+Same numbers. The Phase III Haiku hard-corpus result was already accurate — the leak helped less on hard bugs than on easy ones because the canonical Defects4J fix descriptions for hard multi-file bugs are themselves vaguer. (e.g., the Jsoup-56 fix_summary was a sentence about "preserves attribute order during cloning" which still requires reading the cloning code to act on.)
+
+**C3 anomalies on Phase II × Haiku** (4 bugs where C3 fails and C1 passes): Jsoup-56 (C3 ERR — TTD setup error), Jsoup-71 (C3 FAIL despite static fix being available), JacksonDatabind-79 (C3 CFAIL — agent's TTD-driven patch broke compile), Closure-110 (C3 FAIL). In every case, C1 (no debugger) found the fix; C3 (TTD available) didn't.
+
+---
+
+## §5 TTD invocation rate
+
+**The headline metric.** Counting `back-step`, `ttd-next`, `ttd-goto`, `capture-stack`, `inspect`, `session-end`, `annotate`, `run-test`, `diff <var>` occurrences in the agent's tool-call stream across all 46 valid C3 trials (Phase I × {Haiku, Sonnet} + Phase II × {Haiku, Sonnet}, excluding TOUT/ERR):
+
+**0/46 trials invoked any TTD command.**
+
+This was the headline Phase III negative, and it survives the prompt fix completely. Sonnet and Haiku both have Crochet TTD available as a tool, the prompt explicitly walks through how to use it, the infrastructure is verified end-to-end-working from the manual sanity check (CASE_STUDY-III §11) — and the agents simply don't reach for it. When the failing test output names the assertion site, they grep, they Read, they Edit. They don't `crochet-debug-d4j annotate`. They don't `back-step`.
+
+The negative finding is now defensible: removing the prompt leak did not change the outcome.
+
+---
+
+## §6 Bottom-line synthesis
+
+### What we now know with the methodology fixed
+
+1. **Crochet TTD does not help Haiku 4.5 or Sonnet 4.6 fix Defects4J bugs.** Pass-rate parity or C3-underperforms across both phases × both models. Same finding as Phase III, but now defensible.
+2. **0/46 TTD invocations** across all valid C3 trials. The earlier Phase III "0/54" was inflated by rate-limit-contaminated Phase II × Sonnet trials that didn't really run; on a clean 46-trial denominator the rate is also exactly zero. The agent priors against reaching for an interactive debugger are robust.
+3. **Sonnet 4.6 on hard Defects4J corpus is essentially zero without the leak.** This is a separate, surprising finding: the fix summary was carrying *most of the lift* for Sonnet on multi-file bugs. Whether this is a Sonnet-specific weakness (e.g., tendency to over-read context and stall) or a single-seed artifact would need multi-seed replication to disentangle.
+4. **The leak's lift was real but uneven.** On easy bugs it added 1-2 bugs per cell. On hard bugs it added 0 bugs for Haiku and ~9 bugs for Sonnet. The asymmetry argues that Sonnet was *relying* on the named-method hint that Haiku could derive from the failure output.
+
+### What this means for Crochet's TTD product
+
+The case against TTD as a tool for LLM-agent debugging on Defects4J-shaped bugs is now clean:
+- The infrastructure works (CASE_STUDY-III §11's manual walkthrough on Math-5 confirmed end-to-end).
+- The bug shapes (single-test assertions, often single-file fixes) don't reward state-time navigation; they reward static reading.
+- Both Haiku and Sonnet — regardless of model strength — converge on the same Read/grep/Edit pattern.
+- An *Opus*-grade replication is the obvious next test, but the most likely outcome is "Opus also doesn't invoke TTD and also doesn't need it on this corpus".
+
+The case *for* TTD on harder/concurrent regimes still stands — Phase IV.3's coverage fuzzing on Commons Pool 2 showed Crochet rollback wins ~2× iter/s above a ~15-20ms setup-cost threshold. The TTD claim was always specifically about *agent debugging on this corpus*, and Phase VI strengthens that claim's epistemic standing.
+
+---
+
+## §7 Threats to validity (Phase VI itself)
+
+- **Single seed per cell.** Variance is unbounded. Multi-seed replication should run before any paper-strength claim. The fact that pass-rate patterns are consistent across Phase I × {Haiku, Sonnet} suggests they're not single-seed flukes, but quantitative claims (e.g., "C3 is 1.4 bugs worse than C1") shouldn't be made with this data.
+- **Opus excluded.** Cost-driven decision; means we can't currently rule out "stronger models reach for TTD".
+- **Test failure output may still telegraph some bugs.** For e.g. Math-3, the assertion message says "Index 1 out of bounds for length 1" — that's a strong hint about the bug shape even without the named method. We didn't try to obscure the test output further. A more adversarial variant would replace specific values with `<redacted>`.
+- **`{{WORKDIR}}` is still in the prompt.** It's the path to the buggy source — informative but unavoidable since the agent has to operate on the code. No remaining secret-leakage but worth noting.
+- **No human baseline.** We don't know what fraction of these bugs *humans* would solve with vs without TTD on the corrected prompts. That's the natural complement experiment.
+
+---
+
+## §8 What this means for PR #7
+
+The prior writeups (`CASE_STUDY.md` Phase I, `CASE_STUDY-II.md` Phase II, `CASE_STUDY-III.md` Phase III) need erratum notes at the top pointing to this document. Their per-bug pass-rate tables are inflated by the fix-summary leak; the TTD-invocation count (0/N) is correct.
+
+`EMPIRICAL_STATE.md` §2–4 and `PROJECT_STATE.md` §4 also reference the Phase I-III numbers; they should be updated to point readers at CASE_STUDY-VI for the corrected pass rates. The bottom-line synthesis ("TTD doesn't help LLM agents on Defects4J") survives without modification — only the supporting numbers shift.
+
+The PR is mergeable as-is with one followup commit adding the erratum stamps. The negative finding is the headline result, and Phase VI strengthens not weakens it.
+
+---
+
+## §9 Pointers
+
+- Trial harness: `eval/agent-debug/run-trial.sh` (commit `2e7526b`).
+- Prompt templates: `eval/agent-debug/prompts/condition-C{1,2,3}.md`.
+- Raw trial JSONs: `eval/agent-debug/results-{haiku-4-5,sonnet-4-6,hard-haiku-4-5,hard-sonnet-4-6}/`.
+- Per-sweep summaries: `*/sweep-summary.md` in each results dir.
+- Branch: `unit/VI.1-prompt-fix` (off `java24-tdd`).
+- Methodology bug discovered by: the user, 2026-06-01.

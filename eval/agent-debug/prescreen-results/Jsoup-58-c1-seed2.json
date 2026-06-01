@@ -1,0 +1,26 @@
+{
+  "bug": "Jsoup-58",
+  "condition": "C1",
+  "started_at": "2026-05-21T13:57:38+00:00",
+  "duration_seconds": 412,
+  "tool_calls": 13,
+  "compile_fail": false,
+  "primary_pass": false,
+  "test_pass": false,
+  "baseline_failing_count": 2,
+  "agent_induced_regressions": [],
+  "regressed_tests": [],
+  "diagnosis_quality": 0,
+  "agent_exit_code": 1,
+  "bug_reproduced_pretest": true,
+  "agent_patch": "diff --git a/maven-build.xml b/maven-build.xml\nindex 849871c7..73b0656d 100644\n--- a/maven-build.xml\n+++ b/maven-build.xml\n@@ -71,10 +71,10 @@\n            debug=\"true\" \n            optimize=\"false\" \n            deprecation=\"true\" \n-           target=\"1.6\" \n+           target=\"1.8\" \n            verbose=\"false\" \n            fork=\"false\" \n-           source=\"1.6\">\n+           source=\"1.8\">\n       <src>\n         <pathelement location=\"${maven.build.srcDir.0}\"/>\n       </src>\n@@ -110,10 +110,10 @@\n            debug=\"true\" \n            optimize=\"false\" \n            deprecation=\"true\" \n-           target=\"1.6\" \n+           target=\"1.8\" \n            verbose=\"false\" \n            fork=\"false\" \n-           source=\"1.6\">\n+           source=\"1.8\">\n       <src>\n         <pathelement location=\"${maven.build.testDir.0}\"/>\n       </src>\n",
+  "agent_log": "{\"type\":\"result\",\"subtype\":\"success\",\"is_error\":true,\"api_error_status\":429,\"duration_ms\":410656,\"duration_api_ms\":396963,\"num_turns\":13,\"result\":\"You've hit your session limit \u00b7 resets 4:50pm (UTC)\",\"stop_reason\":\"stop_sequence\",\"session_id\":\"829ce711-ec76-243c-0998-f76d4f16c412\",\"total_cost_usd\":0.4462595000000001,\"usage\":{\"input_tokens\":16,\"cache_creation_input_tokens\":19322,\"cache_read_input_tokens\":355184,\"output_tokens\":5913,\"server_tool_use\":{\"web_search_requests\":0,\"web_fetch_requests\":0},\"service_tier\":\"standard\",\"cache_creation\":{\"ephemeral_1h_input_tokens\":19322,\"ephemeral_5m_input_tokens\":0},\"inference_geo\":\"\",\"iterations\":[{\"input_tokens\":1,\"output_tokens\":567,\"cache_read_input_tokens\":35395,\"cache_creation_input_tokens\":2426,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":2426},\"type\":\"message\"}],\"speed\":\"standard\"},\"modelUsage\":{\"claude-opus-4-7[1m]\":{\"inputTokens\":16,\"outputTokens\":5913,\"cacheReadInputTokens\":355184,\"cacheCreationInputTokens\":19322,\"webSearchRequests\":0,\"costUSD\":0.4462595000000001,\"contextWindow\":1000000,\"maxOutputTokens\":64000}},\"permission_denials\":[],\"terminal_reason\":\"completed\",\"fast_mode_state\":\"off\",\"uuid\":\"bf266cbf-e43b-4337-a3eb-787f43fb402b\"}\n",
+  "agent_stderr": "",
+  "judge_reasoning": "judge failed\n",
+  "verify_log": "Running ant (compile.tests)................................................ OK\nRunning ant (run.dev.tests)................................................ OK\nFailing tests: 1\n  - org.jsoup.safety.CleanerTest::testIsValidBodyHtml\n",
+  "baseline_failing_tests": [
+    "org.jsoup.safety.CleanerTest::testIsValidBodyHtml",
+    "org.jsoup.safety.CleanerTest::testIsValidDocument"
+  ],
+  "compile_log": "Running ant (compile)...................................................... OK\nRunning ant (compile.tests)................................................ OK\n"
+}

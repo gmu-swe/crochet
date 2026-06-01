@@ -1,0 +1,28 @@
+{
+  "bug": "Jsoup-28",
+  "condition": "C1",
+  "started_at": "2026-05-21T13:48:18+00:00",
+  "duration_seconds": 133,
+  "tool_calls": 16,
+  "compile_fail": false,
+  "primary_pass": true,
+  "test_pass": true,
+  "baseline_failing_count": 4,
+  "agent_induced_regressions": [],
+  "regressed_tests": [],
+  "diagnosis_quality": 3,
+  "agent_exit_code": 0,
+  "bug_reproduced_pretest": true,
+  "agent_patch": "diff --git a/maven-build.xml b/maven-build.xml\nindex 93e81600..f77e8eba 100644\n--- a/maven-build.xml\n+++ b/maven-build.xml\n@@ -68,10 +68,10 @@\n            debug=\"true\" \n            optimize=\"false\" \n            deprecation=\"true\" \n-           target=\"1.6\" \n+           target=\"1.8\" \n            verbose=\"false\" \n            fork=\"false\" \n-           source=\"1.6\">\n+           source=\"1.8\">\n       <src>\n         <pathelement location=\"${maven.build.srcDir.0}\"/>\n       </src>\n@@ -99,10 +99,10 @@\n            debug=\"true\" \n            optimize=\"false\" \n            deprecation=\"true\" \n-           target=\"1.6\" \n+           target=\"1.8\" \n            verbose=\"false\" \n            fork=\"false\" \n-           source=\"1.6\">\n+           source=\"1.8\">\n       <src>\n         <pathelement location=\"${maven.build.testDir.0}\"/>\n       </src>\ndiff --git a/src/main/java/org/jsoup/nodes/Entities.java b/src/main/java/org/jsoup/nodes/Entities.java\nindex be73e321..1003b0a9 100644\n--- a/src/main/java/org/jsoup/nodes/Entities.java\n+++ b/src/main/java/org/jsoup/nodes/Entities.java\n@@ -115,7 +115,8 @@ public class Entities {\n                 }\n             } else {\n                 String name = m.group(1);\n-                if (full.containsKey(name))\n+                boolean hasSemi = m.group(0).endsWith(\";\");\n+                if (full.containsKey(name) && (hasSemi || base.containsKey(name)))\n                     charval = full.get(name);\n             }\n             if (charval != -1 || charval > 0xFFFF) {\n",
+  "agent_log": "{\"type\":\"result\",\"subtype\":\"success\",\"is_error\":false,\"api_error_status\":null,\"duration_ms\":131566,\"duration_api_ms\":112775,\"ttft_ms\":3947,\"num_turns\":16,\"result\":\"All Entities tests pass. The fix is in `src/main/java/org/jsoup/nodes/Entities.java` at the named-entity branch of `unescape`.\\n\\nDIAGNOSIS COMPLETE\\n\\nThe root cause was in `Entities.unescape`: when the regex matched a named entity, the code resolved it via `full.containsKey(name)` without checking whether the match included a trailing semicolon. In HTML, only \\\"legacy\\\" named entities (those carried in `entities-base.properties`, e.g. `lt`, `reg`, `copy`) may be parsed without a trailing semicolon; \\\"extended\\\" HTML5 entities that exist only in `entities-full.properties` (e.g. `angst`) must be terminated by `;`. Because the regex made the trailing `;` optional, the buggy code happily decoded `&angst` into `\u00c5`, corrupting the input. The fix detects the semicolon (`m.group(0).endsWith(\\\";\\\")`) and only accepts a named entity without a semicolon if that name also exists in the base entity set, matching the test's expectation that `&LT`/`&reg` resolve but `&angst` (no semicolon) is left untouched.\",\"stop_reason\":\"end_turn\",\"session_id\":\"98fd7432-4512-7f35-cefd-4624edb79636\",\"total_cost_usd\":0.5549332499999999,\"usage\":{\"input_tokens\":20,\"cache_creation_input_tokens\":21637,\"cache_read_input_tokens\":528554,\"output_tokens\":6213,\"server_tool_use\":{\"web_search_requests\":0,\"web_fetch_requests\":0},\"service_tier\":\"standard\",\"cache_creation\":{\"ephemeral_1h_input_tokens\":21637,\"ephemeral_5m_input_tokens\":0},\"inference_geo\":\"\",\"iterations\":[{\"input_tokens\":1,\"output_tokens\":385,\"cache_read_input_tokens\":39615,\"cache_creation_input_tokens\":521,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":521},\"type\":\"message\"}],\"speed\":\"standard\"},\"modelUsage\":{\"claude-opus-4-7[1m]\":{\"inputTokens\":20,\"outputTokens\":6213,\"cacheReadInputTokens\":528554,\"cacheCreationInputTokens\":21637,\"webSearchRequests\":0,\"costUSD\":0.5549332499999999,\"contextWindow\":1000000,\"maxOutputTokens\":64000}},\"permission_denials\":[],\"terminal_reason\":\"completed\",\"fast_mode_state\":\"off\",\"uuid\":\"72eeff80-e7da-4bb6-9a88-0b1010f553c7\"}\n",
+  "agent_stderr": "",
+  "judge_reasoning": "The agent correctly identified the right subsystem (Entities.unescape and named-entity resolution) and described a real bug involving semicolon handling for base vs. full entities. However, the ground-truth fix concerns the entity trie lookup at the boundary between decimal and hexadecimal numeric character references, which the agent did not address at all \u2014 they diagnosed a different (though related) named-entity issue rather than the numeric reference boundary problem.\n",
+  "verify_log": "Running ant (compile.tests)................................................ OK\nRunning ant (run.dev.tests)................................................ OK\nFailing tests: 1\n  - org.jsoup.nodes.EntitiesTest::unescape\n",
+  "baseline_failing_tests": [
+    "org.jsoup.parser.AttributeParseTest::moreAttributeUnescapes",
+    "org.jsoup.parser.AttributeParseTest::strictAttributeUnescapes",
+    "org.jsoup.parser.HtmlParserTest::doesNotFindShortestMatchingEntity",
+    "org.jsoup.parser.HtmlParserTest::relaxedBaseEntityMatchAndStrictExtendedMatch"
+  ],
+  "compile_log": "Running ant (compile)...................................................... OK\nRunning ant (compile.tests)................................................ OK\n"
+}

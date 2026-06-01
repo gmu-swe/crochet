@@ -1,0 +1,26 @@
+{
+  "bug": "Jsoup-22",
+  "condition": "C1",
+  "started_at": "2026-05-21T13:45:30+00:00",
+  "duration_seconds": 80,
+  "tool_calls": 17,
+  "compile_fail": false,
+  "primary_pass": true,
+  "test_pass": true,
+  "baseline_failing_count": 2,
+  "agent_induced_regressions": [],
+  "regressed_tests": [],
+  "diagnosis_quality": 5,
+  "agent_exit_code": 0,
+  "bug_reproduced_pretest": true,
+  "agent_patch": "diff --git a/maven-build.xml b/maven-build.xml\nindex 44658237..31a48d32 100644\n--- a/maven-build.xml\n+++ b/maven-build.xml\n@@ -68,10 +68,10 @@\n            debug=\"true\" \n            optimize=\"false\" \n            deprecation=\"true\" \n-           target=\"1.6\" \n+           target=\"1.8\" \n            verbose=\"false\" \n            fork=\"false\" \n-           source=\"1.6\">\n+           source=\"1.8\">\n       <src>\n         <pathelement location=\"${maven.build.srcDir.0}\"/>\n       </src>\n@@ -94,10 +94,10 @@\n            debug=\"true\" \n            optimize=\"false\" \n            deprecation=\"true\" \n-           target=\"1.6\" \n+           target=\"1.8\" \n            verbose=\"false\" \n            fork=\"false\" \n-           source=\"1.6\">\n+           source=\"1.8\">\n       <src>\n         <pathelement location=\"${maven.build.testDir.0}\"/>\n       </src>\ndiff --git a/src/main/java/org/jsoup/nodes/Element.java b/src/main/java/org/jsoup/nodes/Element.java\nindex fd2b542f..b91ee1a5 100644\n--- a/src/main/java/org/jsoup/nodes/Element.java\n+++ b/src/main/java/org/jsoup/nodes/Element.java\n@@ -431,8 +431,14 @@ public class Element extends Node {\n      * @return sibling elements\n      */\n     public Elements siblingElements() {\n-\n-        return parent().children();\n+        if (parentNode == null) return new Elements();\n+\n+        List<Element> elements = parent().children();\n+        Elements siblings = new Elements();\n+        for (Element el: elements)\n+            if (el != this)\n+                siblings.add(el);\n+        return siblings;\n     }\n \n     /**\n",
+  "agent_log": "{\"type\":\"result\",\"subtype\":\"success\",\"is_error\":false,\"api_error_status\":null,\"duration_ms\":78648,\"duration_api_ms\":61699,\"ttft_ms\":3184,\"num_turns\":17,\"result\":\"Test passes.\\n\\nDIAGNOSIS COMPLETE\\n\\nThe root cause was in `Element.siblingElements()` at `src/main/java/org/jsoup/nodes/Element.java:433`. The method simply returned `parent().children()` without removing the current element from the list, so any element was reported as its own sibling. The fix iterates over the parent's children and excludes the current element using reference identity (`el != this`), which is the correct way to identify \\\"self\\\" (comparing by position in the list would be unsafe when duplicate-looking sibling elements are present, since `List.indexOf` uses `equals`). The method also now returns an empty `Elements` when the element has no parent, avoiding a NullPointerException.\",\"stop_reason\":\"end_turn\",\"session_id\":\"bd2b51c8-993e-4d39-fdc8-06ac4816368f\",\"total_cost_usd\":0.41559575,\"usage\":{\"input_tokens\":21,\"cache_creation_input_tokens\":14321,\"cache_read_input_tokens\":490119,\"output_tokens\":3237,\"server_tool_use\":{\"web_search_requests\":0,\"web_fetch_requests\":0},\"service_tier\":\"standard\",\"cache_creation\":{\"ephemeral_1h_input_tokens\":14321,\"ephemeral_5m_input_tokens\":0},\"inference_geo\":\"\",\"iterations\":[{\"input_tokens\":1,\"output_tokens\":230,\"cache_read_input_tokens\":32598,\"cache_creation_input_tokens\":222,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":222},\"type\":\"message\"}],\"speed\":\"standard\"},\"modelUsage\":{\"claude-opus-4-7[1m]\":{\"inputTokens\":21,\"outputTokens\":3237,\"cacheReadInputTokens\":490119,\"cacheCreationInputTokens\":14321,\"webSearchRequests\":0,\"costUSD\":0.41559575,\"contextWindow\":1000000,\"maxOutputTokens\":64000}},\"permission_denials\":[],\"terminal_reason\":\"completed\",\"fast_mode_state\":\"off\",\"uuid\":\"d0bffdf1-6c18-4a6e-89ad-118887ec88aa\"}\n",
+  "agent_stderr": "",
+  "judge_reasoning": "The agent correctly identified the root cause in Element.siblingElements(), pinpointed the exact file and line, and explained that the fix requires excluding self by reference identity rather than position/equals-based comparison. This directly matches the ground-truth summary about the self-exclusion check needing to use identity rather than position.\n",
+  "verify_log": "Running ant (compile.tests)................................................ OK\nRunning ant (run.dev.tests)................................................ OK\nFailing tests: 1\n  - org.jsoup.nodes.ElementTest::elementIsNotASiblingOfItself\n",
+  "baseline_failing_tests": [
+    "org.jsoup.nodes.NodeTest::nodeIsNotASiblingOfItself",
+    "org.jsoup.nodes.NodeTest::orphanNodeReturnsNullForSiblingElements"
+  ],
+  "compile_log": "Running ant (compile)...................................................... OK\nRunning ant (compile.tests)................................................ OK\n"
+}

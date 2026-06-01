@@ -1,0 +1,25 @@
+{
+  "bug": "Jsoup-87",
+  "condition": "C1",
+  "started_at": "2026-05-21T14:04:18+00:00",
+  "duration_seconds": 6,
+  "tool_calls": 2,
+  "compile_fail": false,
+  "primary_pass": false,
+  "test_pass": false,
+  "baseline_failing_count": 1,
+  "agent_induced_regressions": [],
+  "regressed_tests": [],
+  "diagnosis_quality": 0,
+  "agent_exit_code": 1,
+  "bug_reproduced_pretest": true,
+  "agent_patch": "diff --git a/maven-build.xml b/maven-build.xml\nindex 26f86396..9ac77d10 100644\n--- a/maven-build.xml\n+++ b/maven-build.xml\n@@ -78,10 +78,10 @@\n            debug=\"true\" \n            optimize=\"false\" \n            deprecation=\"true\" \n-           target=\"1.7\" \n+           target=\"1.8\" \n            verbose=\"false\" \n            fork=\"false\" \n-           source=\"1.7\">\n+           source=\"1.8\">\n       <src>\n         <pathelement location=\"${maven.build.srcDir.0}\"/>\n       </src>\n@@ -117,10 +117,10 @@\n            debug=\"true\" \n            optimize=\"false\" \n            deprecation=\"true\" \n-           target=\"1.7\" \n+           target=\"1.8\" \n            verbose=\"false\" \n            fork=\"false\" \n-           source=\"1.7\">\n+           source=\"1.8\">\n       <src>\n         <pathelement location=\"${maven.build.testDir.0}\"/>\n       </src>\n",
+  "agent_log": "{\"type\":\"result\",\"subtype\":\"success\",\"is_error\":true,\"api_error_status\":429,\"duration_ms\":4333,\"duration_api_ms\":3964,\"num_turns\":2,\"result\":\"You've hit your session limit \u00b7 resets 4:50pm (UTC)\",\"stop_reason\":\"stop_sequence\",\"session_id\":\"eac30edc-0631-5765-18b3-d4c444310f5a\",\"total_cost_usd\":0.06435575,\"usage\":{\"input_tokens\":5,\"cache_creation_input_tokens\":8193,\"cache_read_input_tokens\":18499,\"output_tokens\":155,\"server_tool_use\":{\"web_search_requests\":0,\"web_fetch_requests\":0},\"service_tier\":\"standard\",\"cache_creation\":{\"ephemeral_1h_input_tokens\":8193,\"ephemeral_5m_input_tokens\":0},\"inference_geo\":\"\",\"iterations\":[{\"input_tokens\":5,\"output_tokens\":155,\"cache_read_input_tokens\":18499,\"cache_creation_input_tokens\":8193,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":8193},\"type\":\"message\"}],\"speed\":\"standard\"},\"modelUsage\":{\"claude-opus-4-7[1m]\":{\"inputTokens\":5,\"outputTokens\":155,\"cacheReadInputTokens\":18499,\"cacheCreationInputTokens\":8193,\"webSearchRequests\":0,\"costUSD\":0.06435575,\"contextWindow\":1000000,\"maxOutputTokens\":64000}},\"permission_denials\":[],\"terminal_reason\":\"completed\",\"fast_mode_state\":\"off\",\"uuid\":\"ef3f9ff1-406f-45bc-8cca-c1b345fd65cb\"}\n",
+  "agent_stderr": "",
+  "judge_reasoning": "judge failed\n",
+  "verify_log": "Running ant (compile.tests)................................................ OK\nRunning ant (run.dev.tests)................................................ OK\nFailing tests: 1\n  - org.jsoup.parser.HtmlParserTest::preservedCaseLinksCantNest\n",
+  "baseline_failing_tests": [
+    "org.jsoup.parser.HtmlParserTest::preservedCaseLinksCantNest"
+  ],
+  "compile_log": "Running ant (compile)...................................................... OK\nRunning ant (compile.tests)................................................ OK\n"
+}

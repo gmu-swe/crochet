@@ -1,0 +1,27 @@
+{
+  "bug": "Jsoup-52",
+  "condition": "C1",
+  "started_at": "2026-05-21T13:50:58+00:00",
+  "duration_seconds": 267,
+  "tool_calls": 38,
+  "compile_fail": false,
+  "primary_pass": true,
+  "test_pass": true,
+  "baseline_failing_count": 3,
+  "agent_induced_regressions": [],
+  "regressed_tests": [],
+  "diagnosis_quality": 2,
+  "agent_exit_code": 0,
+  "bug_reproduced_pretest": true,
+  "agent_patch": "diff --git a/maven-build.xml b/maven-build.xml\nindex 2ebfa2aa..5e1d3da6 100644\n--- a/maven-build.xml\n+++ b/maven-build.xml\n@@ -68,10 +68,10 @@\n            debug=\"true\" \n            optimize=\"false\" \n            deprecation=\"true\" \n-           target=\"1.6\" \n+           target=\"1.8\" \n            verbose=\"false\" \n            fork=\"false\" \n-           source=\"1.6\">\n+           source=\"1.8\">\n       <src>\n         <pathelement location=\"${maven.build.srcDir.0}\"/>\n       </src>\n@@ -99,10 +99,10 @@\n            debug=\"true\" \n            optimize=\"false\" \n            deprecation=\"true\" \n-           target=\"1.6\" \n+           target=\"1.8\" \n            verbose=\"false\" \n            fork=\"false\" \n-           source=\"1.6\">\n+           source=\"1.8\">\n       <src>\n         <pathelement location=\"${maven.build.testDir.0}\"/>\n       </src>\ndiff --git a/src/main/java/org/jsoup/nodes/XmlDeclaration.java b/src/main/java/org/jsoup/nodes/XmlDeclaration.java\nindex 24a9f164..6fc148bb 100644\n--- a/src/main/java/org/jsoup/nodes/XmlDeclaration.java\n+++ b/src/main/java/org/jsoup/nodes/XmlDeclaration.java\n@@ -65,7 +65,8 @@ public class XmlDeclaration extends Node {\n         accum\n             .append(\"<\")\n             .append(isProcessingInstruction ? \"!\" : \"?\")\n-                .append(getWholeDeclaration())\n+            .append(getWholeDeclaration())\n+            .append(isProcessingInstruction ? \"\" : \"?\")\n             .append(\">\");\n     }\n \n",
+  "agent_log": "{\"type\":\"result\",\"subtype\":\"success\",\"is_error\":false,\"api_error_status\":null,\"duration_ms\":266327,\"duration_api_ms\":244969,\"ttft_ms\":2556,\"num_turns\":38,\"result\":\"The target test passes with a minimal fix.\\n\\nDIAGNOSIS COMPLETE\\n\\nThe root cause is in `XmlDeclaration.outerHtmlHead()`. For a `<?...?>`-style XML declaration (i.e., `isProcessingInstruction == false`), the method emits the opening `<?` and the declaration body but then closes with just `>` instead of `?>`. The class-level comment even states \\\"last data char should be ?\\\", but the rendering code does not append that `?` before the closing `>`. So `ensureMetaCharsetElement()` correctly creates a new `XmlDeclaration(\\\"xml\\\", baseUri, false)` with the right `version`/`encoding` attributes via `prependChild`, but the serialized output came out as `<?xml version=\\\"1.0\\\" encoding=\\\"UTF-8\\\">` \u2014 missing the trailing `?` \u2014 causing the assertion against `<?xml version=\\\"1.0\\\" encoding=\\\"UTF-8\\\"?>` to fail. The fix appends a `?` before the closing `>` when `isProcessingInstruction` is false.\",\"stop_reason\":\"end_turn\",\"session_id\":\"19894718-4233-20c1-7c3d-2302c28994a3\",\"total_cost_usd\":1.31098975,\"usage\":{\"input_tokens\":42,\"cache_creation_input_tokens\":36341,\"cache_read_input_tokens\":1434997,\"output_tokens\":14646,\"server_tool_use\":{\"web_search_requests\":0,\"web_fetch_requests\":0},\"service_tier\":\"standard\",\"cache_creation\":{\"ephemeral_1h_input_tokens\":36341,\"ephemeral_5m_input_tokens\":0},\"inference_geo\":\"\",\"iterations\":[{\"input_tokens\":1,\"output_tokens\":343,\"cache_read_input_tokens\":54416,\"cache_creation_input_tokens\":424,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":424},\"type\":\"message\"}],\"speed\":\"standard\"},\"modelUsage\":{\"claude-opus-4-7[1m]\":{\"inputTokens\":42,\"outputTokens\":14646,\"cacheReadInputTokens\":1434997,\"cacheCreationInputTokens\":36341,\"webSearchRequests\":0,\"costUSD\":1.31098975,\"contextWindow\":1000000,\"maxOutputTokens\":64000}},\"permission_denials\":[],\"terminal_reason\":\"completed\",\"fast_mode_state\":\"off\",\"uuid\":\"670076c7-69f4-4995-83b9-5d6f65e08d32\"}\n",
+  "agent_stderr": "",
+  "judge_reasoning": "The ground-truth fix is in Document.updateMetaCharsetElement() for XML mode, which uses the wrong update path when no charset attribute exists. The agent instead diagnosed a rendering bug in XmlDeclaration.outerHtmlHead() regarding a missing trailing '?'. This is the wrong component, though still in the related XML/charset area of the codebase.\n",
+  "verify_log": "Running ant (compile.tests)................................................ OK\nRunning ant (run.dev.tests)................................................ OK\nFailing tests: 1\n  - org.jsoup.nodes.DocumentTest::testMetaCharsetUpdateXmlNoCharset\n",
+  "baseline_failing_tests": [
+    "org.jsoup.parser.XmlTreeBuilderTest::handlesXmlDeclarationAsDeclaration",
+    "org.jsoup.parser.XmlTreeBuilderTest::testDetectCharsetEncodingDeclaration",
+    "org.jsoup.parser.XmlTreeBuilderTest::testParseDeclarationAttributes"
+  ],
+  "compile_log": "Running ant (compile)...................................................... OK\nRunning ant (compile.tests)................................................ OK\n"
+}
