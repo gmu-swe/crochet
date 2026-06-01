@@ -21,5 +21,33 @@
   "judge_reasoning": "The ground-truth root cause is that the SYSTEM identifier is omitted when a public identifier is present and the system ID is empty-string vs null (a null/empty distinction not preserved through parse\u2192serialize). The agent diagnosed a different scenario\u2014a SYSTEM-only DOCTYPE with no public identifier missing the 'SYSTEM' keyword\u2014which is in the correct method (DocumentType.outerHtmlHead) and component but addresses the wrong condition and mechanism, missing the empty-vs-null distinction entirely.\n",
   "verify_log": "Running ant (compile.tests)................................................ OK\nRunning ant (run.dev.tests)................................................ OK\nFailing tests: 1\n  - org.jsoup.nodes.DocumentTypeTest::testRoundTrip\n",
   "baseline_failing_tests": [],
-  "compile_log": "Running ant (compile)...................................................... OK\nRunning ant (compile.tests)................................................ OK\n"
+  "compile_log": "Running ant (compile)...................................................... OK\nRunning ant (compile.tests)................................................ OK\n",
+  "agent_modified_files": [
+    "maven-build.xml",
+    "pom.xml",
+    "src/main/java/org/jsoup/nodes/DocumentType.java",
+    "src/test/java/org/jsoup/nodes/DocumentTypeTest.java"
+  ],
+  "canonical_modified_files": [
+    "src/main/java/org/jsoup/nodes/DocumentType.java",
+    "src/main/java/org/jsoup/parser/HtmlTreeBuilderState.java",
+    "src/main/java/org/jsoup/parser/Token.java",
+    "src/main/java/org/jsoup/parser/TokeniserState.java",
+    "src/main/java/org/jsoup/parser/XmlTreeBuilder.java"
+  ],
+  "agent_modified_prod_files": [
+    "src/main/java/org/jsoup/nodes/DocumentType.java"
+  ],
+  "file_overlap": [
+    "src/main/java/org/jsoup/nodes/DocumentType.java"
+  ],
+  "missed_canonical": [
+    "src/main/java/org/jsoup/parser/HtmlTreeBuilderState.java",
+    "src/main/java/org/jsoup/parser/Token.java",
+    "src/main/java/org/jsoup/parser/TokeniserState.java",
+    "src/main/java/org/jsoup/parser/XmlTreeBuilder.java"
+  ],
+  "extra_prod_files": [],
+  "fix_locality_score": 0.5,
+  "test_pass_strict": true
 }

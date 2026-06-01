@@ -21,5 +21,29 @@
   "judge_reasoning": "The agent correctly identified that case-preserving mode breaks the <a>-element nesting logic, pinpointing the specific mechanism (hardcoded lowercase 'a' in getActiveFormattingElement/getFromStack at lines 283/288 of HtmlTreeBuilderState) that prevents the adoption-agency-style closing of the outer anchor. This matches the ground truth that link elements incorrectly nest because the <a> tree-builder state isn't applied correctly in case-preserving mode, with precise file/line/variable detail.\n",
   "verify_log": "Running ant (compile.tests)................................................ OK\nRunning ant (run.dev.tests)................................................ OK\nFailing tests: 1\n  - org.jsoup.parser.HtmlParserTest::preservedCaseLinksCantNest\n",
   "baseline_failing_tests": [],
-  "compile_log": "Running ant (compile)...................................................... OK\nRunning ant (compile.tests)................................................ OK\n"
+  "compile_log": "Running ant (compile)...................................................... OK\nRunning ant (compile.tests)................................................ OK\n",
+  "agent_modified_files": [
+    "pom.xml",
+    "src/main/java/org/jsoup/parser/HtmlTreeBuilderState.java"
+  ],
+  "canonical_modified_files": [
+    "src/main/java/org/jsoup/nodes/Element.java",
+    "src/main/java/org/jsoup/parser/HtmlTreeBuilder.java",
+    "src/main/java/org/jsoup/parser/HtmlTreeBuilderState.java",
+    "src/main/java/org/jsoup/parser/Tag.java"
+  ],
+  "agent_modified_prod_files": [
+    "src/main/java/org/jsoup/parser/HtmlTreeBuilderState.java"
+  ],
+  "file_overlap": [
+    "src/main/java/org/jsoup/parser/HtmlTreeBuilderState.java"
+  ],
+  "missed_canonical": [
+    "src/main/java/org/jsoup/nodes/Element.java",
+    "src/main/java/org/jsoup/parser/HtmlTreeBuilder.java",
+    "src/main/java/org/jsoup/parser/Tag.java"
+  ],
+  "extra_prod_files": [],
+  "fix_locality_score": 0.5,
+  "test_pass_strict": true
 }

@@ -21,5 +21,26 @@
   "judge_reasoning": "The ground-truth bug is in Document.updateMetaCharsetElement() taking the wrong update path for XML mode when no charset attribute exists, but the agent diagnosed unrelated bugs in the XmlDeclaration class (trailing '?', constructor parsing, getWholeDeclaration output). The agent stayed in the right general area (XML declaration handling) and its fixes may incidentally affect charset output, but it never identified the actual faulty method or its wrong update path.\n",
   "verify_log": "Running ant (compile.tests)................................................ OK\nRunning ant (run.dev.tests)................................................ OK\nFailing tests: 1\n  - org.jsoup.nodes.DocumentTest::testMetaCharsetUpdateXmlNoCharset\n",
   "baseline_failing_tests": [],
-  "compile_log": "Running ant (compile)...................................................... OK\nRunning ant (compile.tests)................................................ OK\n"
+  "compile_log": "Running ant (compile)...................................................... OK\nRunning ant (compile.tests)................................................ OK\n",
+  "agent_modified_files": [
+    "src/main/java/org/jsoup/nodes/XmlDeclaration.java"
+  ],
+  "canonical_modified_files": [
+    "src/main/java/org/jsoup/helper/DataUtil.java",
+    "src/main/java/org/jsoup/nodes/XmlDeclaration.java",
+    "src/main/java/org/jsoup/parser/XmlTreeBuilder.java"
+  ],
+  "agent_modified_prod_files": [
+    "src/main/java/org/jsoup/nodes/XmlDeclaration.java"
+  ],
+  "file_overlap": [
+    "src/main/java/org/jsoup/nodes/XmlDeclaration.java"
+  ],
+  "missed_canonical": [
+    "src/main/java/org/jsoup/helper/DataUtil.java",
+    "src/main/java/org/jsoup/parser/XmlTreeBuilder.java"
+  ],
+  "extra_prod_files": [],
+  "fix_locality_score": 0.5,
+  "test_pass_strict": true
 }

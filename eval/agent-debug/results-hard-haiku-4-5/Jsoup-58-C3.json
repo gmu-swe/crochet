@@ -24,5 +24,28 @@
     "org.jsoup.safety.CleanerTest::testIsValidDocument",
     "org.jsoup.safety.CleanerTest::testScriptTagInWhiteList"
   ],
-  "compile_log": "Running ant (compile)...................................................... OK\nRunning ant (compile.tests)................................................ OK\n"
+  "compile_log": "Running ant (compile)...................................................... OK\nRunning ant (compile.tests)................................................ OK\n",
+  "agent_modified_files": [
+    "maven-build.xml",
+    "pom.xml",
+    "src/main/java/org/jsoup/Jsoup.java"
+  ],
+  "canonical_modified_files": [
+    "src/main/java/org/jsoup/Jsoup.java",
+    "src/main/java/org/jsoup/parser/Parser.java",
+    "src/main/java/org/jsoup/safety/Cleaner.java"
+  ],
+  "agent_modified_prod_files": [
+    "src/main/java/org/jsoup/Jsoup.java"
+  ],
+  "file_overlap": [
+    "src/main/java/org/jsoup/Jsoup.java"
+  ],
+  "missed_canonical": [
+    "src/main/java/org/jsoup/parser/Parser.java",
+    "src/main/java/org/jsoup/safety/Cleaner.java"
+  ],
+  "extra_prod_files": [],
+  "fix_locality_score": 0.5,
+  "test_pass_strict": true
 }

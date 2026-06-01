@@ -1,0 +1,54 @@
+{
+  "bug": "Closure-137",
+  "condition": "C2",
+  "model": "claude-haiku-4-5",
+  "model_default_used": false,
+  "started_at": "2026-06-01T04:02:05+00:00",
+  "duration_seconds": 326,
+  "tool_calls": 81,
+  "compile_fail": false,
+  "primary_pass": false,
+  "test_pass": false,
+  "baseline_failing_count": 6,
+  "agent_induced_regressions": [],
+  "regressed_tests": [],
+  "diagnosis_quality": 1,
+  "agent_exit_code": 1,
+  "bug_reproduced_pretest": true,
+  "agent_patch": "diff --git a/build.xml b/build.xml\nindex 682c1f28a..f7b69b95f 100644\n--- a/build.xml\n+++ b/build.xml\n@@ -14,8 +14,8 @@\n  limitations under the License.\n -->\n <project name=\"compiler\" basedir=\".\" default=\"jar\">\n-<property name=\"ant.build.javac.target\" value=\"1.6\"/>\n-<property name=\"ant.build.javac.source\" value=\"1.6\"/>\n+<property name=\"ant.build.javac.target\" value=\"1.8\"/>\n+<property name=\"ant.build.javac.source\" value=\"1.8\"/>\n \n   <!-- define other variables -->\n   <property name=\"src.dir\" value=\"${basedir}/src\" />\ndiff --git a/src/com/google/javascript/jscomp/MakeDeclaredNamesUnique.java b/src/com/google/javascript/jscomp/MakeDeclaredNamesUnique.java\nindex 79f2247dd..8b8e1529e 100644\n--- a/src/com/google/javascript/jscomp/MakeDeclaredNamesUnique.java\n+++ b/src/com/google/javascript/jscomp/MakeDeclaredNamesUnique.java\n@@ -315,21 +315,45 @@ class MakeDeclaredNamesUnique\n      * values.\n      */\n         // Check if the new name is valid and if it would cause conflicts.\n-            if (var.scope.isDeclared(newName, recurseScopes) ||\n+            // First check ancestor scopes (always recurse)\n+            if (var.scope.isDeclared(newName, true) ||\n                 !TokenStream.isJSIdentifier(newName)) {\n               newName = oldName;\n             } else {\n-              var.scope.declare(newName, var.nameNode, null, null);\n-          // Adding a reference to the new name to prevent either the parent\n-          // scopes or the current scope renaming another var to this new name.\n-              Node parentNode = var.getParentNode();\n-              if (parentNode.getType() == Token.FUNCTION &&\n-                  parentNode == var.scope.getRootNode()) {\n-                var.getNameNode().setString(newName);\n+              // Also check if any descendant scope has already reverted to this name\n+              // (we can't revert in parent if descendants have reverted to it)\n+              boolean hasConflict = false;\n+              for (Var mapVar : nameMap.keySet()) {\n+                if (nameMap.get(mapVar).equals(newName)) {\n+                  // Check if mapVar's scope is a descendant of current var's scope\n+                  // i.e., can we reach var.scope by going up from mapVar.scope?\n+                  Scope s = mapVar.scope.getParent();\n+                  while (s != null) {\n+                    if (s == var.scope) {\n+                      hasConflict = true;\n+                      break;\n+                    }\n+                    s = s.getParent();\n+                  }\n+                  if (hasConflict) break;\n+                }\n               }\n-              node.setString(newName);\n-          compiler.reportCodeChange();\n-        }\n+\n+              if (hasConflict) {\n+                newName = oldName;\n+              } else {\n+                var.scope.declare(newName, var.nameNode, null, null);\n+            // Adding a reference to the new name to prevent either the parent\n+            // scopes or the current scope renaming another var to this new name.\n+                Node parentNode = var.getParentNode();\n+                if (parentNode.getType() == Token.FUNCTION &&\n+                    parentNode == var.scope.getRootNode()) {\n+                  var.getNameNode().setString(newName);\n+                }\n+                node.setString(newName);\n+            compiler.reportCodeChange();\n+              }\n+            }\n \n             nameMap.put(var, newName);\n \n",
+  "agent_log": "{\"type\":\"result\",\"subtype\":\"error_max_turns\",\"duration_ms\":324798,\"duration_api_ms\":309552,\"is_error\":true,\"num_turns\":81,\"stop_reason\":\"tool_use\",\"session_id\":\"6813b787-467b-4f42-ab11-21d049367baf\",\"total_cost_usd\":0.7645227500000003,\"usage\":{\"input_tokens\":105,\"cache_creation_input_tokens\":78519,\"cache_read_input_tokens\":5097540,\"output_tokens\":31303,\"server_tool_use\":{\"web_search_requests\":0,\"web_fetch_requests\":0},\"service_tier\":\"standard\",\"cache_creation\":{\"ephemeral_1h_input_tokens\":78519,\"ephemeral_5m_input_tokens\":0},\"inference_geo\":\"not_available\",\"iterations\":[{\"input_tokens\":0,\"output_tokens\":151,\"cache_read_input_tokens\":90724,\"cache_creation_input_tokens\":343,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":343},\"type\":\"message\"}],\"speed\":\"standard\"},\"modelUsage\":{\"claude-haiku-4-5\":{\"inputTokens\":105,\"outputTokens\":31303,\"cacheReadInputTokens\":5097540,\"cacheCreationInputTokens\":78519,\"webSearchRequests\":0,\"costUSD\":0.7645227500000003,\"contextWindow\":200000,\"maxOutputTokens\":32000}},\"permission_denials\":[],\"terminal_reason\":\"max_turns\",\"fast_mode_state\":\"off\",\"uuid\":\"a5d6e543-18dd-4d05-b9c0-e86a69654a01\",\"errors\":[\"Reached maximum number of turns (80)\"]}\n",
+  "agent_stderr": "",
+  "judge_reasoning": "The agent provided no diagnosis at all (the final diagnosis field is empty), so there is no root cause identification to evaluate against the ground-truth summary about ContextualRenameInverter extending the wrong callback interface.\n",
+  "verify_log": "Running ant (compile.tests)................................................ OK\nRunning ant (run.dev.tests)................................................ OK\nFailing tests: 1\n  - com.google.javascript.jscomp.MakeDeclaredNamesUniqueTest::testOnlyInversion3\n",
+  "baseline_failing_tests": [
+    "com.google.javascript.jscomp.MakeDeclaredNamesUniqueTest::testArguments",
+    "com.google.javascript.jscomp.MakeDeclaredNamesUniqueTest::testMakeLocalNamesUniqueWithContext1",
+    "com.google.javascript.jscomp.MakeDeclaredNamesUniqueTest::testMakeLocalNamesUniqueWithContext2",
+    "com.google.javascript.jscomp.MakeDeclaredNamesUniqueTest::testOnlyInversion3",
+    "com.google.javascript.jscomp.MakeDeclaredNamesUniqueTest::testOnlyInversion4",
+    "com.google.javascript.jscomp.NormalizeTest::testRemoveDuplicateVarDeclarations2"
+  ],
+  "compile_log": "Running ant (compile)...................................................... OK\nRunning ant (compile.tests)................................................ OK\n",
+  "agent_modified_files": [
+    "build.xml",
+    "src/com/google/javascript/jscomp/MakeDeclaredNamesUnique.java"
+  ],
+  "canonical_modified_files": [
+    "src/com/google/javascript/jscomp/MakeDeclaredNamesUnique.java",
+    "src/com/google/javascript/jscomp/NodeUtil.java",
+    "src/com/google/javascript/jscomp/Normalize.java"
+  ],
+  "agent_modified_prod_files": [
+    "src/com/google/javascript/jscomp/MakeDeclaredNamesUnique.java"
+  ],
+  "file_overlap": [
+    "src/com/google/javascript/jscomp/MakeDeclaredNamesUnique.java"
+  ],
+  "missed_canonical": [
+    "src/com/google/javascript/jscomp/NodeUtil.java",
+    "src/com/google/javascript/jscomp/Normalize.java"
+  ],
+  "extra_prod_files": [],
+  "fix_locality_score": 0.5,
+  "test_pass_strict": false
+}

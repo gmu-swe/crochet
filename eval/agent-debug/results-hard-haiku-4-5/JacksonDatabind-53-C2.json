@@ -34,5 +34,27 @@
     "com.fasterxml.jackson.databind.type.TestTypeFactoryWithClassLoader",
     "com.fasterxml.jackson.databind.util.TestClassUtil::testFindEnumType"
   ],
-  "compile_log": "Running ant (compile)...................................................... OK\nRunning ant (compile.tests)................................................ OK\n"
+  "compile_log": "Running ant (compile)...................................................... OK\nRunning ant (compile.tests)................................................ OK\n",
+  "agent_modified_files": [
+    "maven-build.xml",
+    "pom.xml",
+    "src/main/java/com/fasterxml/jackson/databind/deser/impl/CreatorCollector.java"
+  ],
+  "canonical_modified_files": [
+    "src/main/java/com/fasterxml/jackson/databind/type/TypeBindings.java",
+    "src/main/java/com/fasterxml/jackson/databind/type/TypeFactory.java"
+  ],
+  "agent_modified_prod_files": [
+    "src/main/java/com/fasterxml/jackson/databind/deser/impl/CreatorCollector.java"
+  ],
+  "file_overlap": [],
+  "missed_canonical": [
+    "src/main/java/com/fasterxml/jackson/databind/type/TypeBindings.java",
+    "src/main/java/com/fasterxml/jackson/databind/type/TypeFactory.java"
+  ],
+  "extra_prod_files": [
+    "src/main/java/com/fasterxml/jackson/databind/deser/impl/CreatorCollector.java"
+  ],
+  "fix_locality_score": 0.0,
+  "test_pass_strict": false
 }
