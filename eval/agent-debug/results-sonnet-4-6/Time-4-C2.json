@@ -1,0 +1,32 @@
+{
+  "bug": "Time-4",
+  "condition": "C2",
+  "model": "claude-sonnet-4-6",
+  "model_default_used": false,
+  "started_at": "2026-06-01T02:35:38+00:00",
+  "duration_seconds": 113,
+  "tool_calls": 18,
+  "compile_fail": false,
+  "primary_pass": true,
+  "test_pass": true,
+  "baseline_failing_count": 6,
+  "agent_induced_regressions": [],
+  "regressed_tests": [],
+  "diagnosis_quality": 5,
+  "agent_exit_code": 0,
+  "bug_reproduced_pretest": true,
+  "agent_patch": "diff --git a/maven-build.xml b/maven-build.xml\nindex 1a5047be..0a289f6b 100644\n--- a/maven-build.xml\n+++ b/maven-build.xml\n@@ -71,10 +71,10 @@\n            debug=\"true\" \n            optimize=\"false\" \n            deprecation=\"true\" \n-           target=\"1.6\" \n+           target=\"1.8\" \n            verbose=\"false\" \n            fork=\"false\" \n-           source=\"1.6\">\n+           source=\"1.8\">\n       <src>\n         <pathelement location=\"${maven.build.srcDir.0}\"/>\n       </src>\n@@ -108,10 +108,10 @@\n            debug=\"true\" \n            optimize=\"false\" \n            deprecation=\"true\" \n-           target=\"1.6\" \n+           target=\"1.8\" \n            verbose=\"false\" \n            fork=\"false\" \n-           source=\"1.6\">\n+           source=\"1.8\">\n       <src>\n         <pathelement location=\"${maven.build.testDir.0}\"/>\n       </src>\ndiff --git a/src/main/java/org/joda/time/Partial.java b/src/main/java/org/joda/time/Partial.java\nindex 0d4edf47..8e8e6034 100644\n--- a/src/main/java/org/joda/time/Partial.java\n+++ b/src/main/java/org/joda/time/Partial.java\n@@ -461,7 +461,7 @@ public final class Partial\n             System.arraycopy(iValues, i, newValues, i + 1, newValues.length - i - 1);\n             // use public constructor to ensure full validation\n             // this isn't overly efficient, but is safe\n-            Partial newPartial = new Partial(iChronology, newTypes, newValues);\n+            Partial newPartial = new Partial(newTypes, newValues, iChronology);\n             iChronology.validate(newPartial, newValues);\n             return newPartial;\n         }\n",
+  "agent_log": "{\"type\":\"result\",\"subtype\":\"success\",\"is_error\":false,\"api_error_status\":null,\"duration_ms\":112101,\"duration_api_ms\":100395,\"ttft_ms\":4875,\"num_turns\":18,\"result\":\"The test passes now.\\n\\nDIAGNOSIS COMPLETE\\n\\nThe root cause was a parameter order mistake in `Partial.java`'s `with` method (line 464). The method comment explicitly says \\\"use public constructor to ensure full validation\\\", but the code called `new Partial(iChronology, newTypes, newValues)` \u2014 which matches the *private* package-level constructor `Partial(Chronology, DateTimeFieldType[], int[])` that performs **no validation**. The public constructor has the signature `Partial(DateTimeFieldType[], int[], Chronology)` (types first, chronology last). As a result, when adding `clockhourOfDay` to a `Partial` that already contained `hourOfDay` (both fields share the same unit duration *hours* and range duration *days*, making them logical duplicates), the duplicate check in the public constructor was bypassed and no `IllegalArgumentException` was thrown. The fix was to swap the argument order so the public validating constructor is actually called.\",\"stop_reason\":\"end_turn\",\"session_id\":\"9dfa72bf-4203-4440-9459-771f08b2a65f\",\"total_cost_usd\":0.32327639999999996,\"usage\":{\"input_tokens\":19,\"cache_creation_input_tokens\":22414,\"cache_read_input_tokens\":538373,\"output_tokens\":5177,\"server_tool_use\":{\"web_search_requests\":0,\"web_fetch_requests\":0},\"service_tier\":\"standard\",\"cache_creation\":{\"ephemeral_1h_input_tokens\":22414,\"ephemeral_5m_input_tokens\":0},\"inference_geo\":\"not_available\",\"iterations\":[{\"input_tokens\":1,\"output_tokens\":228,\"cache_read_input_tokens\":35493,\"cache_creation_input_tokens\":180,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":180},\"type\":\"message\"}],\"speed\":\"standard\"},\"modelUsage\":{\"claude-sonnet-4-6\":{\"inputTokens\":19,\"outputTokens\":5177,\"cacheReadInputTokens\":538373,\"cacheCreationInputTokens\":22414,\"webSearchRequests\":0,\"costUSD\":0.32327639999999996,\"contextWindow\":200000,\"maxOutputTokens\":32000}},\"permission_denials\":[],\"terminal_reason\":\"completed\",\"fast_mode_state\":\"off\",\"uuid\":\"70e69771-1a2c-4699-afd5-8191516c7c1d\"}\n",
+  "agent_stderr": "",
+  "judge_reasoning": "The agent precisely identified the root cause at Partial.java line 464: the `with` method called the non-validating private constructor due to a parameter-order mistake (chronology-first vs. types-first), bypassing the duplicate/ordering validation. This matches the ground-truth that Partial.with() allows illegal field ordering by skipping full validation, and it cites the exact line, method, constructor signatures, and concrete failure scenario (clockhourOfDay/hourOfDay duplicate).\n",
+  "verify_log": "Running ant (compile.tests)................................................ OK\nRunning ant (run.dev.tests)................................................ OK\nFailing tests: 1\n  - org.joda.time.TestPartial_Basics::testWith3\n",
+  "baseline_failing_tests": [
+    "org.joda.time.TestDateMidnight_Properties::testPropertyGetMonthOfYear",
+    "org.joda.time.TestDateTime_Properties::testPropertyGetMonthOfYear",
+    "org.joda.time.TestMonthDay_Properties::testPropertyGetMonthOfYear",
+    "org.joda.time.TestMutableDateTime_Properties::testPropertyGetMonthOfYear",
+    "org.joda.time.convert.TestCalendarConverter::testGetChronology_Object_Zone",
+    "org.joda.time.convert.TestCalendarConverter::testGetChronology_Object_nullChronology"
+  ],
+  "compile_log": "Running ant (compile)...................................................... OK\nRunning ant (compile.tests)................................................ OK\n"
+}
