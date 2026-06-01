@@ -1,0 +1,32 @@
+{
+  "bug": "Time-11",
+  "condition": "C3",
+  "model": "claude-sonnet-4-6",
+  "model_default_used": false,
+  "started_at": "2026-06-01T02:39:11+00:00",
+  "duration_seconds": 109,
+  "tool_calls": 19,
+  "compile_fail": false,
+  "primary_pass": true,
+  "test_pass": true,
+  "baseline_failing_count": 6,
+  "agent_induced_regressions": [],
+  "regressed_tests": [],
+  "diagnosis_quality": 1,
+  "agent_exit_code": 0,
+  "bug_reproduced_pretest": true,
+  "agent_patch": "diff --git a/maven-build.xml b/maven-build.xml\nindex 21b233c1..f73ad386 100644\n--- a/maven-build.xml\n+++ b/maven-build.xml\n@@ -72,10 +72,10 @@\n            debug=\"true\" \n            optimize=\"true\" \n            deprecation=\"false\" \n-           target=\"1.6\" \n+           target=\"1.8\" \n            verbose=\"true\" \n            fork=\"true\" \n-           source=\"1.6\">\n+           source=\"1.8\">\n       <src>\n         <pathelement location=\"${maven.build.srcDir.0}\"/>\n       </src>\n@@ -111,10 +111,10 @@\n            debug=\"true\" \n            optimize=\"true\" \n            deprecation=\"false\" \n-           target=\"1.6\" \n+           target=\"1.8\" \n            verbose=\"true\" \n            fork=\"true\" \n-           source=\"1.6\">\n+           source=\"1.8\">\n       <src>\n         <pathelement location=\"${maven.build.testDir.0}\"/>\n       </src>\ndiff --git a/src/main/java/org/joda/time/tz/ZoneInfoCompiler.java b/src/main/java/org/joda/time/tz/ZoneInfoCompiler.java\nindex 6efe0716..64da5ea5 100644\n--- a/src/main/java/org/joda/time/tz/ZoneInfoCompiler.java\n+++ b/src/main/java/org/joda/time/tz/ZoneInfoCompiler.java\n@@ -65,10 +65,11 @@ public class ZoneInfoCompiler {\n \n     static Chronology cLenientISO;\n \n-    static ThreadLocal<Boolean> cVerbose = new ThreadLocal<Boolean>();\n-    static {\n-        cVerbose.set(Boolean.FALSE);\n-    }\n+    static ThreadLocal<Boolean> cVerbose = new ThreadLocal<Boolean>() {\n+        protected Boolean initialValue() {\n+            return Boolean.FALSE;\n+        }\n+    };\n \n     /**\n      * Gets a flag indicating that verbose logging is required.\n",
+  "agent_log": "{\"type\":\"result\",\"subtype\":\"success\",\"is_error\":false,\"api_error_status\":null,\"duration_ms\":108670,\"duration_api_ms\":86215,\"ttft_ms\":2684,\"num_turns\":19,\"result\":\"The test passes. \\n\\nDIAGNOSIS COMPLETE\\n\\nThe root cause is a thread-safety bug in `ZoneInfoCompiler.java`. The `cVerbose` field is a `ThreadLocal<Boolean>` intended to hold the verbose flag per-thread. However, its initialization used a `static {}` block calling `cVerbose.set(Boolean.FALSE)`, which only sets the value for the thread that loads the class (typically the main thread). When the test spawns a second thread to call `toDateTimeZone()`, that thread's `cVerbose.get()` returns `null` (the ThreadLocal was never set for it). The `verbose()` method returns this `null` Boolean, and auto-unboxing it to a primitive `boolean` throws a `NullPointerException`, causing the thread to die silently \u2014 so `zone[0]` remains `null` and `assertNotNull(zone[0])` fails. The fix overrides `initialValue()` on the `ThreadLocal` to return `Boolean.FALSE`, ensuring every thread sees a non-null default value without needing an explicit `set()` call.\",\"stop_reason\":\"end_turn\",\"session_id\":\"d2c9c105-7e73-40bf-83a2-afc2d7fd013f\",\"total_cost_usd\":0.50320455,\"usage\":{\"input_tokens\":17,\"cache_creation_input_tokens\":54565,\"cache_read_input_tokens\":779916,\"output_tokens\":4304,\"server_tool_use\":{\"web_search_requests\":0,\"web_fetch_requests\":0},\"service_tier\":\"standard\",\"cache_creation\":{\"ephemeral_1h_input_tokens\":54565,\"ephemeral_5m_input_tokens\":0},\"inference_geo\":\"not_available\",\"iterations\":[{\"input_tokens\":1,\"output_tokens\":257,\"cache_read_input_tokens\":67662,\"cache_creation_input_tokens\":162,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":162},\"type\":\"message\"}],\"speed\":\"standard\"},\"modelUsage\":{\"claude-sonnet-4-6\":{\"inputTokens\":17,\"outputTokens\":4304,\"cacheReadInputTokens\":779916,\"cacheCreationInputTokens\":54565,\"webSearchRequests\":0,\"costUSD\":0.50320455,\"contextWindow\":200000,\"maxOutputTokens\":32000}},\"permission_denials\":[],\"terminal_reason\":\"completed\",\"fast_mode_state\":\"off\",\"uuid\":\"97e20b7b-7c49-47db-81f0-8f9b5922ca92\"}\n",
+  "agent_stderr": "",
+  "judge_reasoning": "The ground-truth root cause is in DateTimeZoneBuilder mishandling recurrence transitions, producing wrong zone offsets. The agent instead diagnosed an entirely unrelated ThreadLocal/NullPointerException thread-safety issue in ZoneInfoCompiler, identifying the wrong component and mechanism with no overlap with the actual bug.\n",
+  "verify_log": "Running ant (compile.tests)................................................ OK\nRunning ant (run.dev.tests)................................................ OK\nFailing tests: 1\n  - org.joda.time.tz.TestCompiler::testDateTimeZoneBuilder\n",
+  "baseline_failing_tests": [
+    "org.joda.time.TestDateMidnight_Properties::testPropertyGetMonthOfYear",
+    "org.joda.time.TestDateTime_Properties::testPropertyGetMonthOfYear",
+    "org.joda.time.TestMonthDay_Properties::testPropertyGetMonthOfYear",
+    "org.joda.time.TestMutableDateTime_Properties::testPropertyGetMonthOfYear",
+    "org.joda.time.convert.TestCalendarConverter::testGetChronology_Object_Zone",
+    "org.joda.time.convert.TestCalendarConverter::testGetChronology_Object_nullChronology"
+  ],
+  "compile_log": "Running ant (compile)...................................................... OK\nRunning ant (compile.tests)................................................ OK\n"
+}
