@@ -24,5 +24,21 @@
     "org.jsoup.select.SelectorTest::splitOnBr",
     "org.jsoup.select.SelectorTest::textAsElements"
   ],
-  "compile_log": "Running ant (compile)...................................................... OK\nRunning ant (compile.tests)................................................ OK\n"
+  "compile_log": "Running ant (compile)...................................................... OK\nRunning ant (compile.tests)................................................ OK\n",
+  "agent_modified_files": [
+    "maven-build.xml"
+  ],
+  "canonical_modified_files": [
+    "src/main/java/org/jsoup/select/Evaluator.java",
+    "src/main/java/org/jsoup/select/QueryParser.java"
+  ],
+  "agent_modified_prod_files": [],
+  "file_overlap": [],
+  "missed_canonical": [
+    "src/main/java/org/jsoup/select/Evaluator.java",
+    "src/main/java/org/jsoup/select/QueryParser.java"
+  ],
+  "extra_prod_files": [],
+  "fix_locality_score": 0.0,
+  "test_pass_strict": false
 }

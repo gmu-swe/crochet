@@ -1,0 +1,1797 @@
+[
+  {
+    "bug": "Closure-110",
+    "condition": "C1",
+    "model": "claude-sonnet-4-6",
+    "model_default_used": false,
+    "started_at": "2026-06-01T04:45:31+00:00",
+    "duration_seconds": 2,
+    "tool_calls": 1,
+    "compile_fail": false,
+    "primary_pass": false,
+    "test_pass": false,
+    "baseline_failing_count": 2,
+    "agent_induced_regressions": [],
+    "regressed_tests": [],
+    "diagnosis_quality": 0,
+    "agent_exit_code": 1,
+    "bug_reproduced_pretest": true,
+    "agent_patch": "diff --git a/build.xml b/build.xml\nindex ff96be798..09695dd59 100644\n--- a/build.xml\n+++ b/build.xml\n@@ -28,8 +28,8 @@\n   <property name=\"test.fork\" value=\"true\"/>\n \n   <!-- Force java 6 -->\n-  <property name=\"ant.build.javac.source\" value=\"1.6\" />\n-  <property name=\"ant.build.javac.target\" value=\"1.6\" />\n+  <property name=\"ant.build.javac.source\" value=\"1.8\" />\n+  <property name=\"ant.build.javac.target\" value=\"1.8\" />\n \n   <!-- define other variables -->\n   <property name=\"javac.debug\" value=\"on\" />\ndiff --git a/lib/rhino/build.properties b/lib/rhino/build.properties\nindex e5503e720..c7f1bca36 100644\n--- a/lib/rhino/build.properties\n+++ b/lib/rhino/build.properties\n@@ -21,8 +21,8 @@ classes: ${build.dir}/classes\n \n # compilation settings\n debug: on\n-target-jvm 1.6\n-source-level 1.6\n+target-jvm 1.8\n+source-level 1.8\n \n # jar generation settings\n jar-compression: true\n",
+    "agent_log": "{\"type\":\"result\",\"subtype\":\"success\",\"is_error\":true,\"api_error_status\":429,\"duration_ms\":359,\"duration_api_ms\":0,\"num_turns\":1,\"result\":\"You've hit your session limit \u00b7 resets 5:10am (UTC)\",\"stop_reason\":\"stop_sequence\",\"session_id\":\"e30ffe97-e87b-43b9-9b58-7b409e8d1e5a\",\"total_cost_usd\":0,\"usage\":{\"input_tokens\":0,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"output_tokens\":0,\"server_tool_use\":{\"web_search_requests\":0,\"web_fetch_requests\":0},\"service_tier\":\"standard\",\"cache_creation\":{\"ephemeral_1h_input_tokens\":0,\"ephemeral_5m_input_tokens\":0},\"inference_geo\":\"\",\"iterations\":[],\"speed\":\"standard\"},\"modelUsage\":{},\"permission_denials\":[],\"terminal_reason\":\"completed\",\"fast_mode_state\":\"off\",\"uuid\":\"f9ca4356-c237-469d-a3f8-1b7843ae5ce5\"}\n",
+    "agent_stderr": "",
+    "judge_reasoning": "judge failed\n",
+    "verify_log": "Running ant (compile.tests)................................................ OK\nRunning ant (run.dev.tests)................................................ OK\nFailing tests: 1\n  - com.google.javascript.jscomp.ScopedAliasesTest::testHoistedFunctionDeclaration\n",
+    "baseline_failing_tests": [
+      "com.google.javascript.jscomp.ScopedAliasesTest::testFunctionDeclaration",
+      "com.google.javascript.jscomp.ScopedAliasesTest::testHoistedFunctionDeclaration"
+    ],
+    "compile_log": "Running ant (compile)...................................................... OK\nRunning ant (compile.tests)................................................ OK\n",
+    "agent_modified_files": [
+      "build.xml",
+      "lib/rhino/build.properties"
+    ],
+    "canonical_modified_files": [
+      "src/com/google/javascript/jscomp/ScopedAliases.java",
+      "src/com/google/javascript/rhino/Node.java"
+    ],
+    "agent_modified_prod_files": [],
+    "file_overlap": [],
+    "missed_canonical": [
+      "src/com/google/javascript/jscomp/ScopedAliases.java",
+      "src/com/google/javascript/rhino/Node.java"
+    ],
+    "extra_prod_files": [],
+    "fix_locality_score": 0.0,
+    "test_pass_strict": false
+  },
+  {
+    "bug": "Closure-110",
+    "condition": "C2",
+    "model": "claude-sonnet-4-6",
+    "model_default_used": false,
+    "started_at": "2026-06-01T04:45:47+00:00",
+    "duration_seconds": 2,
+    "tool_calls": 1,
+    "compile_fail": false,
+    "primary_pass": false,
+    "test_pass": false,
+    "baseline_failing_count": 2,
+    "agent_induced_regressions": [],
+    "regressed_tests": [],
+    "diagnosis_quality": 0,
+    "agent_exit_code": 1,
+    "bug_reproduced_pretest": true,
+    "agent_patch": "diff --git a/build.xml b/build.xml\nindex ff96be798..09695dd59 100644\n--- a/build.xml\n+++ b/build.xml\n@@ -28,8 +28,8 @@\n   <property name=\"test.fork\" value=\"true\"/>\n \n   <!-- Force java 6 -->\n-  <property name=\"ant.build.javac.source\" value=\"1.6\" />\n-  <property name=\"ant.build.javac.target\" value=\"1.6\" />\n+  <property name=\"ant.build.javac.source\" value=\"1.8\" />\n+  <property name=\"ant.build.javac.target\" value=\"1.8\" />\n \n   <!-- define other variables -->\n   <property name=\"javac.debug\" value=\"on\" />\ndiff --git a/lib/rhino/build.properties b/lib/rhino/build.properties\nindex e5503e720..c7f1bca36 100644\n--- a/lib/rhino/build.properties\n+++ b/lib/rhino/build.properties\n@@ -21,8 +21,8 @@ classes: ${build.dir}/classes\n \n # compilation settings\n debug: on\n-target-jvm 1.6\n-source-level 1.6\n+target-jvm 1.8\n+source-level 1.8\n \n # jar generation settings\n jar-compression: true\n",
+    "agent_log": "{\"type\":\"result\",\"subtype\":\"success\",\"is_error\":true,\"api_error_status\":429,\"duration_ms\":358,\"duration_api_ms\":0,\"num_turns\":1,\"result\":\"You've hit your session limit \u00b7 resets 5:10am (UTC)\",\"stop_reason\":\"stop_sequence\",\"session_id\":\"e0db79ca-e5ca-4310-a27f-83fd1bee766b\",\"total_cost_usd\":0,\"usage\":{\"input_tokens\":0,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"output_tokens\":0,\"server_tool_use\":{\"web_search_requests\":0,\"web_fetch_requests\":0},\"service_tier\":\"standard\",\"cache_creation\":{\"ephemeral_1h_input_tokens\":0,\"ephemeral_5m_input_tokens\":0},\"inference_geo\":\"\",\"iterations\":[],\"speed\":\"standard\"},\"modelUsage\":{},\"permission_denials\":[],\"terminal_reason\":\"completed\",\"fast_mode_state\":\"off\",\"uuid\":\"06ed1238-fbcf-43ab-a3a9-176971b076fd\"}\n",
+    "agent_stderr": "",
+    "judge_reasoning": "judge failed\n",
+    "verify_log": "Running ant (compile.tests)................................................ OK\nRunning ant (run.dev.tests)................................................ OK\nFailing tests: 1\n  - com.google.javascript.jscomp.ScopedAliasesTest::testHoistedFunctionDeclaration\n",
+    "baseline_failing_tests": [
+      "com.google.javascript.jscomp.ScopedAliasesTest::testFunctionDeclaration",
+      "com.google.javascript.jscomp.ScopedAliasesTest::testHoistedFunctionDeclaration"
+    ],
+    "compile_log": "Running ant (compile)...................................................... OK\nRunning ant (compile.tests)................................................ OK\n",
+    "agent_modified_files": [
+      "build.xml",
+      "lib/rhino/build.properties"
+    ],
+    "canonical_modified_files": [
+      "src/com/google/javascript/jscomp/ScopedAliases.java",
+      "src/com/google/javascript/rhino/Node.java"
+    ],
+    "agent_modified_prod_files": [],
+    "file_overlap": [],
+    "missed_canonical": [
+      "src/com/google/javascript/jscomp/ScopedAliases.java",
+      "src/com/google/javascript/rhino/Node.java"
+    ],
+    "extra_prod_files": [],
+    "fix_locality_score": 0.0,
+    "test_pass_strict": false
+  },
+  {
+    "bug": "Closure-110",
+    "condition": "C3",
+    "model": "claude-sonnet-4-6",
+    "model_default_used": false,
+    "started_at": "2026-06-01T04:45:52+00:00",
+    "duration_seconds": 1,
+    "tool_calls": 1,
+    "compile_fail": false,
+    "primary_pass": false,
+    "test_pass": false,
+    "baseline_failing_count": 2,
+    "agent_induced_regressions": [],
+    "regressed_tests": [],
+    "diagnosis_quality": 0,
+    "agent_exit_code": 1,
+    "bug_reproduced_pretest": true,
+    "agent_patch": "diff --git a/build.xml b/build.xml\nindex ff96be798..09695dd59 100644\n--- a/build.xml\n+++ b/build.xml\n@@ -28,8 +28,8 @@\n   <property name=\"test.fork\" value=\"true\"/>\n \n   <!-- Force java 6 -->\n-  <property name=\"ant.build.javac.source\" value=\"1.6\" />\n-  <property name=\"ant.build.javac.target\" value=\"1.6\" />\n+  <property name=\"ant.build.javac.source\" value=\"1.8\" />\n+  <property name=\"ant.build.javac.target\" value=\"1.8\" />\n \n   <!-- define other variables -->\n   <property name=\"javac.debug\" value=\"on\" />\ndiff --git a/lib/rhino/build.properties b/lib/rhino/build.properties\nindex e5503e720..c7f1bca36 100644\n--- a/lib/rhino/build.properties\n+++ b/lib/rhino/build.properties\n@@ -21,8 +21,8 @@ classes: ${build.dir}/classes\n \n # compilation settings\n debug: on\n-target-jvm 1.6\n-source-level 1.6\n+target-jvm 1.8\n+source-level 1.8\n \n # jar generation settings\n jar-compression: true\n",
+    "agent_log": "{\"type\":\"result\",\"subtype\":\"success\",\"is_error\":true,\"api_error_status\":429,\"duration_ms\":345,\"duration_api_ms\":0,\"num_turns\":1,\"result\":\"You've hit your session limit \u00b7 resets 5:10am (UTC)\",\"stop_reason\":\"stop_sequence\",\"session_id\":\"e73fa7bc-114d-46c5-84b0-06b5e1fb218b\",\"total_cost_usd\":0,\"usage\":{\"input_tokens\":0,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"output_tokens\":0,\"server_tool_use\":{\"web_search_requests\":0,\"web_fetch_requests\":0},\"service_tier\":\"standard\",\"cache_creation\":{\"ephemeral_1h_input_tokens\":0,\"ephemeral_5m_input_tokens\":0},\"inference_geo\":\"\",\"iterations\":[],\"speed\":\"standard\"},\"modelUsage\":{},\"permission_denials\":[],\"terminal_reason\":\"completed\",\"fast_mode_state\":\"off\",\"uuid\":\"0b05ee10-15e2-4861-98a2-495da524a684\"}\n",
+    "agent_stderr": "",
+    "judge_reasoning": "judge failed\n",
+    "verify_log": "Running ant (compile.tests)................................................ OK\nRunning ant (run.dev.tests)................................................ OK\nFailing tests: 1\n  - com.google.javascript.jscomp.ScopedAliasesTest::testHoistedFunctionDeclaration\n",
+    "baseline_failing_tests": [
+      "com.google.javascript.jscomp.ScopedAliasesTest::testFunctionDeclaration",
+      "com.google.javascript.jscomp.ScopedAliasesTest::testHoistedFunctionDeclaration"
+    ],
+    "compile_log": "Running ant (compile)...................................................... OK\nRunning ant (compile.tests)................................................ OK\n",
+    "agent_modified_files": [
+      "build.xml",
+      "lib/rhino/build.properties"
+    ],
+    "canonical_modified_files": [
+      "src/com/google/javascript/jscomp/ScopedAliases.java",
+      "src/com/google/javascript/rhino/Node.java"
+    ],
+    "agent_modified_prod_files": [],
+    "file_overlap": [],
+    "missed_canonical": [
+      "src/com/google/javascript/jscomp/ScopedAliases.java",
+      "src/com/google/javascript/rhino/Node.java"
+    ],
+    "extra_prod_files": [],
+    "fix_locality_score": 0.0,
+    "test_pass_strict": false
+  },
+  {
+    "bug": "Closure-137",
+    "condition": "C1",
+    "model": "claude-sonnet-4-6",
+    "model_default_used": false,
+    "started_at": "2026-06-01T04:43:40+00:00",
+    "duration_seconds": 1,
+    "tool_calls": 1,
+    "compile_fail": false,
+    "primary_pass": false,
+    "test_pass": false,
+    "baseline_failing_count": 5,
+    "agent_induced_regressions": [],
+    "regressed_tests": [],
+    "diagnosis_quality": 0,
+    "agent_exit_code": 1,
+    "bug_reproduced_pretest": true,
+    "agent_patch": "diff --git a/build.xml b/build.xml\nindex 682c1f28a..f7b69b95f 100644\n--- a/build.xml\n+++ b/build.xml\n@@ -14,8 +14,8 @@\n  limitations under the License.\n -->\n <project name=\"compiler\" basedir=\".\" default=\"jar\">\n-<property name=\"ant.build.javac.target\" value=\"1.6\"/>\n-<property name=\"ant.build.javac.source\" value=\"1.6\"/>\n+<property name=\"ant.build.javac.target\" value=\"1.8\"/>\n+<property name=\"ant.build.javac.source\" value=\"1.8\"/>\n \n   <!-- define other variables -->\n   <property name=\"src.dir\" value=\"${basedir}/src\" />\n",
+    "agent_log": "{\"type\":\"result\",\"subtype\":\"success\",\"is_error\":true,\"api_error_status\":429,\"duration_ms\":347,\"duration_api_ms\":0,\"num_turns\":1,\"result\":\"You've hit your session limit \u00b7 resets 5:10am (UTC)\",\"stop_reason\":\"stop_sequence\",\"session_id\":\"d37001cb-eb0c-4df7-9b82-7daf6b99887b\",\"total_cost_usd\":0,\"usage\":{\"input_tokens\":0,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"output_tokens\":0,\"server_tool_use\":{\"web_search_requests\":0,\"web_fetch_requests\":0},\"service_tier\":\"standard\",\"cache_creation\":{\"ephemeral_1h_input_tokens\":0,\"ephemeral_5m_input_tokens\":0},\"inference_geo\":\"\",\"iterations\":[],\"speed\":\"standard\"},\"modelUsage\":{},\"permission_denials\":[],\"terminal_reason\":\"completed\",\"fast_mode_state\":\"off\",\"uuid\":\"e66d5c45-8888-4360-8c2f-f78a17cf59c2\"}\n",
+    "agent_stderr": "",
+    "judge_reasoning": "judge failed\n",
+    "verify_log": "Running ant (compile.tests)................................................ OK\nRunning ant (run.dev.tests)................................................ OK\nFailing tests: 1\n  - com.google.javascript.jscomp.MakeDeclaredNamesUniqueTest::testOnlyInversion3\n",
+    "baseline_failing_tests": [
+      "com.google.javascript.jscomp.MakeDeclaredNamesUniqueTest::testArguments",
+      "com.google.javascript.jscomp.MakeDeclaredNamesUniqueTest::testMakeLocalNamesUniqueWithContext1",
+      "com.google.javascript.jscomp.MakeDeclaredNamesUniqueTest::testOnlyInversion3",
+      "com.google.javascript.jscomp.MakeDeclaredNamesUniqueTest::testOnlyInversion4",
+      "com.google.javascript.jscomp.NormalizeTest::testRemoveDuplicateVarDeclarations2"
+    ],
+    "compile_log": "Running ant (compile)...................................................... OK\nRunning ant (compile.tests)................................................ OK\n",
+    "agent_modified_files": [
+      "build.xml"
+    ],
+    "canonical_modified_files": [
+      "src/com/google/javascript/jscomp/MakeDeclaredNamesUnique.java",
+      "src/com/google/javascript/jscomp/NodeUtil.java",
+      "src/com/google/javascript/jscomp/Normalize.java"
+    ],
+    "agent_modified_prod_files": [],
+    "file_overlap": [],
+    "missed_canonical": [
+      "src/com/google/javascript/jscomp/MakeDeclaredNamesUnique.java",
+      "src/com/google/javascript/jscomp/NodeUtil.java",
+      "src/com/google/javascript/jscomp/Normalize.java"
+    ],
+    "extra_prod_files": [],
+    "fix_locality_score": 0.0,
+    "test_pass_strict": false
+  },
+  {
+    "bug": "Closure-137",
+    "condition": "C2",
+    "model": "claude-sonnet-4-6",
+    "model_default_used": false,
+    "started_at": "2026-06-01T04:43:56+00:00",
+    "duration_seconds": 1,
+    "tool_calls": 1,
+    "compile_fail": false,
+    "primary_pass": false,
+    "test_pass": false,
+    "baseline_failing_count": 5,
+    "agent_induced_regressions": [],
+    "regressed_tests": [],
+    "diagnosis_quality": 0,
+    "agent_exit_code": 1,
+    "bug_reproduced_pretest": true,
+    "agent_patch": "diff --git a/build.xml b/build.xml\nindex 682c1f28a..f7b69b95f 100644\n--- a/build.xml\n+++ b/build.xml\n@@ -14,8 +14,8 @@\n  limitations under the License.\n -->\n <project name=\"compiler\" basedir=\".\" default=\"jar\">\n-<property name=\"ant.build.javac.target\" value=\"1.6\"/>\n-<property name=\"ant.build.javac.source\" value=\"1.6\"/>\n+<property name=\"ant.build.javac.target\" value=\"1.8\"/>\n+<property name=\"ant.build.javac.source\" value=\"1.8\"/>\n \n   <!-- define other variables -->\n   <property name=\"src.dir\" value=\"${basedir}/src\" />\n",
+    "agent_log": "{\"type\":\"result\",\"subtype\":\"success\",\"is_error\":true,\"api_error_status\":429,\"duration_ms\":364,\"duration_api_ms\":0,\"num_turns\":1,\"result\":\"You've hit your session limit \u00b7 resets 5:10am (UTC)\",\"stop_reason\":\"stop_sequence\",\"session_id\":\"5ff689a4-6044-4b2d-812e-4409ab49f6b5\",\"total_cost_usd\":0,\"usage\":{\"input_tokens\":0,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"output_tokens\":0,\"server_tool_use\":{\"web_search_requests\":0,\"web_fetch_requests\":0},\"service_tier\":\"standard\",\"cache_creation\":{\"ephemeral_1h_input_tokens\":0,\"ephemeral_5m_input_tokens\":0},\"inference_geo\":\"\",\"iterations\":[],\"speed\":\"standard\"},\"modelUsage\":{},\"permission_denials\":[],\"terminal_reason\":\"completed\",\"fast_mode_state\":\"off\",\"uuid\":\"e28444fd-1b91-437d-9c9c-1cd872a7895a\"}\n",
+    "agent_stderr": "",
+    "judge_reasoning": "judge failed\n",
+    "verify_log": "Running ant (compile.tests)................................................ OK\nRunning ant (run.dev.tests)................................................ OK\nFailing tests: 1\n  - com.google.javascript.jscomp.MakeDeclaredNamesUniqueTest::testOnlyInversion3\n",
+    "baseline_failing_tests": [
+      "com.google.javascript.jscomp.MakeDeclaredNamesUniqueTest::testArguments",
+      "com.google.javascript.jscomp.MakeDeclaredNamesUniqueTest::testMakeLocalNamesUniqueWithContext1",
+      "com.google.javascript.jscomp.MakeDeclaredNamesUniqueTest::testOnlyInversion3",
+      "com.google.javascript.jscomp.MakeDeclaredNamesUniqueTest::testOnlyInversion4",
+      "com.google.javascript.jscomp.NormalizeTest::testRemoveDuplicateVarDeclarations2"
+    ],
+    "compile_log": "Running ant (compile)...................................................... OK\nRunning ant (compile.tests)................................................ OK\n",
+    "agent_modified_files": [
+      "build.xml"
+    ],
+    "canonical_modified_files": [
+      "src/com/google/javascript/jscomp/MakeDeclaredNamesUnique.java",
+      "src/com/google/javascript/jscomp/NodeUtil.java",
+      "src/com/google/javascript/jscomp/Normalize.java"
+    ],
+    "agent_modified_prod_files": [],
+    "file_overlap": [],
+    "missed_canonical": [
+      "src/com/google/javascript/jscomp/MakeDeclaredNamesUnique.java",
+      "src/com/google/javascript/jscomp/NodeUtil.java",
+      "src/com/google/javascript/jscomp/Normalize.java"
+    ],
+    "extra_prod_files": [],
+    "fix_locality_score": 0.0,
+    "test_pass_strict": false
+  },
+  {
+    "bug": "Closure-137",
+    "condition": "C3",
+    "model": "claude-sonnet-4-6",
+    "model_default_used": false,
+    "started_at": "2026-06-01T04:44:00+00:00",
+    "duration_seconds": 1,
+    "tool_calls": 1,
+    "compile_fail": false,
+    "primary_pass": false,
+    "test_pass": false,
+    "baseline_failing_count": 5,
+    "agent_induced_regressions": [],
+    "regressed_tests": [],
+    "diagnosis_quality": 0,
+    "agent_exit_code": 1,
+    "bug_reproduced_pretest": true,
+    "agent_patch": "diff --git a/build.xml b/build.xml\nindex 682c1f28a..f7b69b95f 100644\n--- a/build.xml\n+++ b/build.xml\n@@ -14,8 +14,8 @@\n  limitations under the License.\n -->\n <project name=\"compiler\" basedir=\".\" default=\"jar\">\n-<property name=\"ant.build.javac.target\" value=\"1.6\"/>\n-<property name=\"ant.build.javac.source\" value=\"1.6\"/>\n+<property name=\"ant.build.javac.target\" value=\"1.8\"/>\n+<property name=\"ant.build.javac.source\" value=\"1.8\"/>\n \n   <!-- define other variables -->\n   <property name=\"src.dir\" value=\"${basedir}/src\" />\n",
+    "agent_log": "{\"type\":\"result\",\"subtype\":\"success\",\"is_error\":true,\"api_error_status\":429,\"duration_ms\":357,\"duration_api_ms\":0,\"num_turns\":1,\"result\":\"You've hit your session limit \u00b7 resets 5:10am (UTC)\",\"stop_reason\":\"stop_sequence\",\"session_id\":\"95c6686a-f3e3-4143-9c75-1387b93d4588\",\"total_cost_usd\":0,\"usage\":{\"input_tokens\":0,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"output_tokens\":0,\"server_tool_use\":{\"web_search_requests\":0,\"web_fetch_requests\":0},\"service_tier\":\"standard\",\"cache_creation\":{\"ephemeral_1h_input_tokens\":0,\"ephemeral_5m_input_tokens\":0},\"inference_geo\":\"\",\"iterations\":[],\"speed\":\"standard\"},\"modelUsage\":{},\"permission_denials\":[],\"terminal_reason\":\"completed\",\"fast_mode_state\":\"off\",\"uuid\":\"f3e5088f-6f39-46c1-8a28-60e41e0e9523\"}\n",
+    "agent_stderr": "",
+    "judge_reasoning": "judge failed\n",
+    "verify_log": "Running ant (compile.tests)................................................ OK\nRunning ant (run.dev.tests)................................................ OK\nFailing tests: 1\n  - com.google.javascript.jscomp.MakeDeclaredNamesUniqueTest::testOnlyInversion3\n",
+    "baseline_failing_tests": [
+      "com.google.javascript.jscomp.MakeDeclaredNamesUniqueTest::testArguments",
+      "com.google.javascript.jscomp.MakeDeclaredNamesUniqueTest::testMakeLocalNamesUniqueWithContext1",
+      "com.google.javascript.jscomp.MakeDeclaredNamesUniqueTest::testOnlyInversion3",
+      "com.google.javascript.jscomp.MakeDeclaredNamesUniqueTest::testOnlyInversion4",
+      "com.google.javascript.jscomp.NormalizeTest::testRemoveDuplicateVarDeclarations2"
+    ],
+    "compile_log": "Running ant (compile)...................................................... OK\nRunning ant (compile.tests)................................................ OK\n",
+    "agent_modified_files": [
+      "build.xml"
+    ],
+    "canonical_modified_files": [
+      "src/com/google/javascript/jscomp/MakeDeclaredNamesUnique.java",
+      "src/com/google/javascript/jscomp/NodeUtil.java",
+      "src/com/google/javascript/jscomp/Normalize.java"
+    ],
+    "agent_modified_prod_files": [],
+    "file_overlap": [],
+    "missed_canonical": [
+      "src/com/google/javascript/jscomp/MakeDeclaredNamesUnique.java",
+      "src/com/google/javascript/jscomp/NodeUtil.java",
+      "src/com/google/javascript/jscomp/Normalize.java"
+    ],
+    "extra_prod_files": [],
+    "fix_locality_score": 0.0,
+    "test_pass_strict": false
+  },
+  {
+    "bug": "Closure-155",
+    "condition": "C1",
+    "model": "claude-sonnet-4-6",
+    "model_default_used": false,
+    "started_at": "2026-06-01T04:41:18+00:00",
+    "duration_seconds": 1,
+    "tool_calls": 1,
+    "compile_fail": false,
+    "primary_pass": false,
+    "test_pass": false,
+    "baseline_failing_count": 7,
+    "agent_induced_regressions": [],
+    "regressed_tests": [],
+    "diagnosis_quality": 0,
+    "agent_exit_code": 1,
+    "bug_reproduced_pretest": true,
+    "agent_patch": "diff --git a/build.xml b/build.xml\nindex e9f85364d..0bbf2827c 100644\n--- a/build.xml\n+++ b/build.xml\n@@ -16,8 +16,8 @@\n <project name=\"compiler\" basedir=\".\" default=\"jar\" xmlns:artifact=\"antlib:org.apache.maven.artifact.ant\">\n \n   <!-- Force java 6 -->\n-  <property name=\"ant.build.javac.source\" value=\"1.6\" />\n-  <property name=\"ant.build.javac.target\" value=\"1.6\" />\n+  <property name=\"ant.build.javac.source\" value=\"1.8\" />\n+  <property name=\"ant.build.javac.target\" value=\"1.8\" />\n \n   <!-- define other variables -->\n   <property name=\"src.dir\" value=\"${basedir}/src\" />\n",
+    "agent_log": "{\"type\":\"result\",\"subtype\":\"success\",\"is_error\":true,\"api_error_status\":429,\"duration_ms\":352,\"duration_api_ms\":0,\"num_turns\":1,\"result\":\"You've hit your session limit \u00b7 resets 5:10am (UTC)\",\"stop_reason\":\"stop_sequence\",\"session_id\":\"9c9da884-408d-4c4e-9e6c-61b2e63a58d4\",\"total_cost_usd\":0,\"usage\":{\"input_tokens\":0,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"output_tokens\":0,\"server_tool_use\":{\"web_search_requests\":0,\"web_fetch_requests\":0},\"service_tier\":\"standard\",\"cache_creation\":{\"ephemeral_1h_input_tokens\":0,\"ephemeral_5m_input_tokens\":0},\"inference_geo\":\"\",\"iterations\":[],\"speed\":\"standard\"},\"modelUsage\":{},\"permission_denials\":[],\"terminal_reason\":\"completed\",\"fast_mode_state\":\"off\",\"uuid\":\"42cec963-62e6-4314-8912-091685b409b2\"}\n",
+    "agent_stderr": "",
+    "judge_reasoning": "judge failed\n",
+    "verify_log": "Running ant (compile.tests)................................................ OK\nRunning ant (run.dev.tests)................................................ OK\nFailing tests: 1\n  - com.google.javascript.jscomp.InlineVariablesTest::testArgumentsModifiedInInnerFunction\n",
+    "baseline_failing_tests": [
+      "com.google.javascript.jscomp.InlineVariablesTest::testArgumentsModifiedInInnerFunction",
+      "com.google.javascript.jscomp.InlineVariablesTest::testArgumentsModifiedInOuterFunction",
+      "com.google.javascript.jscomp.InlineVariablesTest::testIssue378EscapedArguments1",
+      "com.google.javascript.jscomp.InlineVariablesTest::testIssue378EscapedArguments2",
+      "com.google.javascript.jscomp.InlineVariablesTest::testIssue378EscapedArguments4",
+      "com.google.javascript.jscomp.InlineVariablesTest::testIssue378ModifiedArguments1",
+      "com.google.javascript.jscomp.InlineVariablesTest::testIssue378ModifiedArguments2"
+    ],
+    "compile_log": "Running ant (compile)...................................................... OK\nRunning ant (compile.tests)................................................ OK\n",
+    "agent_modified_files": [
+      "build.xml"
+    ],
+    "canonical_modified_files": [
+      "src/com/google/javascript/jscomp/InlineVariables.java",
+      "src/com/google/javascript/jscomp/ReferenceCollectingCallback.java",
+      "src/com/google/javascript/jscomp/Scope.java"
+    ],
+    "agent_modified_prod_files": [],
+    "file_overlap": [],
+    "missed_canonical": [
+      "src/com/google/javascript/jscomp/InlineVariables.java",
+      "src/com/google/javascript/jscomp/ReferenceCollectingCallback.java",
+      "src/com/google/javascript/jscomp/Scope.java"
+    ],
+    "extra_prod_files": [],
+    "fix_locality_score": 0.0,
+    "test_pass_strict": false
+  },
+  {
+    "bug": "Closure-155",
+    "condition": "C2",
+    "model": "claude-sonnet-4-6",
+    "model_default_used": false,
+    "started_at": "2026-06-01T04:41:34+00:00",
+    "duration_seconds": 1,
+    "tool_calls": 1,
+    "compile_fail": false,
+    "primary_pass": false,
+    "test_pass": false,
+    "baseline_failing_count": 7,
+    "agent_induced_regressions": [],
+    "regressed_tests": [],
+    "diagnosis_quality": 0,
+    "agent_exit_code": 1,
+    "bug_reproduced_pretest": true,
+    "agent_patch": "diff --git a/build.xml b/build.xml\nindex e9f85364d..0bbf2827c 100644\n--- a/build.xml\n+++ b/build.xml\n@@ -16,8 +16,8 @@\n <project name=\"compiler\" basedir=\".\" default=\"jar\" xmlns:artifact=\"antlib:org.apache.maven.artifact.ant\">\n \n   <!-- Force java 6 -->\n-  <property name=\"ant.build.javac.source\" value=\"1.6\" />\n-  <property name=\"ant.build.javac.target\" value=\"1.6\" />\n+  <property name=\"ant.build.javac.source\" value=\"1.8\" />\n+  <property name=\"ant.build.javac.target\" value=\"1.8\" />\n \n   <!-- define other variables -->\n   <property name=\"src.dir\" value=\"${basedir}/src\" />\n",
+    "agent_log": "{\"type\":\"result\",\"subtype\":\"success\",\"is_error\":true,\"api_error_status\":429,\"duration_ms\":347,\"duration_api_ms\":0,\"num_turns\":1,\"result\":\"You've hit your session limit \u00b7 resets 5:10am (UTC)\",\"stop_reason\":\"stop_sequence\",\"session_id\":\"ca42363d-9c51-4a3c-94aa-3c6d6537619b\",\"total_cost_usd\":0,\"usage\":{\"input_tokens\":0,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"output_tokens\":0,\"server_tool_use\":{\"web_search_requests\":0,\"web_fetch_requests\":0},\"service_tier\":\"standard\",\"cache_creation\":{\"ephemeral_1h_input_tokens\":0,\"ephemeral_5m_input_tokens\":0},\"inference_geo\":\"\",\"iterations\":[],\"speed\":\"standard\"},\"modelUsage\":{},\"permission_denials\":[],\"terminal_reason\":\"completed\",\"fast_mode_state\":\"off\",\"uuid\":\"929dd42d-e7f6-4d44-aac2-bbb756a79211\"}\n",
+    "agent_stderr": "",
+    "judge_reasoning": "judge failed\n",
+    "verify_log": "Running ant (compile.tests)................................................ OK\nRunning ant (run.dev.tests)................................................ OK\nFailing tests: 1\n  - com.google.javascript.jscomp.InlineVariablesTest::testArgumentsModifiedInInnerFunction\n",
+    "baseline_failing_tests": [
+      "com.google.javascript.jscomp.InlineVariablesTest::testArgumentsModifiedInInnerFunction",
+      "com.google.javascript.jscomp.InlineVariablesTest::testArgumentsModifiedInOuterFunction",
+      "com.google.javascript.jscomp.InlineVariablesTest::testIssue378EscapedArguments1",
+      "com.google.javascript.jscomp.InlineVariablesTest::testIssue378EscapedArguments2",
+      "com.google.javascript.jscomp.InlineVariablesTest::testIssue378EscapedArguments4",
+      "com.google.javascript.jscomp.InlineVariablesTest::testIssue378ModifiedArguments1",
+      "com.google.javascript.jscomp.InlineVariablesTest::testIssue378ModifiedArguments2"
+    ],
+    "compile_log": "Running ant (compile)...................................................... OK\nRunning ant (compile.tests)................................................ OK\n",
+    "agent_modified_files": [
+      "build.xml"
+    ],
+    "canonical_modified_files": [
+      "src/com/google/javascript/jscomp/InlineVariables.java",
+      "src/com/google/javascript/jscomp/ReferenceCollectingCallback.java",
+      "src/com/google/javascript/jscomp/Scope.java"
+    ],
+    "agent_modified_prod_files": [],
+    "file_overlap": [],
+    "missed_canonical": [
+      "src/com/google/javascript/jscomp/InlineVariables.java",
+      "src/com/google/javascript/jscomp/ReferenceCollectingCallback.java",
+      "src/com/google/javascript/jscomp/Scope.java"
+    ],
+    "extra_prod_files": [],
+    "fix_locality_score": 0.0,
+    "test_pass_strict": false
+  },
+  {
+    "bug": "Closure-155",
+    "condition": "C3",
+    "model": "claude-sonnet-4-6",
+    "model_default_used": false,
+    "started_at": "2026-06-01T04:41:36+00:00",
+    "duration_seconds": 1,
+    "tool_calls": 1,
+    "compile_fail": false,
+    "primary_pass": false,
+    "test_pass": false,
+    "baseline_failing_count": 7,
+    "agent_induced_regressions": [],
+    "regressed_tests": [],
+    "diagnosis_quality": 0,
+    "agent_exit_code": 1,
+    "bug_reproduced_pretest": true,
+    "agent_patch": "diff --git a/build.xml b/build.xml\nindex e9f85364d..0bbf2827c 100644\n--- a/build.xml\n+++ b/build.xml\n@@ -16,8 +16,8 @@\n <project name=\"compiler\" basedir=\".\" default=\"jar\" xmlns:artifact=\"antlib:org.apache.maven.artifact.ant\">\n \n   <!-- Force java 6 -->\n-  <property name=\"ant.build.javac.source\" value=\"1.6\" />\n-  <property name=\"ant.build.javac.target\" value=\"1.6\" />\n+  <property name=\"ant.build.javac.source\" value=\"1.8\" />\n+  <property name=\"ant.build.javac.target\" value=\"1.8\" />\n \n   <!-- define other variables -->\n   <property name=\"src.dir\" value=\"${basedir}/src\" />\n",
+    "agent_log": "{\"type\":\"result\",\"subtype\":\"success\",\"is_error\":true,\"api_error_status\":429,\"duration_ms\":328,\"duration_api_ms\":0,\"num_turns\":1,\"result\":\"You've hit your session limit \u00b7 resets 5:10am (UTC)\",\"stop_reason\":\"stop_sequence\",\"session_id\":\"11d879ac-4a1e-4dae-84ca-d151f61d4aef\",\"total_cost_usd\":0,\"usage\":{\"input_tokens\":0,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"output_tokens\":0,\"server_tool_use\":{\"web_search_requests\":0,\"web_fetch_requests\":0},\"service_tier\":\"standard\",\"cache_creation\":{\"ephemeral_1h_input_tokens\":0,\"ephemeral_5m_input_tokens\":0},\"inference_geo\":\"\",\"iterations\":[],\"speed\":\"standard\"},\"modelUsage\":{},\"permission_denials\":[],\"terminal_reason\":\"completed\",\"fast_mode_state\":\"off\",\"uuid\":\"6db985ff-1beb-4351-8b77-dc0281d4ce02\"}\n",
+    "agent_stderr": "",
+    "judge_reasoning": "judge failed\n",
+    "verify_log": "Running ant (compile.tests)................................................ OK\nRunning ant (run.dev.tests)................................................ OK\nFailing tests: 1\n  - com.google.javascript.jscomp.InlineVariablesTest::testArgumentsModifiedInInnerFunction\n",
+    "baseline_failing_tests": [
+      "com.google.javascript.jscomp.InlineVariablesTest::testArgumentsModifiedInInnerFunction",
+      "com.google.javascript.jscomp.InlineVariablesTest::testArgumentsModifiedInOuterFunction",
+      "com.google.javascript.jscomp.InlineVariablesTest::testIssue378EscapedArguments1",
+      "com.google.javascript.jscomp.InlineVariablesTest::testIssue378EscapedArguments2",
+      "com.google.javascript.jscomp.InlineVariablesTest::testIssue378EscapedArguments4",
+      "com.google.javascript.jscomp.InlineVariablesTest::testIssue378ModifiedArguments1",
+      "com.google.javascript.jscomp.InlineVariablesTest::testIssue378ModifiedArguments2"
+    ],
+    "compile_log": "Running ant (compile)...................................................... OK\nRunning ant (compile.tests)................................................ OK\n",
+    "agent_modified_files": [
+      "build.xml"
+    ],
+    "canonical_modified_files": [
+      "src/com/google/javascript/jscomp/InlineVariables.java",
+      "src/com/google/javascript/jscomp/ReferenceCollectingCallback.java",
+      "src/com/google/javascript/jscomp/Scope.java"
+    ],
+    "agent_modified_prod_files": [],
+    "file_overlap": [],
+    "missed_canonical": [
+      "src/com/google/javascript/jscomp/InlineVariables.java",
+      "src/com/google/javascript/jscomp/ReferenceCollectingCallback.java",
+      "src/com/google/javascript/jscomp/Scope.java"
+    ],
+    "extra_prod_files": [],
+    "fix_locality_score": 0.0,
+    "test_pass_strict": false
+  },
+  {
+    "bug": "JacksonDatabind-53",
+    "condition": "C1",
+    "model": "claude-sonnet-4-6",
+    "model_default_used": false,
+    "started_at": "2026-06-01T04:38:47+00:00",
+    "duration_seconds": 1,
+    "tool_calls": 1,
+    "compile_fail": false,
+    "primary_pass": false,
+    "test_pass": false,
+    "baseline_failing_count": 12,
+    "agent_induced_regressions": [],
+    "regressed_tests": [],
+    "diagnosis_quality": 0,
+    "agent_exit_code": 1,
+    "bug_reproduced_pretest": true,
+    "agent_patch": "diff --git a/maven-build.xml b/maven-build.xml\nindex f63ead930..ae38d6342 100644\n--- a/maven-build.xml\n+++ b/maven-build.xml\n@@ -83,10 +83,10 @@\n            debug=\"true\" \n            optimize=\"true\" \n            deprecation=\"true\" \n-           target=\"1.6\" \n+           target=\"1.8\" \n            verbose=\"false\" \n            fork=\"false\" \n-           source=\"1.6\">\n+           source=\"1.8\">\n       <src>\n         <pathelement location=\"${maven.build.srcDir.0}\"/>\n       </src>\n@@ -111,10 +111,10 @@\n            debug=\"true\" \n            optimize=\"true\" \n            deprecation=\"true\" \n-           target=\"1.6\" \n+           target=\"1.8\" \n            verbose=\"false\" \n            fork=\"false\" \n-           source=\"1.6\">\n+           source=\"1.8\">\n       <src>\n         <pathelement location=\"${maven.build.testDir.0}\"/>\n       </src>\n",
+    "agent_log": "{\"type\":\"result\",\"subtype\":\"success\",\"is_error\":true,\"api_error_status\":429,\"duration_ms\":365,\"duration_api_ms\":0,\"num_turns\":1,\"result\":\"You've hit your session limit \u00b7 resets 5:10am (UTC)\",\"stop_reason\":\"stop_sequence\",\"session_id\":\"2e2c3212-f084-4dee-9ea2-d59759e757bf\",\"total_cost_usd\":0,\"usage\":{\"input_tokens\":0,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"output_tokens\":0,\"server_tool_use\":{\"web_search_requests\":0,\"web_fetch_requests\":0},\"service_tier\":\"standard\",\"cache_creation\":{\"ephemeral_1h_input_tokens\":0,\"ephemeral_5m_input_tokens\":0},\"inference_geo\":\"\",\"iterations\":[],\"speed\":\"standard\"},\"modelUsage\":{},\"permission_denials\":[],\"terminal_reason\":\"completed\",\"fast_mode_state\":\"off\",\"uuid\":\"a1a5d332-3c78-499c-b590-9c8b429f3521\"}\n",
+    "agent_stderr": "",
+    "judge_reasoning": "judge failed\n",
+    "verify_log": "Running ant (compile.tests)................................................ OK\nRunning ant (run.dev.tests)................................................ OK\nFailing tests: 1\n  - com.fasterxml.jackson.databind.jsontype.TypeRefinementForMap1215Test::testMapRefinement\n",
+    "baseline_failing_tests": [
+      "com.fasterxml.jackson.databind.deser.TestExceptionDeserialization::testIOException",
+      "com.fasterxml.jackson.databind.deser.TestExceptionDeserialization::testJDK7SuppressionProperty",
+      "com.fasterxml.jackson.databind.deser.TestExceptionDeserialization::testNoArgsException",
+      "com.fasterxml.jackson.databind.deser.TestExceptionDeserialization::testSingleValueArrayDeserializationException",
+      "com.fasterxml.jackson.databind.deser.TestExceptionDeserialization::testWithCreator",
+      "com.fasterxml.jackson.databind.deser.TestExceptionDeserialization::testWithNullMessage",
+      "com.fasterxml.jackson.databind.deser.TestJdkTypes::testStackTraceElementWithCustom",
+      "com.fasterxml.jackson.databind.deser.TestJdkTypes::testStringBuilder",
+      "com.fasterxml.jackson.databind.jsontype.TypeRefinementForMap1215Test::testMapRefinement",
+      "com.fasterxml.jackson.databind.struct.TestFormatForCollections::testListAsObject",
+      "com.fasterxml.jackson.databind.type.TestTypeFactoryWithClassLoader",
+      "com.fasterxml.jackson.databind.util.TestClassUtil::testFindEnumType"
+    ],
+    "compile_log": "Running ant (compile)...................................................... OK\nRunning ant (compile.tests)................................................ OK\n",
+    "agent_modified_files": [
+      "maven-build.xml"
+    ],
+    "canonical_modified_files": [
+      "src/main/java/com/fasterxml/jackson/databind/type/TypeBindings.java",
+      "src/main/java/com/fasterxml/jackson/databind/type/TypeFactory.java"
+    ],
+    "agent_modified_prod_files": [],
+    "file_overlap": [],
+    "missed_canonical": [
+      "src/main/java/com/fasterxml/jackson/databind/type/TypeBindings.java",
+      "src/main/java/com/fasterxml/jackson/databind/type/TypeFactory.java"
+    ],
+    "extra_prod_files": [],
+    "fix_locality_score": 0.0,
+    "test_pass_strict": false
+  },
+  {
+    "bug": "JacksonDatabind-53",
+    "condition": "C2",
+    "model": "claude-sonnet-4-6",
+    "model_default_used": false,
+    "started_at": "2026-06-01T04:39:01+00:00",
+    "duration_seconds": 2,
+    "tool_calls": 1,
+    "compile_fail": false,
+    "primary_pass": false,
+    "test_pass": false,
+    "baseline_failing_count": 12,
+    "agent_induced_regressions": [],
+    "regressed_tests": [],
+    "diagnosis_quality": 0,
+    "agent_exit_code": 1,
+    "bug_reproduced_pretest": true,
+    "agent_patch": "diff --git a/maven-build.xml b/maven-build.xml\nindex f63ead930..ae38d6342 100644\n--- a/maven-build.xml\n+++ b/maven-build.xml\n@@ -83,10 +83,10 @@\n            debug=\"true\" \n            optimize=\"true\" \n            deprecation=\"true\" \n-           target=\"1.6\" \n+           target=\"1.8\" \n            verbose=\"false\" \n            fork=\"false\" \n-           source=\"1.6\">\n+           source=\"1.8\">\n       <src>\n         <pathelement location=\"${maven.build.srcDir.0}\"/>\n       </src>\n@@ -111,10 +111,10 @@\n            debug=\"true\" \n            optimize=\"true\" \n            deprecation=\"true\" \n-           target=\"1.6\" \n+           target=\"1.8\" \n            verbose=\"false\" \n            fork=\"false\" \n-           source=\"1.6\">\n+           source=\"1.8\">\n       <src>\n         <pathelement location=\"${maven.build.testDir.0}\"/>\n       </src>\n",
+    "agent_log": "{\"type\":\"result\",\"subtype\":\"success\",\"is_error\":true,\"api_error_status\":429,\"duration_ms\":623,\"duration_api_ms\":0,\"num_turns\":1,\"result\":\"You've hit your session limit \u00b7 resets 5:10am (UTC)\",\"stop_reason\":\"stop_sequence\",\"session_id\":\"69886802-0ad4-45fe-b400-969a3c55435e\",\"total_cost_usd\":0,\"usage\":{\"input_tokens\":0,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"output_tokens\":0,\"server_tool_use\":{\"web_search_requests\":0,\"web_fetch_requests\":0},\"service_tier\":\"standard\",\"cache_creation\":{\"ephemeral_1h_input_tokens\":0,\"ephemeral_5m_input_tokens\":0},\"inference_geo\":\"\",\"iterations\":[],\"speed\":\"standard\"},\"modelUsage\":{},\"permission_denials\":[],\"terminal_reason\":\"completed\",\"fast_mode_state\":\"off\",\"uuid\":\"af3dcdc7-45d8-4a15-839c-71ba20f9d223\"}\n",
+    "agent_stderr": "",
+    "judge_reasoning": "judge failed\n",
+    "verify_log": "Running ant (compile.tests)................................................ OK\nRunning ant (run.dev.tests)................................................ OK\nFailing tests: 1\n  - com.fasterxml.jackson.databind.jsontype.TypeRefinementForMap1215Test::testMapRefinement\n",
+    "baseline_failing_tests": [
+      "com.fasterxml.jackson.databind.deser.TestExceptionDeserialization::testIOException",
+      "com.fasterxml.jackson.databind.deser.TestExceptionDeserialization::testJDK7SuppressionProperty",
+      "com.fasterxml.jackson.databind.deser.TestExceptionDeserialization::testNoArgsException",
+      "com.fasterxml.jackson.databind.deser.TestExceptionDeserialization::testSingleValueArrayDeserializationException",
+      "com.fasterxml.jackson.databind.deser.TestExceptionDeserialization::testWithCreator",
+      "com.fasterxml.jackson.databind.deser.TestExceptionDeserialization::testWithNullMessage",
+      "com.fasterxml.jackson.databind.deser.TestJdkTypes::testStackTraceElementWithCustom",
+      "com.fasterxml.jackson.databind.deser.TestJdkTypes::testStringBuilder",
+      "com.fasterxml.jackson.databind.jsontype.TypeRefinementForMap1215Test::testMapRefinement",
+      "com.fasterxml.jackson.databind.struct.TestFormatForCollections::testListAsObject",
+      "com.fasterxml.jackson.databind.type.TestTypeFactoryWithClassLoader",
+      "com.fasterxml.jackson.databind.util.TestClassUtil::testFindEnumType"
+    ],
+    "compile_log": "Running ant (compile)...................................................... OK\nRunning ant (compile.tests)................................................ OK\n",
+    "agent_modified_files": [
+      "maven-build.xml"
+    ],
+    "canonical_modified_files": [
+      "src/main/java/com/fasterxml/jackson/databind/type/TypeBindings.java",
+      "src/main/java/com/fasterxml/jackson/databind/type/TypeFactory.java"
+    ],
+    "agent_modified_prod_files": [],
+    "file_overlap": [],
+    "missed_canonical": [
+      "src/main/java/com/fasterxml/jackson/databind/type/TypeBindings.java",
+      "src/main/java/com/fasterxml/jackson/databind/type/TypeFactory.java"
+    ],
+    "extra_prod_files": [],
+    "fix_locality_score": 0.0,
+    "test_pass_strict": false
+  },
+  {
+    "bug": "JacksonDatabind-53",
+    "condition": "C3",
+    "model": "claude-sonnet-4-6",
+    "model_default_used": false,
+    "started_at": "2026-06-01T04:39:05+00:00",
+    "duration_seconds": 2,
+    "tool_calls": 1,
+    "compile_fail": false,
+    "primary_pass": false,
+    "test_pass": false,
+    "baseline_failing_count": 12,
+    "agent_induced_regressions": [],
+    "regressed_tests": [],
+    "diagnosis_quality": 0,
+    "agent_exit_code": 1,
+    "bug_reproduced_pretest": true,
+    "agent_patch": "diff --git a/maven-build.xml b/maven-build.xml\nindex f63ead930..ae38d6342 100644\n--- a/maven-build.xml\n+++ b/maven-build.xml\n@@ -83,10 +83,10 @@\n            debug=\"true\" \n            optimize=\"true\" \n            deprecation=\"true\" \n-           target=\"1.6\" \n+           target=\"1.8\" \n            verbose=\"false\" \n            fork=\"false\" \n-           source=\"1.6\">\n+           source=\"1.8\">\n       <src>\n         <pathelement location=\"${maven.build.srcDir.0}\"/>\n       </src>\n@@ -111,10 +111,10 @@\n            debug=\"true\" \n            optimize=\"true\" \n            deprecation=\"true\" \n-           target=\"1.6\" \n+           target=\"1.8\" \n            verbose=\"false\" \n            fork=\"false\" \n-           source=\"1.6\">\n+           source=\"1.8\">\n       <src>\n         <pathelement location=\"${maven.build.testDir.0}\"/>\n       </src>\n",
+    "agent_log": "{\"type\":\"result\",\"subtype\":\"success\",\"is_error\":true,\"api_error_status\":429,\"duration_ms\":356,\"duration_api_ms\":0,\"num_turns\":1,\"result\":\"You've hit your session limit \u00b7 resets 5:10am (UTC)\",\"stop_reason\":\"stop_sequence\",\"session_id\":\"e1d9c2e8-7371-45b7-a560-25fa9edc04d5\",\"total_cost_usd\":0,\"usage\":{\"input_tokens\":0,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"output_tokens\":0,\"server_tool_use\":{\"web_search_requests\":0,\"web_fetch_requests\":0},\"service_tier\":\"standard\",\"cache_creation\":{\"ephemeral_1h_input_tokens\":0,\"ephemeral_5m_input_tokens\":0},\"inference_geo\":\"\",\"iterations\":[],\"speed\":\"standard\"},\"modelUsage\":{},\"permission_denials\":[],\"terminal_reason\":\"completed\",\"fast_mode_state\":\"off\",\"uuid\":\"8d8b87ac-3a6c-4e13-9d8d-f115541ed743\"}\n",
+    "agent_stderr": "",
+    "judge_reasoning": "judge failed\n",
+    "verify_log": "Running ant (compile.tests)................................................ OK\nRunning ant (run.dev.tests)................................................ OK\nFailing tests: 1\n  - com.fasterxml.jackson.databind.jsontype.TypeRefinementForMap1215Test::testMapRefinement\n",
+    "baseline_failing_tests": [
+      "com.fasterxml.jackson.databind.deser.TestExceptionDeserialization::testIOException",
+      "com.fasterxml.jackson.databind.deser.TestExceptionDeserialization::testJDK7SuppressionProperty",
+      "com.fasterxml.jackson.databind.deser.TestExceptionDeserialization::testNoArgsException",
+      "com.fasterxml.jackson.databind.deser.TestExceptionDeserialization::testSingleValueArrayDeserializationException",
+      "com.fasterxml.jackson.databind.deser.TestExceptionDeserialization::testWithCreator",
+      "com.fasterxml.jackson.databind.deser.TestExceptionDeserialization::testWithNullMessage",
+      "com.fasterxml.jackson.databind.deser.TestJdkTypes::testStackTraceElementWithCustom",
+      "com.fasterxml.jackson.databind.deser.TestJdkTypes::testStringBuilder",
+      "com.fasterxml.jackson.databind.jsontype.TypeRefinementForMap1215Test::testMapRefinement",
+      "com.fasterxml.jackson.databind.struct.TestFormatForCollections::testListAsObject",
+      "com.fasterxml.jackson.databind.type.TestTypeFactoryWithClassLoader",
+      "com.fasterxml.jackson.databind.util.TestClassUtil::testFindEnumType"
+    ],
+    "compile_log": "Running ant (compile)...................................................... OK\nRunning ant (compile.tests)................................................ OK\n",
+    "agent_modified_files": [
+      "maven-build.xml"
+    ],
+    "canonical_modified_files": [
+      "src/main/java/com/fasterxml/jackson/databind/type/TypeBindings.java",
+      "src/main/java/com/fasterxml/jackson/databind/type/TypeFactory.java"
+    ],
+    "agent_modified_prod_files": [],
+    "file_overlap": [],
+    "missed_canonical": [
+      "src/main/java/com/fasterxml/jackson/databind/type/TypeBindings.java",
+      "src/main/java/com/fasterxml/jackson/databind/type/TypeFactory.java"
+    ],
+    "extra_prod_files": [],
+    "fix_locality_score": 0.0,
+    "test_pass_strict": false
+  },
+  {
+    "bug": "JacksonDatabind-79",
+    "condition": "C1",
+    "model": "claude-sonnet-4-6",
+    "model_default_used": false,
+    "started_at": "2026-06-01T04:36:14+00:00",
+    "duration_seconds": 2,
+    "tool_calls": 1,
+    "compile_fail": false,
+    "primary_pass": false,
+    "test_pass": false,
+    "baseline_failing_count": 14,
+    "agent_induced_regressions": [],
+    "regressed_tests": [],
+    "diagnosis_quality": 0,
+    "agent_exit_code": 1,
+    "bug_reproduced_pretest": true,
+    "agent_patch": "diff --git a/maven-build.xml b/maven-build.xml\nindex db3349c7a..9d8f34898 100644\n--- a/maven-build.xml\n+++ b/maven-build.xml\n@@ -83,10 +83,10 @@\n            debug=\"true\" \n            optimize=\"true\" \n            deprecation=\"true\" \n-           target=\"1.6\" \n+           target=\"1.8\" \n            verbose=\"false\" \n            fork=\"false\" \n-           source=\"1.6\">\n+           source=\"1.8\">\n       <src>\n         <pathelement location=\"${maven.build.srcDir.0}\"/>\n       </src>\n@@ -111,10 +111,10 @@\n            debug=\"true\" \n            optimize=\"true\" \n            deprecation=\"true\" \n-           target=\"1.6\" \n+           target=\"1.8\" \n            verbose=\"false\" \n            fork=\"false\" \n-           source=\"1.6\">\n+           source=\"1.8\">\n       <src>\n         <pathelement location=\"${maven.build.testDir.0}\"/>\n       </src>\n",
+    "agent_log": "{\"type\":\"result\",\"subtype\":\"success\",\"is_error\":true,\"api_error_status\":429,\"duration_ms\":349,\"duration_api_ms\":0,\"num_turns\":1,\"result\":\"You've hit your session limit \u00b7 resets 5:10am (UTC)\",\"stop_reason\":\"stop_sequence\",\"session_id\":\"75e12ea1-9c21-4d58-96cf-18d6a4e41c95\",\"total_cost_usd\":0,\"usage\":{\"input_tokens\":0,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"output_tokens\":0,\"server_tool_use\":{\"web_search_requests\":0,\"web_fetch_requests\":0},\"service_tier\":\"standard\",\"cache_creation\":{\"ephemeral_1h_input_tokens\":0,\"ephemeral_5m_input_tokens\":0},\"inference_geo\":\"\",\"iterations\":[],\"speed\":\"standard\"},\"modelUsage\":{},\"permission_denials\":[],\"terminal_reason\":\"completed\",\"fast_mode_state\":\"off\",\"uuid\":\"75a999ad-3416-4cc2-946a-5e858a221ea8\"}\n",
+    "agent_stderr": "",
+    "judge_reasoning": "judge failed\n",
+    "verify_log": "Running ant (compile.tests)................................................ OK\nRunning ant (run.dev.tests)................................................ OK\nFailing tests: 1\n  - com.fasterxml.jackson.databind.objectid.AlwaysAsReferenceFirstTest::testIssue1607\n",
+    "baseline_failing_tests": [
+      "com.fasterxml.jackson.databind.creators.ArrayDelegatorCreatorForCollectionTest::testUnmodifiable",
+      "com.fasterxml.jackson.databind.deser.TestExceptionDeserialization::testIOException",
+      "com.fasterxml.jackson.databind.deser.TestExceptionDeserialization::testJDK7SuppressionProperty",
+      "com.fasterxml.jackson.databind.deser.TestExceptionDeserialization::testNoArgsException",
+      "com.fasterxml.jackson.databind.deser.TestExceptionDeserialization::testSingleValueArrayDeserializationException",
+      "com.fasterxml.jackson.databind.deser.TestExceptionDeserialization::testWithCreator",
+      "com.fasterxml.jackson.databind.deser.TestExceptionDeserialization::testWithNullMessage",
+      "com.fasterxml.jackson.databind.deser.TestJdkTypes::testStackTraceElementWithCustom",
+      "com.fasterxml.jackson.databind.deser.TestJdkTypes::testStringBuilder",
+      "com.fasterxml.jackson.databind.misc.AccessFixTest::testCauseOfThrowableIgnoral",
+      "com.fasterxml.jackson.databind.objectid.AlwaysAsReferenceFirstTest::testIssue1607",
+      "com.fasterxml.jackson.databind.struct.TestFormatForCollections::testListAsObject",
+      "com.fasterxml.jackson.databind.type.TestTypeFactoryWithClassLoader",
+      "com.fasterxml.jackson.databind.util.TestClassUtil::testFindEnumType"
+    ],
+    "compile_log": "Running ant (compile)...................................................... OK\nRunning ant (compile.tests)................................................ OK\n",
+    "agent_modified_files": [
+      "maven-build.xml"
+    ],
+    "canonical_modified_files": [
+      "src/main/java/com/fasterxml/jackson/databind/introspect/JacksonAnnotationIntrospector.java",
+      "src/main/java/com/fasterxml/jackson/databind/introspect/ObjectIdInfo.java",
+      "src/main/java/com/fasterxml/jackson/databind/ser/std/BeanSerializerBase.java"
+    ],
+    "agent_modified_prod_files": [],
+    "file_overlap": [],
+    "missed_canonical": [
+      "src/main/java/com/fasterxml/jackson/databind/introspect/JacksonAnnotationIntrospector.java",
+      "src/main/java/com/fasterxml/jackson/databind/introspect/ObjectIdInfo.java",
+      "src/main/java/com/fasterxml/jackson/databind/ser/std/BeanSerializerBase.java"
+    ],
+    "extra_prod_files": [],
+    "fix_locality_score": 0.0,
+    "test_pass_strict": false
+  },
+  {
+    "bug": "JacksonDatabind-79",
+    "condition": "C2",
+    "model": "claude-sonnet-4-6",
+    "model_default_used": false,
+    "started_at": "2026-06-01T04:36:28+00:00",
+    "duration_seconds": 1,
+    "tool_calls": 1,
+    "compile_fail": false,
+    "primary_pass": false,
+    "test_pass": false,
+    "baseline_failing_count": 14,
+    "agent_induced_regressions": [],
+    "regressed_tests": [],
+    "diagnosis_quality": 0,
+    "agent_exit_code": 1,
+    "bug_reproduced_pretest": true,
+    "agent_patch": "diff --git a/maven-build.xml b/maven-build.xml\nindex db3349c7a..9d8f34898 100644\n--- a/maven-build.xml\n+++ b/maven-build.xml\n@@ -83,10 +83,10 @@\n            debug=\"true\" \n            optimize=\"true\" \n            deprecation=\"true\" \n-           target=\"1.6\" \n+           target=\"1.8\" \n            verbose=\"false\" \n            fork=\"false\" \n-           source=\"1.6\">\n+           source=\"1.8\">\n       <src>\n         <pathelement location=\"${maven.build.srcDir.0}\"/>\n       </src>\n@@ -111,10 +111,10 @@\n            debug=\"true\" \n            optimize=\"true\" \n            deprecation=\"true\" \n-           target=\"1.6\" \n+           target=\"1.8\" \n            verbose=\"false\" \n            fork=\"false\" \n-           source=\"1.6\">\n+           source=\"1.8\">\n       <src>\n         <pathelement location=\"${maven.build.testDir.0}\"/>\n       </src>\n",
+    "agent_log": "{\"type\":\"result\",\"subtype\":\"success\",\"is_error\":true,\"api_error_status\":429,\"duration_ms\":398,\"duration_api_ms\":0,\"num_turns\":1,\"result\":\"You've hit your session limit \u00b7 resets 5:10am (UTC)\",\"stop_reason\":\"stop_sequence\",\"session_id\":\"6de4b21a-a42e-4e80-bcf1-1efcbd4668e9\",\"total_cost_usd\":0,\"usage\":{\"input_tokens\":0,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"output_tokens\":0,\"server_tool_use\":{\"web_search_requests\":0,\"web_fetch_requests\":0},\"service_tier\":\"standard\",\"cache_creation\":{\"ephemeral_1h_input_tokens\":0,\"ephemeral_5m_input_tokens\":0},\"inference_geo\":\"\",\"iterations\":[],\"speed\":\"standard\"},\"modelUsage\":{},\"permission_denials\":[],\"terminal_reason\":\"completed\",\"fast_mode_state\":\"off\",\"uuid\":\"e090f156-9900-4e04-a302-fb937cdaefae\"}\n",
+    "agent_stderr": "",
+    "judge_reasoning": "judge failed\n",
+    "verify_log": "Running ant (compile.tests)................................................ OK\nRunning ant (run.dev.tests)................................................ OK\nFailing tests: 1\n  - com.fasterxml.jackson.databind.objectid.AlwaysAsReferenceFirstTest::testIssue1607\n",
+    "baseline_failing_tests": [
+      "com.fasterxml.jackson.databind.creators.ArrayDelegatorCreatorForCollectionTest::testUnmodifiable",
+      "com.fasterxml.jackson.databind.deser.TestExceptionDeserialization::testIOException",
+      "com.fasterxml.jackson.databind.deser.TestExceptionDeserialization::testJDK7SuppressionProperty",
+      "com.fasterxml.jackson.databind.deser.TestExceptionDeserialization::testNoArgsException",
+      "com.fasterxml.jackson.databind.deser.TestExceptionDeserialization::testSingleValueArrayDeserializationException",
+      "com.fasterxml.jackson.databind.deser.TestExceptionDeserialization::testWithCreator",
+      "com.fasterxml.jackson.databind.deser.TestExceptionDeserialization::testWithNullMessage",
+      "com.fasterxml.jackson.databind.deser.TestJdkTypes::testStackTraceElementWithCustom",
+      "com.fasterxml.jackson.databind.deser.TestJdkTypes::testStringBuilder",
+      "com.fasterxml.jackson.databind.misc.AccessFixTest::testCauseOfThrowableIgnoral",
+      "com.fasterxml.jackson.databind.objectid.AlwaysAsReferenceFirstTest::testIssue1607",
+      "com.fasterxml.jackson.databind.struct.TestFormatForCollections::testListAsObject",
+      "com.fasterxml.jackson.databind.type.TestTypeFactoryWithClassLoader",
+      "com.fasterxml.jackson.databind.util.TestClassUtil::testFindEnumType"
+    ],
+    "compile_log": "Running ant (compile)...................................................... OK\nRunning ant (compile.tests)................................................ OK\n",
+    "agent_modified_files": [
+      "maven-build.xml"
+    ],
+    "canonical_modified_files": [
+      "src/main/java/com/fasterxml/jackson/databind/introspect/JacksonAnnotationIntrospector.java",
+      "src/main/java/com/fasterxml/jackson/databind/introspect/ObjectIdInfo.java",
+      "src/main/java/com/fasterxml/jackson/databind/ser/std/BeanSerializerBase.java"
+    ],
+    "agent_modified_prod_files": [],
+    "file_overlap": [],
+    "missed_canonical": [
+      "src/main/java/com/fasterxml/jackson/databind/introspect/JacksonAnnotationIntrospector.java",
+      "src/main/java/com/fasterxml/jackson/databind/introspect/ObjectIdInfo.java",
+      "src/main/java/com/fasterxml/jackson/databind/ser/std/BeanSerializerBase.java"
+    ],
+    "extra_prod_files": [],
+    "fix_locality_score": 0.0,
+    "test_pass_strict": false
+  },
+  {
+    "bug": "JacksonDatabind-79",
+    "condition": "C3",
+    "model": "claude-sonnet-4-6",
+    "model_default_used": false,
+    "started_at": "2026-06-01T04:36:31+00:00",
+    "duration_seconds": 1,
+    "tool_calls": 1,
+    "compile_fail": false,
+    "primary_pass": false,
+    "test_pass": false,
+    "baseline_failing_count": 14,
+    "agent_induced_regressions": [],
+    "regressed_tests": [],
+    "diagnosis_quality": 0,
+    "agent_exit_code": 1,
+    "bug_reproduced_pretest": true,
+    "agent_patch": "diff --git a/maven-build.xml b/maven-build.xml\nindex db3349c7a..9d8f34898 100644\n--- a/maven-build.xml\n+++ b/maven-build.xml\n@@ -83,10 +83,10 @@\n            debug=\"true\" \n            optimize=\"true\" \n            deprecation=\"true\" \n-           target=\"1.6\" \n+           target=\"1.8\" \n            verbose=\"false\" \n            fork=\"false\" \n-           source=\"1.6\">\n+           source=\"1.8\">\n       <src>\n         <pathelement location=\"${maven.build.srcDir.0}\"/>\n       </src>\n@@ -111,10 +111,10 @@\n            debug=\"true\" \n            optimize=\"true\" \n            deprecation=\"true\" \n-           target=\"1.6\" \n+           target=\"1.8\" \n            verbose=\"false\" \n            fork=\"false\" \n-           source=\"1.6\">\n+           source=\"1.8\">\n       <src>\n         <pathelement location=\"${maven.build.testDir.0}\"/>\n       </src>\n",
+    "agent_log": "{\"type\":\"result\",\"subtype\":\"success\",\"is_error\":true,\"api_error_status\":429,\"duration_ms\":335,\"duration_api_ms\":0,\"num_turns\":1,\"result\":\"You've hit your session limit \u00b7 resets 5:10am (UTC)\",\"stop_reason\":\"stop_sequence\",\"session_id\":\"2b1913df-9c79-4a1c-88b6-b574bd685570\",\"total_cost_usd\":0,\"usage\":{\"input_tokens\":0,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"output_tokens\":0,\"server_tool_use\":{\"web_search_requests\":0,\"web_fetch_requests\":0},\"service_tier\":\"standard\",\"cache_creation\":{\"ephemeral_1h_input_tokens\":0,\"ephemeral_5m_input_tokens\":0},\"inference_geo\":\"\",\"iterations\":[],\"speed\":\"standard\"},\"modelUsage\":{},\"permission_denials\":[],\"terminal_reason\":\"completed\",\"fast_mode_state\":\"off\",\"uuid\":\"a8c685b0-2af1-4688-a309-1082fe17bb67\"}\n",
+    "agent_stderr": "",
+    "judge_reasoning": "judge failed\n",
+    "verify_log": "Running ant (compile.tests)................................................ OK\nRunning ant (run.dev.tests)................................................ OK\nFailing tests: 1\n  - com.fasterxml.jackson.databind.objectid.AlwaysAsReferenceFirstTest::testIssue1607\n",
+    "baseline_failing_tests": [
+      "com.fasterxml.jackson.databind.creators.ArrayDelegatorCreatorForCollectionTest::testUnmodifiable",
+      "com.fasterxml.jackson.databind.deser.TestExceptionDeserialization::testIOException",
+      "com.fasterxml.jackson.databind.deser.TestExceptionDeserialization::testJDK7SuppressionProperty",
+      "com.fasterxml.jackson.databind.deser.TestExceptionDeserialization::testNoArgsException",
+      "com.fasterxml.jackson.databind.deser.TestExceptionDeserialization::testSingleValueArrayDeserializationException",
+      "com.fasterxml.jackson.databind.deser.TestExceptionDeserialization::testWithCreator",
+      "com.fasterxml.jackson.databind.deser.TestExceptionDeserialization::testWithNullMessage",
+      "com.fasterxml.jackson.databind.deser.TestJdkTypes::testStackTraceElementWithCustom",
+      "com.fasterxml.jackson.databind.deser.TestJdkTypes::testStringBuilder",
+      "com.fasterxml.jackson.databind.misc.AccessFixTest::testCauseOfThrowableIgnoral",
+      "com.fasterxml.jackson.databind.objectid.AlwaysAsReferenceFirstTest::testIssue1607",
+      "com.fasterxml.jackson.databind.struct.TestFormatForCollections::testListAsObject",
+      "com.fasterxml.jackson.databind.type.TestTypeFactoryWithClassLoader",
+      "com.fasterxml.jackson.databind.util.TestClassUtil::testFindEnumType"
+    ],
+    "compile_log": "Running ant (compile)...................................................... OK\nRunning ant (compile.tests)................................................ OK\n",
+    "agent_modified_files": [
+      "maven-build.xml"
+    ],
+    "canonical_modified_files": [
+      "src/main/java/com/fasterxml/jackson/databind/introspect/JacksonAnnotationIntrospector.java",
+      "src/main/java/com/fasterxml/jackson/databind/introspect/ObjectIdInfo.java",
+      "src/main/java/com/fasterxml/jackson/databind/ser/std/BeanSerializerBase.java"
+    ],
+    "agent_modified_prod_files": [],
+    "file_overlap": [],
+    "missed_canonical": [
+      "src/main/java/com/fasterxml/jackson/databind/introspect/JacksonAnnotationIntrospector.java",
+      "src/main/java/com/fasterxml/jackson/databind/introspect/ObjectIdInfo.java",
+      "src/main/java/com/fasterxml/jackson/databind/ser/std/BeanSerializerBase.java"
+    ],
+    "extra_prod_files": [],
+    "fix_locality_score": 0.0,
+    "test_pass_strict": false
+  },
+  {
+    "bug": "Jsoup-22",
+    "condition": "C1",
+    "model": "claude-sonnet-4-6",
+    "model_default_used": false,
+    "started_at": "2026-06-01T04:35:46+00:00",
+    "duration_seconds": 1,
+    "tool_calls": 1,
+    "compile_fail": false,
+    "primary_pass": false,
+    "test_pass": false,
+    "baseline_failing_count": 3,
+    "agent_induced_regressions": [],
+    "regressed_tests": [],
+    "diagnosis_quality": 0,
+    "agent_exit_code": 1,
+    "bug_reproduced_pretest": true,
+    "agent_patch": "diff --git a/maven-build.xml b/maven-build.xml\nindex 44658237..31a48d32 100644\n--- a/maven-build.xml\n+++ b/maven-build.xml\n@@ -68,10 +68,10 @@\n            debug=\"true\" \n            optimize=\"false\" \n            deprecation=\"true\" \n-           target=\"1.6\" \n+           target=\"1.8\" \n            verbose=\"false\" \n            fork=\"false\" \n-           source=\"1.6\">\n+           source=\"1.8\">\n       <src>\n         <pathelement location=\"${maven.build.srcDir.0}\"/>\n       </src>\n@@ -94,10 +94,10 @@\n            debug=\"true\" \n            optimize=\"false\" \n            deprecation=\"true\" \n-           target=\"1.6\" \n+           target=\"1.8\" \n            verbose=\"false\" \n            fork=\"false\" \n-           source=\"1.6\">\n+           source=\"1.8\">\n       <src>\n         <pathelement location=\"${maven.build.testDir.0}\"/>\n       </src>\n",
+    "agent_log": "{\"type\":\"result\",\"subtype\":\"success\",\"is_error\":true,\"api_error_status\":429,\"duration_ms\":355,\"duration_api_ms\":0,\"num_turns\":1,\"result\":\"You've hit your session limit \u00b7 resets 5:10am (UTC)\",\"stop_reason\":\"stop_sequence\",\"session_id\":\"67481c23-ebad-4034-abd2-d8f4b837b045\",\"total_cost_usd\":0,\"usage\":{\"input_tokens\":0,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"output_tokens\":0,\"server_tool_use\":{\"web_search_requests\":0,\"web_fetch_requests\":0},\"service_tier\":\"standard\",\"cache_creation\":{\"ephemeral_1h_input_tokens\":0,\"ephemeral_5m_input_tokens\":0},\"inference_geo\":\"\",\"iterations\":[],\"speed\":\"standard\"},\"modelUsage\":{},\"permission_denials\":[],\"terminal_reason\":\"completed\",\"fast_mode_state\":\"off\",\"uuid\":\"34289cd5-c069-4689-9d99-f4ab011b63e2\"}\n",
+    "agent_stderr": "",
+    "judge_reasoning": "judge failed\n",
+    "verify_log": "Running ant (compile.tests)................................................ OK\nRunning ant (run.dev.tests)................................................ OK\nFailing tests: 1\n  - org.jsoup.nodes.ElementTest::elementIsNotASiblingOfItself\n",
+    "baseline_failing_tests": [
+      "org.jsoup.nodes.ElementTest::elementIsNotASiblingOfItself",
+      "org.jsoup.nodes.NodeTest::nodeIsNotASiblingOfItself",
+      "org.jsoup.nodes.NodeTest::orphanNodeReturnsNullForSiblingElements"
+    ],
+    "compile_log": "Running ant (compile)...................................................... OK\nRunning ant (compile.tests)................................................ OK\n",
+    "agent_modified_files": [
+      "maven-build.xml"
+    ],
+    "canonical_modified_files": [
+      "src/main/java/org/jsoup/nodes/Element.java",
+      "src/main/java/org/jsoup/nodes/Node.java",
+      "src/main/java/org/jsoup/select/Elements.java"
+    ],
+    "agent_modified_prod_files": [],
+    "file_overlap": [],
+    "missed_canonical": [
+      "src/main/java/org/jsoup/nodes/Element.java",
+      "src/main/java/org/jsoup/nodes/Node.java",
+      "src/main/java/org/jsoup/select/Elements.java"
+    ],
+    "extra_prod_files": [],
+    "fix_locality_score": 0.0,
+    "test_pass_strict": false
+  },
+  {
+    "bug": "Jsoup-22",
+    "condition": "C2",
+    "model": "claude-sonnet-4-6",
+    "model_default_used": false,
+    "started_at": "2026-06-01T04:36:01+00:00",
+    "duration_seconds": 1,
+    "tool_calls": 1,
+    "compile_fail": false,
+    "primary_pass": false,
+    "test_pass": false,
+    "baseline_failing_count": 3,
+    "agent_induced_regressions": [],
+    "regressed_tests": [],
+    "diagnosis_quality": 0,
+    "agent_exit_code": 1,
+    "bug_reproduced_pretest": true,
+    "agent_patch": "diff --git a/maven-build.xml b/maven-build.xml\nindex 44658237..31a48d32 100644\n--- a/maven-build.xml\n+++ b/maven-build.xml\n@@ -68,10 +68,10 @@\n            debug=\"true\" \n            optimize=\"false\" \n            deprecation=\"true\" \n-           target=\"1.6\" \n+           target=\"1.8\" \n            verbose=\"false\" \n            fork=\"false\" \n-           source=\"1.6\">\n+           source=\"1.8\">\n       <src>\n         <pathelement location=\"${maven.build.srcDir.0}\"/>\n       </src>\n@@ -94,10 +94,10 @@\n            debug=\"true\" \n            optimize=\"false\" \n            deprecation=\"true\" \n-           target=\"1.6\" \n+           target=\"1.8\" \n            verbose=\"false\" \n            fork=\"false\" \n-           source=\"1.6\">\n+           source=\"1.8\">\n       <src>\n         <pathelement location=\"${maven.build.testDir.0}\"/>\n       </src>\n",
+    "agent_log": "{\"type\":\"result\",\"subtype\":\"success\",\"is_error\":true,\"api_error_status\":429,\"duration_ms\":350,\"duration_api_ms\":0,\"num_turns\":1,\"result\":\"You've hit your session limit \u00b7 resets 5:10am (UTC)\",\"stop_reason\":\"stop_sequence\",\"session_id\":\"e9757123-1aea-4151-8e56-1cab99919b99\",\"total_cost_usd\":0,\"usage\":{\"input_tokens\":0,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"output_tokens\":0,\"server_tool_use\":{\"web_search_requests\":0,\"web_fetch_requests\":0},\"service_tier\":\"standard\",\"cache_creation\":{\"ephemeral_1h_input_tokens\":0,\"ephemeral_5m_input_tokens\":0},\"inference_geo\":\"\",\"iterations\":[],\"speed\":\"standard\"},\"modelUsage\":{},\"permission_denials\":[],\"terminal_reason\":\"completed\",\"fast_mode_state\":\"off\",\"uuid\":\"4a6272cf-7d31-4104-b044-4287140e5445\"}\n",
+    "agent_stderr": "",
+    "judge_reasoning": "judge failed\n",
+    "verify_log": "Running ant (compile.tests)................................................ OK\nRunning ant (run.dev.tests)................................................ OK\nFailing tests: 1\n  - org.jsoup.nodes.ElementTest::elementIsNotASiblingOfItself\n",
+    "baseline_failing_tests": [
+      "org.jsoup.nodes.ElementTest::elementIsNotASiblingOfItself",
+      "org.jsoup.nodes.NodeTest::nodeIsNotASiblingOfItself",
+      "org.jsoup.nodes.NodeTest::orphanNodeReturnsNullForSiblingElements"
+    ],
+    "compile_log": "Running ant (compile)...................................................... OK\nRunning ant (compile.tests)................................................ OK\n",
+    "agent_modified_files": [
+      "maven-build.xml"
+    ],
+    "canonical_modified_files": [
+      "src/main/java/org/jsoup/nodes/Element.java",
+      "src/main/java/org/jsoup/nodes/Node.java",
+      "src/main/java/org/jsoup/select/Elements.java"
+    ],
+    "agent_modified_prod_files": [],
+    "file_overlap": [],
+    "missed_canonical": [
+      "src/main/java/org/jsoup/nodes/Element.java",
+      "src/main/java/org/jsoup/nodes/Node.java",
+      "src/main/java/org/jsoup/select/Elements.java"
+    ],
+    "extra_prod_files": [],
+    "fix_locality_score": 0.0,
+    "test_pass_strict": false
+  },
+  {
+    "bug": "Jsoup-22",
+    "condition": "C3",
+    "model": "claude-sonnet-4-6",
+    "model_default_used": false,
+    "started_at": "2026-06-01T04:36:03+00:00",
+    "duration_seconds": 2,
+    "tool_calls": 1,
+    "compile_fail": false,
+    "primary_pass": false,
+    "test_pass": false,
+    "baseline_failing_count": 3,
+    "agent_induced_regressions": [],
+    "regressed_tests": [],
+    "diagnosis_quality": 0,
+    "agent_exit_code": 1,
+    "bug_reproduced_pretest": true,
+    "agent_patch": "diff --git a/maven-build.xml b/maven-build.xml\nindex 44658237..31a48d32 100644\n--- a/maven-build.xml\n+++ b/maven-build.xml\n@@ -68,10 +68,10 @@\n            debug=\"true\" \n            optimize=\"false\" \n            deprecation=\"true\" \n-           target=\"1.6\" \n+           target=\"1.8\" \n            verbose=\"false\" \n            fork=\"false\" \n-           source=\"1.6\">\n+           source=\"1.8\">\n       <src>\n         <pathelement location=\"${maven.build.srcDir.0}\"/>\n       </src>\n@@ -94,10 +94,10 @@\n            debug=\"true\" \n            optimize=\"false\" \n            deprecation=\"true\" \n-           target=\"1.6\" \n+           target=\"1.8\" \n            verbose=\"false\" \n            fork=\"false\" \n-           source=\"1.6\">\n+           source=\"1.8\">\n       <src>\n         <pathelement location=\"${maven.build.testDir.0}\"/>\n       </src>\n",
+    "agent_log": "{\"type\":\"result\",\"subtype\":\"success\",\"is_error\":true,\"api_error_status\":429,\"duration_ms\":383,\"duration_api_ms\":0,\"num_turns\":1,\"result\":\"You've hit your session limit \u00b7 resets 5:10am (UTC)\",\"stop_reason\":\"stop_sequence\",\"session_id\":\"668fcbce-a4d8-40fb-97a1-6d71c5deb5d6\",\"total_cost_usd\":0,\"usage\":{\"input_tokens\":0,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"output_tokens\":0,\"server_tool_use\":{\"web_search_requests\":0,\"web_fetch_requests\":0},\"service_tier\":\"standard\",\"cache_creation\":{\"ephemeral_1h_input_tokens\":0,\"ephemeral_5m_input_tokens\":0},\"inference_geo\":\"\",\"iterations\":[],\"speed\":\"standard\"},\"modelUsage\":{},\"permission_denials\":[],\"terminal_reason\":\"completed\",\"fast_mode_state\":\"off\",\"uuid\":\"8efa2ff2-520e-4c5c-85cf-6754958186b3\"}\n",
+    "agent_stderr": "",
+    "judge_reasoning": "judge failed\n",
+    "verify_log": "Running ant (compile.tests)................................................ OK\nRunning ant (run.dev.tests)................................................ OK\nFailing tests: 1\n  - org.jsoup.nodes.ElementTest::elementIsNotASiblingOfItself\n",
+    "baseline_failing_tests": [
+      "org.jsoup.nodes.ElementTest::elementIsNotASiblingOfItself",
+      "org.jsoup.nodes.NodeTest::nodeIsNotASiblingOfItself",
+      "org.jsoup.nodes.NodeTest::orphanNodeReturnsNullForSiblingElements"
+    ],
+    "compile_log": "Running ant (compile)...................................................... OK\nRunning ant (compile.tests)................................................ OK\n",
+    "agent_modified_files": [
+      "maven-build.xml"
+    ],
+    "canonical_modified_files": [
+      "src/main/java/org/jsoup/nodes/Element.java",
+      "src/main/java/org/jsoup/nodes/Node.java",
+      "src/main/java/org/jsoup/select/Elements.java"
+    ],
+    "agent_modified_prod_files": [],
+    "file_overlap": [],
+    "missed_canonical": [
+      "src/main/java/org/jsoup/nodes/Element.java",
+      "src/main/java/org/jsoup/nodes/Node.java",
+      "src/main/java/org/jsoup/select/Elements.java"
+    ],
+    "extra_prod_files": [],
+    "fix_locality_score": 0.0,
+    "test_pass_strict": false
+  },
+  {
+    "bug": "Jsoup-28",
+    "condition": "C1",
+    "model": "claude-sonnet-4-6",
+    "model_default_used": false,
+    "started_at": "2026-06-01T04:35:24+00:00",
+    "duration_seconds": 1,
+    "tool_calls": 1,
+    "compile_fail": false,
+    "primary_pass": false,
+    "test_pass": false,
+    "baseline_failing_count": 6,
+    "agent_induced_regressions": [],
+    "regressed_tests": [],
+    "diagnosis_quality": 0,
+    "agent_exit_code": 1,
+    "bug_reproduced_pretest": true,
+    "agent_patch": "diff --git a/maven-build.xml b/maven-build.xml\nindex 93e81600..f77e8eba 100644\n--- a/maven-build.xml\n+++ b/maven-build.xml\n@@ -68,10 +68,10 @@\n            debug=\"true\" \n            optimize=\"false\" \n            deprecation=\"true\" \n-           target=\"1.6\" \n+           target=\"1.8\" \n            verbose=\"false\" \n            fork=\"false\" \n-           source=\"1.6\">\n+           source=\"1.8\">\n       <src>\n         <pathelement location=\"${maven.build.srcDir.0}\"/>\n       </src>\n@@ -99,10 +99,10 @@\n            debug=\"true\" \n            optimize=\"false\" \n            deprecation=\"true\" \n-           target=\"1.6\" \n+           target=\"1.8\" \n            verbose=\"false\" \n            fork=\"false\" \n-           source=\"1.6\">\n+           source=\"1.8\">\n       <src>\n         <pathelement location=\"${maven.build.testDir.0}\"/>\n       </src>\n",
+    "agent_log": "{\"type\":\"result\",\"subtype\":\"success\",\"is_error\":true,\"api_error_status\":429,\"duration_ms\":333,\"duration_api_ms\":0,\"num_turns\":1,\"result\":\"You've hit your session limit \u00b7 resets 5:10am (UTC)\",\"stop_reason\":\"stop_sequence\",\"session_id\":\"3d586c93-a3c0-4542-af74-3f503a6700ea\",\"total_cost_usd\":0,\"usage\":{\"input_tokens\":0,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"output_tokens\":0,\"server_tool_use\":{\"web_search_requests\":0,\"web_fetch_requests\":0},\"service_tier\":\"standard\",\"cache_creation\":{\"ephemeral_1h_input_tokens\":0,\"ephemeral_5m_input_tokens\":0},\"inference_geo\":\"\",\"iterations\":[],\"speed\":\"standard\"},\"modelUsage\":{},\"permission_denials\":[],\"terminal_reason\":\"completed\",\"fast_mode_state\":\"off\",\"uuid\":\"6c565735-dc84-4981-a2b8-fe1771011c58\"}\n",
+    "agent_stderr": "",
+    "judge_reasoning": "judge failed\n",
+    "verify_log": "Running ant (compile.tests)................................................ OK\nRunning ant (run.dev.tests)................................................ OK\nFailing tests: 1\n  - org.jsoup.nodes.EntitiesTest::unescape\n",
+    "baseline_failing_tests": [
+      "org.jsoup.nodes.EntitiesTest::noSpuriousDecodes",
+      "org.jsoup.nodes.EntitiesTest::unescape",
+      "org.jsoup.parser.AttributeParseTest::moreAttributeUnescapes",
+      "org.jsoup.parser.AttributeParseTest::strictAttributeUnescapes",
+      "org.jsoup.parser.HtmlParserTest::doesNotFindShortestMatchingEntity",
+      "org.jsoup.parser.HtmlParserTest::relaxedBaseEntityMatchAndStrictExtendedMatch"
+    ],
+    "compile_log": "Running ant (compile)...................................................... OK\nRunning ant (compile.tests)................................................ OK\n",
+    "agent_modified_files": [
+      "maven-build.xml"
+    ],
+    "canonical_modified_files": [
+      "src/main/java/org/jsoup/nodes/Entities.java",
+      "src/main/java/org/jsoup/parser/Parser.java",
+      "src/main/java/org/jsoup/parser/Tokeniser.java"
+    ],
+    "agent_modified_prod_files": [],
+    "file_overlap": [],
+    "missed_canonical": [
+      "src/main/java/org/jsoup/nodes/Entities.java",
+      "src/main/java/org/jsoup/parser/Parser.java",
+      "src/main/java/org/jsoup/parser/Tokeniser.java"
+    ],
+    "extra_prod_files": [],
+    "fix_locality_score": 0.0,
+    "test_pass_strict": false
+  },
+  {
+    "bug": "Jsoup-28",
+    "condition": "C2",
+    "model": "claude-sonnet-4-6",
+    "model_default_used": false,
+    "started_at": "2026-06-01T04:35:41+00:00",
+    "duration_seconds": 2,
+    "tool_calls": 1,
+    "compile_fail": false,
+    "primary_pass": false,
+    "test_pass": false,
+    "baseline_failing_count": 6,
+    "agent_induced_regressions": [],
+    "regressed_tests": [],
+    "diagnosis_quality": 0,
+    "agent_exit_code": 1,
+    "bug_reproduced_pretest": true,
+    "agent_patch": "diff --git a/maven-build.xml b/maven-build.xml\nindex 93e81600..f77e8eba 100644\n--- a/maven-build.xml\n+++ b/maven-build.xml\n@@ -68,10 +68,10 @@\n            debug=\"true\" \n            optimize=\"false\" \n            deprecation=\"true\" \n-           target=\"1.6\" \n+           target=\"1.8\" \n            verbose=\"false\" \n            fork=\"false\" \n-           source=\"1.6\">\n+           source=\"1.8\">\n       <src>\n         <pathelement location=\"${maven.build.srcDir.0}\"/>\n       </src>\n@@ -99,10 +99,10 @@\n            debug=\"true\" \n            optimize=\"false\" \n            deprecation=\"true\" \n-           target=\"1.6\" \n+           target=\"1.8\" \n            verbose=\"false\" \n            fork=\"false\" \n-           source=\"1.6\">\n+           source=\"1.8\">\n       <src>\n         <pathelement location=\"${maven.build.testDir.0}\"/>\n       </src>\n",
+    "agent_log": "{\"type\":\"result\",\"subtype\":\"success\",\"is_error\":true,\"api_error_status\":429,\"duration_ms\":357,\"duration_api_ms\":0,\"num_turns\":1,\"result\":\"You've hit your session limit \u00b7 resets 5:10am (UTC)\",\"stop_reason\":\"stop_sequence\",\"session_id\":\"b88394c0-652a-458d-9307-d99f2f308d84\",\"total_cost_usd\":0,\"usage\":{\"input_tokens\":0,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"output_tokens\":0,\"server_tool_use\":{\"web_search_requests\":0,\"web_fetch_requests\":0},\"service_tier\":\"standard\",\"cache_creation\":{\"ephemeral_1h_input_tokens\":0,\"ephemeral_5m_input_tokens\":0},\"inference_geo\":\"\",\"iterations\":[],\"speed\":\"standard\"},\"modelUsage\":{},\"permission_denials\":[],\"terminal_reason\":\"completed\",\"fast_mode_state\":\"off\",\"uuid\":\"7ebe29b2-ef04-4e90-992d-14317e58a5c6\"}\n",
+    "agent_stderr": "",
+    "judge_reasoning": "judge failed\n",
+    "verify_log": "Running ant (compile.tests)................................................ OK\nRunning ant (run.dev.tests)................................................ OK\nFailing tests: 1\n  - org.jsoup.nodes.EntitiesTest::unescape\n",
+    "baseline_failing_tests": [
+      "org.jsoup.nodes.EntitiesTest::noSpuriousDecodes",
+      "org.jsoup.nodes.EntitiesTest::unescape",
+      "org.jsoup.parser.AttributeParseTest::moreAttributeUnescapes",
+      "org.jsoup.parser.AttributeParseTest::strictAttributeUnescapes",
+      "org.jsoup.parser.HtmlParserTest::doesNotFindShortestMatchingEntity",
+      "org.jsoup.parser.HtmlParserTest::relaxedBaseEntityMatchAndStrictExtendedMatch"
+    ],
+    "compile_log": "Running ant (compile)...................................................... OK\nRunning ant (compile.tests)................................................ OK\n",
+    "agent_modified_files": [
+      "maven-build.xml"
+    ],
+    "canonical_modified_files": [
+      "src/main/java/org/jsoup/nodes/Entities.java",
+      "src/main/java/org/jsoup/parser/Parser.java",
+      "src/main/java/org/jsoup/parser/Tokeniser.java"
+    ],
+    "agent_modified_prod_files": [],
+    "file_overlap": [],
+    "missed_canonical": [
+      "src/main/java/org/jsoup/nodes/Entities.java",
+      "src/main/java/org/jsoup/parser/Parser.java",
+      "src/main/java/org/jsoup/parser/Tokeniser.java"
+    ],
+    "extra_prod_files": [],
+    "fix_locality_score": 0.0,
+    "test_pass_strict": false
+  },
+  {
+    "bug": "Jsoup-28",
+    "condition": "C3",
+    "model": "claude-sonnet-4-6",
+    "model_default_used": false,
+    "started_at": "2026-06-01T04:35:43+00:00",
+    "duration_seconds": 2,
+    "tool_calls": 1,
+    "compile_fail": false,
+    "primary_pass": false,
+    "test_pass": false,
+    "baseline_failing_count": 6,
+    "agent_induced_regressions": [],
+    "regressed_tests": [],
+    "diagnosis_quality": 0,
+    "agent_exit_code": 1,
+    "bug_reproduced_pretest": true,
+    "agent_patch": "diff --git a/maven-build.xml b/maven-build.xml\nindex 93e81600..f77e8eba 100644\n--- a/maven-build.xml\n+++ b/maven-build.xml\n@@ -68,10 +68,10 @@\n            debug=\"true\" \n            optimize=\"false\" \n            deprecation=\"true\" \n-           target=\"1.6\" \n+           target=\"1.8\" \n            verbose=\"false\" \n            fork=\"false\" \n-           source=\"1.6\">\n+           source=\"1.8\">\n       <src>\n         <pathelement location=\"${maven.build.srcDir.0}\"/>\n       </src>\n@@ -99,10 +99,10 @@\n            debug=\"true\" \n            optimize=\"false\" \n            deprecation=\"true\" \n-           target=\"1.6\" \n+           target=\"1.8\" \n            verbose=\"false\" \n            fork=\"false\" \n-           source=\"1.6\">\n+           source=\"1.8\">\n       <src>\n         <pathelement location=\"${maven.build.testDir.0}\"/>\n       </src>\n",
+    "agent_log": "{\"type\":\"result\",\"subtype\":\"success\",\"is_error\":true,\"api_error_status\":429,\"duration_ms\":352,\"duration_api_ms\":0,\"num_turns\":1,\"result\":\"You've hit your session limit \u00b7 resets 5:10am (UTC)\",\"stop_reason\":\"stop_sequence\",\"session_id\":\"e0f82c63-b7ce-4cb6-81a6-a4c6ee40fcd7\",\"total_cost_usd\":0,\"usage\":{\"input_tokens\":0,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"output_tokens\":0,\"server_tool_use\":{\"web_search_requests\":0,\"web_fetch_requests\":0},\"service_tier\":\"standard\",\"cache_creation\":{\"ephemeral_1h_input_tokens\":0,\"ephemeral_5m_input_tokens\":0},\"inference_geo\":\"\",\"iterations\":[],\"speed\":\"standard\"},\"modelUsage\":{},\"permission_denials\":[],\"terminal_reason\":\"completed\",\"fast_mode_state\":\"off\",\"uuid\":\"608483fa-1d1e-4307-b854-920dbb54cb94\"}\n",
+    "agent_stderr": "",
+    "judge_reasoning": "judge failed\n",
+    "verify_log": "Running ant (compile.tests)................................................ OK\nRunning ant (run.dev.tests)................................................ OK\nFailing tests: 1\n  - org.jsoup.nodes.EntitiesTest::unescape\n",
+    "baseline_failing_tests": [
+      "org.jsoup.nodes.EntitiesTest::noSpuriousDecodes",
+      "org.jsoup.nodes.EntitiesTest::unescape",
+      "org.jsoup.parser.AttributeParseTest::moreAttributeUnescapes",
+      "org.jsoup.parser.AttributeParseTest::strictAttributeUnescapes",
+      "org.jsoup.parser.HtmlParserTest::doesNotFindShortestMatchingEntity",
+      "org.jsoup.parser.HtmlParserTest::relaxedBaseEntityMatchAndStrictExtendedMatch"
+    ],
+    "compile_log": "Running ant (compile)...................................................... OK\nRunning ant (compile.tests)................................................ OK\n",
+    "agent_modified_files": [
+      "maven-build.xml"
+    ],
+    "canonical_modified_files": [
+      "src/main/java/org/jsoup/nodes/Entities.java",
+      "src/main/java/org/jsoup/parser/Parser.java",
+      "src/main/java/org/jsoup/parser/Tokeniser.java"
+    ],
+    "agent_modified_prod_files": [],
+    "file_overlap": [],
+    "missed_canonical": [
+      "src/main/java/org/jsoup/nodes/Entities.java",
+      "src/main/java/org/jsoup/parser/Parser.java",
+      "src/main/java/org/jsoup/parser/Tokeniser.java"
+    ],
+    "extra_prod_files": [],
+    "fix_locality_score": 0.0,
+    "test_pass_strict": false
+  },
+  {
+    "bug": "Jsoup-52",
+    "condition": "C1",
+    "model": "claude-sonnet-4-6",
+    "model_default_used": false,
+    "started_at": "2026-06-01T04:35:03+00:00",
+    "duration_seconds": 2,
+    "tool_calls": 1,
+    "compile_fail": false,
+    "primary_pass": false,
+    "test_pass": false,
+    "baseline_failing_count": 7,
+    "agent_induced_regressions": [],
+    "regressed_tests": [],
+    "diagnosis_quality": 0,
+    "agent_exit_code": 1,
+    "bug_reproduced_pretest": true,
+    "agent_patch": "diff --git a/maven-build.xml b/maven-build.xml\nindex 2ebfa2aa..5e1d3da6 100644\n--- a/maven-build.xml\n+++ b/maven-build.xml\n@@ -68,10 +68,10 @@\n            debug=\"true\" \n            optimize=\"false\" \n            deprecation=\"true\" \n-           target=\"1.6\" \n+           target=\"1.8\" \n            verbose=\"false\" \n            fork=\"false\" \n-           source=\"1.6\">\n+           source=\"1.8\">\n       <src>\n         <pathelement location=\"${maven.build.srcDir.0}\"/>\n       </src>\n@@ -99,10 +99,10 @@\n            debug=\"true\" \n            optimize=\"false\" \n            deprecation=\"true\" \n-           target=\"1.6\" \n+           target=\"1.8\" \n            verbose=\"false\" \n            fork=\"false\" \n-           source=\"1.6\">\n+           source=\"1.8\">\n       <src>\n         <pathelement location=\"${maven.build.testDir.0}\"/>\n       </src>\n",
+    "agent_log": "{\"type\":\"result\",\"subtype\":\"success\",\"is_error\":true,\"api_error_status\":429,\"duration_ms\":530,\"duration_api_ms\":0,\"num_turns\":1,\"result\":\"You've hit your session limit \u00b7 resets 5:10am (UTC)\",\"stop_reason\":\"stop_sequence\",\"session_id\":\"cdebc186-b348-440d-81d0-aa3afe38626e\",\"total_cost_usd\":0,\"usage\":{\"input_tokens\":0,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"output_tokens\":0,\"server_tool_use\":{\"web_search_requests\":0,\"web_fetch_requests\":0},\"service_tier\":\"standard\",\"cache_creation\":{\"ephemeral_1h_input_tokens\":0,\"ephemeral_5m_input_tokens\":0},\"inference_geo\":\"\",\"iterations\":[],\"speed\":\"standard\"},\"modelUsage\":{},\"permission_denials\":[],\"terminal_reason\":\"completed\",\"fast_mode_state\":\"off\",\"uuid\":\"3f2f07a9-4910-4e9b-96ae-c5b14e81ad5f\"}\n",
+    "agent_stderr": "",
+    "judge_reasoning": "judge failed\n",
+    "verify_log": "Running ant (compile.tests)................................................ OK\nRunning ant (run.dev.tests)................................................ OK\nFailing tests: 1\n  - org.jsoup.nodes.DocumentTest::testMetaCharsetUpdateXmlNoCharset\n",
+    "baseline_failing_tests": [
+      "org.jsoup.nodes.DocumentTest::testMetaCharsetUpdateXmlDisabledNoChanges",
+      "org.jsoup.nodes.DocumentTest::testMetaCharsetUpdateXmlIso8859",
+      "org.jsoup.nodes.DocumentTest::testMetaCharsetUpdateXmlNoCharset",
+      "org.jsoup.nodes.DocumentTest::testMetaCharsetUpdateXmlUtf8",
+      "org.jsoup.parser.XmlTreeBuilderTest::handlesXmlDeclarationAsDeclaration",
+      "org.jsoup.parser.XmlTreeBuilderTest::testDetectCharsetEncodingDeclaration",
+      "org.jsoup.parser.XmlTreeBuilderTest::testParseDeclarationAttributes"
+    ],
+    "compile_log": "Running ant (compile)...................................................... OK\nRunning ant (compile.tests)................................................ OK\n",
+    "agent_modified_files": [
+      "maven-build.xml"
+    ],
+    "canonical_modified_files": [
+      "src/main/java/org/jsoup/helper/DataUtil.java",
+      "src/main/java/org/jsoup/nodes/XmlDeclaration.java",
+      "src/main/java/org/jsoup/parser/XmlTreeBuilder.java"
+    ],
+    "agent_modified_prod_files": [],
+    "file_overlap": [],
+    "missed_canonical": [
+      "src/main/java/org/jsoup/helper/DataUtil.java",
+      "src/main/java/org/jsoup/nodes/XmlDeclaration.java",
+      "src/main/java/org/jsoup/parser/XmlTreeBuilder.java"
+    ],
+    "extra_prod_files": [],
+    "fix_locality_score": 0.0,
+    "test_pass_strict": false
+  },
+  {
+    "bug": "Jsoup-52",
+    "condition": "C2",
+    "model": "claude-sonnet-4-6",
+    "model_default_used": false,
+    "started_at": "2026-06-01T04:35:21+00:00",
+    "duration_seconds": 1,
+    "tool_calls": 1,
+    "compile_fail": false,
+    "primary_pass": false,
+    "test_pass": false,
+    "baseline_failing_count": 7,
+    "agent_induced_regressions": [],
+    "regressed_tests": [],
+    "diagnosis_quality": 0,
+    "agent_exit_code": 1,
+    "bug_reproduced_pretest": true,
+    "agent_patch": "diff --git a/maven-build.xml b/maven-build.xml\nindex 2ebfa2aa..5e1d3da6 100644\n--- a/maven-build.xml\n+++ b/maven-build.xml\n@@ -68,10 +68,10 @@\n            debug=\"true\" \n            optimize=\"false\" \n            deprecation=\"true\" \n-           target=\"1.6\" \n+           target=\"1.8\" \n            verbose=\"false\" \n            fork=\"false\" \n-           source=\"1.6\">\n+           source=\"1.8\">\n       <src>\n         <pathelement location=\"${maven.build.srcDir.0}\"/>\n       </src>\n@@ -99,10 +99,10 @@\n            debug=\"true\" \n            optimize=\"false\" \n            deprecation=\"true\" \n-           target=\"1.6\" \n+           target=\"1.8\" \n            verbose=\"false\" \n            fork=\"false\" \n-           source=\"1.6\">\n+           source=\"1.8\">\n       <src>\n         <pathelement location=\"${maven.build.testDir.0}\"/>\n       </src>\n",
+    "agent_log": "{\"type\":\"result\",\"subtype\":\"success\",\"is_error\":true,\"api_error_status\":429,\"duration_ms\":378,\"duration_api_ms\":0,\"num_turns\":1,\"result\":\"You've hit your session limit \u00b7 resets 5:10am (UTC)\",\"stop_reason\":\"stop_sequence\",\"session_id\":\"a3a41b41-d339-4e19-97da-2dea6ff4a3c2\",\"total_cost_usd\":0,\"usage\":{\"input_tokens\":0,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"output_tokens\":0,\"server_tool_use\":{\"web_search_requests\":0,\"web_fetch_requests\":0},\"service_tier\":\"standard\",\"cache_creation\":{\"ephemeral_1h_input_tokens\":0,\"ephemeral_5m_input_tokens\":0},\"inference_geo\":\"\",\"iterations\":[],\"speed\":\"standard\"},\"modelUsage\":{},\"permission_denials\":[],\"terminal_reason\":\"completed\",\"fast_mode_state\":\"off\",\"uuid\":\"a5671073-5379-4879-9842-8ffd797a10a4\"}\n",
+    "agent_stderr": "",
+    "judge_reasoning": "judge failed\n",
+    "verify_log": "Running ant (compile.tests)................................................ OK\nRunning ant (run.dev.tests)................................................ OK\nFailing tests: 1\n  - org.jsoup.nodes.DocumentTest::testMetaCharsetUpdateXmlNoCharset\n",
+    "baseline_failing_tests": [
+      "org.jsoup.nodes.DocumentTest::testMetaCharsetUpdateXmlDisabledNoChanges",
+      "org.jsoup.nodes.DocumentTest::testMetaCharsetUpdateXmlIso8859",
+      "org.jsoup.nodes.DocumentTest::testMetaCharsetUpdateXmlNoCharset",
+      "org.jsoup.nodes.DocumentTest::testMetaCharsetUpdateXmlUtf8",
+      "org.jsoup.parser.XmlTreeBuilderTest::handlesXmlDeclarationAsDeclaration",
+      "org.jsoup.parser.XmlTreeBuilderTest::testDetectCharsetEncodingDeclaration",
+      "org.jsoup.parser.XmlTreeBuilderTest::testParseDeclarationAttributes"
+    ],
+    "compile_log": "Running ant (compile)...................................................... OK\nRunning ant (compile.tests)................................................ OK\n",
+    "agent_modified_files": [
+      "maven-build.xml"
+    ],
+    "canonical_modified_files": [
+      "src/main/java/org/jsoup/helper/DataUtil.java",
+      "src/main/java/org/jsoup/nodes/XmlDeclaration.java",
+      "src/main/java/org/jsoup/parser/XmlTreeBuilder.java"
+    ],
+    "agent_modified_prod_files": [],
+    "file_overlap": [],
+    "missed_canonical": [
+      "src/main/java/org/jsoup/helper/DataUtil.java",
+      "src/main/java/org/jsoup/nodes/XmlDeclaration.java",
+      "src/main/java/org/jsoup/parser/XmlTreeBuilder.java"
+    ],
+    "extra_prod_files": [],
+    "fix_locality_score": 0.0,
+    "test_pass_strict": false
+  },
+  {
+    "bug": "Jsoup-52",
+    "condition": "C3",
+    "model": "claude-sonnet-4-6",
+    "model_default_used": false,
+    "started_at": "2026-06-01T04:35:25+00:00",
+    "duration_seconds": 2,
+    "tool_calls": 1,
+    "compile_fail": false,
+    "primary_pass": false,
+    "test_pass": false,
+    "baseline_failing_count": 7,
+    "agent_induced_regressions": [],
+    "regressed_tests": [],
+    "diagnosis_quality": 0,
+    "agent_exit_code": 1,
+    "bug_reproduced_pretest": true,
+    "agent_patch": "diff --git a/maven-build.xml b/maven-build.xml\nindex 2ebfa2aa..5e1d3da6 100644\n--- a/maven-build.xml\n+++ b/maven-build.xml\n@@ -68,10 +68,10 @@\n            debug=\"true\" \n            optimize=\"false\" \n            deprecation=\"true\" \n-           target=\"1.6\" \n+           target=\"1.8\" \n            verbose=\"false\" \n            fork=\"false\" \n-           source=\"1.6\">\n+           source=\"1.8\">\n       <src>\n         <pathelement location=\"${maven.build.srcDir.0}\"/>\n       </src>\n@@ -99,10 +99,10 @@\n            debug=\"true\" \n            optimize=\"false\" \n            deprecation=\"true\" \n-           target=\"1.6\" \n+           target=\"1.8\" \n            verbose=\"false\" \n            fork=\"false\" \n-           source=\"1.6\">\n+           source=\"1.8\">\n       <src>\n         <pathelement location=\"${maven.build.testDir.0}\"/>\n       </src>\n",
+    "agent_log": "{\"type\":\"result\",\"subtype\":\"success\",\"is_error\":true,\"api_error_status\":429,\"duration_ms\":518,\"duration_api_ms\":0,\"num_turns\":1,\"result\":\"You've hit your session limit \u00b7 resets 5:10am (UTC)\",\"stop_reason\":\"stop_sequence\",\"session_id\":\"56f29d37-ecfc-4d9b-9685-fca2e9aa1b30\",\"total_cost_usd\":0,\"usage\":{\"input_tokens\":0,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"output_tokens\":0,\"server_tool_use\":{\"web_search_requests\":0,\"web_fetch_requests\":0},\"service_tier\":\"standard\",\"cache_creation\":{\"ephemeral_1h_input_tokens\":0,\"ephemeral_5m_input_tokens\":0},\"inference_geo\":\"\",\"iterations\":[],\"speed\":\"standard\"},\"modelUsage\":{},\"permission_denials\":[],\"terminal_reason\":\"completed\",\"fast_mode_state\":\"off\",\"uuid\":\"b728b94d-b2d5-4a55-8bbe-25a57d6dec33\"}\n",
+    "agent_stderr": "",
+    "judge_reasoning": "judge failed\n",
+    "verify_log": "Running ant (compile.tests)................................................ OK\nRunning ant (run.dev.tests)................................................ OK\nFailing tests: 1\n  - org.jsoup.nodes.DocumentTest::testMetaCharsetUpdateXmlNoCharset\n",
+    "baseline_failing_tests": [
+      "org.jsoup.nodes.DocumentTest::testMetaCharsetUpdateXmlDisabledNoChanges",
+      "org.jsoup.nodes.DocumentTest::testMetaCharsetUpdateXmlIso8859",
+      "org.jsoup.nodes.DocumentTest::testMetaCharsetUpdateXmlNoCharset",
+      "org.jsoup.nodes.DocumentTest::testMetaCharsetUpdateXmlUtf8",
+      "org.jsoup.parser.XmlTreeBuilderTest::handlesXmlDeclarationAsDeclaration",
+      "org.jsoup.parser.XmlTreeBuilderTest::testDetectCharsetEncodingDeclaration",
+      "org.jsoup.parser.XmlTreeBuilderTest::testParseDeclarationAttributes"
+    ],
+    "compile_log": "Running ant (compile)...................................................... OK\nRunning ant (compile.tests)................................................ OK\n",
+    "agent_modified_files": [
+      "maven-build.xml"
+    ],
+    "canonical_modified_files": [
+      "src/main/java/org/jsoup/helper/DataUtil.java",
+      "src/main/java/org/jsoup/nodes/XmlDeclaration.java",
+      "src/main/java/org/jsoup/parser/XmlTreeBuilder.java"
+    ],
+    "agent_modified_prod_files": [],
+    "file_overlap": [],
+    "missed_canonical": [
+      "src/main/java/org/jsoup/helper/DataUtil.java",
+      "src/main/java/org/jsoup/nodes/XmlDeclaration.java",
+      "src/main/java/org/jsoup/parser/XmlTreeBuilder.java"
+    ],
+    "extra_prod_files": [],
+    "fix_locality_score": 0.0,
+    "test_pass_strict": false
+  },
+  {
+    "bug": "Jsoup-56",
+    "condition": "C1",
+    "model": "claude-sonnet-4-6",
+    "model_default_used": false,
+    "started_at": "2026-06-01T04:34:15+00:00",
+    "duration_seconds": 1,
+    "tool_calls": 1,
+    "compile_fail": false,
+    "primary_pass": false,
+    "test_pass": false,
+    "baseline_failing_count": 1,
+    "agent_induced_regressions": [],
+    "regressed_tests": [],
+    "diagnosis_quality": 0,
+    "agent_exit_code": 1,
+    "bug_reproduced_pretest": true,
+    "agent_patch": "diff --git a/maven-build.xml b/maven-build.xml\nindex 01b6ee6b..c778aebd 100644\n--- a/maven-build.xml\n+++ b/maven-build.xml\n@@ -71,10 +71,10 @@\n            debug=\"true\" \n            optimize=\"false\" \n            deprecation=\"true\" \n-           target=\"1.6\" \n+           target=\"1.8\" \n            verbose=\"false\" \n            fork=\"false\" \n-           source=\"1.6\">\n+           source=\"1.8\">\n       <src>\n         <pathelement location=\"${maven.build.srcDir.0}\"/>\n       </src>\n@@ -110,10 +110,10 @@\n            debug=\"true\" \n            optimize=\"false\" \n            deprecation=\"true\" \n-           target=\"1.6\" \n+           target=\"1.8\" \n            verbose=\"false\" \n            fork=\"false\" \n-           source=\"1.6\">\n+           source=\"1.8\">\n       <src>\n         <pathelement location=\"${maven.build.testDir.0}\"/>\n       </src>\n",
+    "agent_log": "{\"type\":\"result\",\"subtype\":\"success\",\"is_error\":true,\"api_error_status\":429,\"duration_ms\":324,\"duration_api_ms\":0,\"num_turns\":1,\"result\":\"You've hit your session limit \u00b7 resets 5:10am (UTC)\",\"stop_reason\":\"stop_sequence\",\"session_id\":\"8de373cc-4cb7-4076-aacb-4bbbdd28936f\",\"total_cost_usd\":0,\"usage\":{\"input_tokens\":0,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"output_tokens\":0,\"server_tool_use\":{\"web_search_requests\":0,\"web_fetch_requests\":0},\"service_tier\":\"standard\",\"cache_creation\":{\"ephemeral_1h_input_tokens\":0,\"ephemeral_5m_input_tokens\":0},\"inference_geo\":\"\",\"iterations\":[],\"speed\":\"standard\"},\"modelUsage\":{},\"permission_denials\":[],\"terminal_reason\":\"completed\",\"fast_mode_state\":\"off\",\"uuid\":\"cb78344e-8670-49eb-a70a-b4ba5482cef0\"}\n",
+    "agent_stderr": "",
+    "judge_reasoning": "judge failed\n",
+    "verify_log": "Running ant (compile.tests)................................................ OK\nRunning ant (run.dev.tests)................................................ OK\nFailing tests: 1\n  - org.jsoup.nodes.DocumentTypeTest::testRoundTrip\n",
+    "baseline_failing_tests": [
+      "org.jsoup.nodes.DocumentTypeTest::testRoundTrip"
+    ],
+    "compile_log": "Running ant (compile)...................................................... OK\nRunning ant (compile.tests)................................................ OK\n",
+    "agent_modified_files": [
+      "maven-build.xml"
+    ],
+    "canonical_modified_files": [
+      "src/main/java/org/jsoup/nodes/DocumentType.java",
+      "src/main/java/org/jsoup/parser/HtmlTreeBuilderState.java",
+      "src/main/java/org/jsoup/parser/Token.java",
+      "src/main/java/org/jsoup/parser/TokeniserState.java",
+      "src/main/java/org/jsoup/parser/XmlTreeBuilder.java"
+    ],
+    "agent_modified_prod_files": [],
+    "file_overlap": [],
+    "missed_canonical": [
+      "src/main/java/org/jsoup/nodes/DocumentType.java",
+      "src/main/java/org/jsoup/parser/HtmlTreeBuilderState.java",
+      "src/main/java/org/jsoup/parser/Token.java",
+      "src/main/java/org/jsoup/parser/TokeniserState.java",
+      "src/main/java/org/jsoup/parser/XmlTreeBuilder.java"
+    ],
+    "extra_prod_files": [],
+    "fix_locality_score": 0.0,
+    "test_pass_strict": false
+  },
+  {
+    "bug": "Jsoup-56",
+    "condition": "C2",
+    "model": "claude-sonnet-4-6",
+    "model_default_used": false,
+    "started_at": "2026-06-01T04:34:34+00:00",
+    "duration_seconds": 2,
+    "tool_calls": 1,
+    "compile_fail": false,
+    "primary_pass": false,
+    "test_pass": false,
+    "baseline_failing_count": 1,
+    "agent_induced_regressions": [],
+    "regressed_tests": [],
+    "diagnosis_quality": 0,
+    "agent_exit_code": 1,
+    "bug_reproduced_pretest": true,
+    "agent_patch": "diff --git a/maven-build.xml b/maven-build.xml\nindex 01b6ee6b..c778aebd 100644\n--- a/maven-build.xml\n+++ b/maven-build.xml\n@@ -71,10 +71,10 @@\n            debug=\"true\" \n            optimize=\"false\" \n            deprecation=\"true\" \n-           target=\"1.6\" \n+           target=\"1.8\" \n            verbose=\"false\" \n            fork=\"false\" \n-           source=\"1.6\">\n+           source=\"1.8\">\n       <src>\n         <pathelement location=\"${maven.build.srcDir.0}\"/>\n       </src>\n@@ -110,10 +110,10 @@\n            debug=\"true\" \n            optimize=\"false\" \n            deprecation=\"true\" \n-           target=\"1.6\" \n+           target=\"1.8\" \n            verbose=\"false\" \n            fork=\"false\" \n-           source=\"1.6\">\n+           source=\"1.8\">\n       <src>\n         <pathelement location=\"${maven.build.testDir.0}\"/>\n       </src>\n",
+    "agent_log": "{\"type\":\"result\",\"subtype\":\"success\",\"is_error\":true,\"api_error_status\":429,\"duration_ms\":616,\"duration_api_ms\":0,\"num_turns\":1,\"result\":\"You've hit your session limit \u00b7 resets 5:10am (UTC)\",\"stop_reason\":\"stop_sequence\",\"session_id\":\"519b0925-b16c-4ab9-8bf5-bb0c9940bd50\",\"total_cost_usd\":0,\"usage\":{\"input_tokens\":0,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"output_tokens\":0,\"server_tool_use\":{\"web_search_requests\":0,\"web_fetch_requests\":0},\"service_tier\":\"standard\",\"cache_creation\":{\"ephemeral_1h_input_tokens\":0,\"ephemeral_5m_input_tokens\":0},\"inference_geo\":\"\",\"iterations\":[],\"speed\":\"standard\"},\"modelUsage\":{},\"permission_denials\":[],\"terminal_reason\":\"completed\",\"fast_mode_state\":\"off\",\"uuid\":\"70fad32a-e625-427c-81d5-646abb07b59e\"}\n",
+    "agent_stderr": "",
+    "judge_reasoning": "judge failed\n",
+    "verify_log": "Running ant (compile.tests)................................................ OK\nRunning ant (run.dev.tests)................................................ OK\nFailing tests: 1\n  - org.jsoup.nodes.DocumentTypeTest::testRoundTrip\n",
+    "baseline_failing_tests": [
+      "org.jsoup.nodes.DocumentTypeTest::testRoundTrip"
+    ],
+    "compile_log": "Running ant (compile)...................................................... OK\nRunning ant (compile.tests)................................................ OK\n",
+    "agent_modified_files": [
+      "maven-build.xml"
+    ],
+    "canonical_modified_files": [
+      "src/main/java/org/jsoup/nodes/DocumentType.java",
+      "src/main/java/org/jsoup/parser/HtmlTreeBuilderState.java",
+      "src/main/java/org/jsoup/parser/Token.java",
+      "src/main/java/org/jsoup/parser/TokeniserState.java",
+      "src/main/java/org/jsoup/parser/XmlTreeBuilder.java"
+    ],
+    "agent_modified_prod_files": [],
+    "file_overlap": [],
+    "missed_canonical": [
+      "src/main/java/org/jsoup/nodes/DocumentType.java",
+      "src/main/java/org/jsoup/parser/HtmlTreeBuilderState.java",
+      "src/main/java/org/jsoup/parser/Token.java",
+      "src/main/java/org/jsoup/parser/TokeniserState.java",
+      "src/main/java/org/jsoup/parser/XmlTreeBuilder.java"
+    ],
+    "extra_prod_files": [],
+    "fix_locality_score": 0.0,
+    "test_pass_strict": false
+  },
+  {
+    "bug": "Jsoup-56",
+    "condition": "C3",
+    "model": "claude-sonnet-4-6",
+    "model_default_used": false,
+    "started_at": "2026-06-01T04:34:38+00:00",
+    "duration_seconds": 1,
+    "tool_calls": 1,
+    "compile_fail": false,
+    "primary_pass": false,
+    "test_pass": false,
+    "baseline_failing_count": 1,
+    "agent_induced_regressions": [],
+    "regressed_tests": [],
+    "diagnosis_quality": 0,
+    "agent_exit_code": 1,
+    "bug_reproduced_pretest": true,
+    "agent_patch": "diff --git a/maven-build.xml b/maven-build.xml\nindex 01b6ee6b..c778aebd 100644\n--- a/maven-build.xml\n+++ b/maven-build.xml\n@@ -71,10 +71,10 @@\n            debug=\"true\" \n            optimize=\"false\" \n            deprecation=\"true\" \n-           target=\"1.6\" \n+           target=\"1.8\" \n            verbose=\"false\" \n            fork=\"false\" \n-           source=\"1.6\">\n+           source=\"1.8\">\n       <src>\n         <pathelement location=\"${maven.build.srcDir.0}\"/>\n       </src>\n@@ -110,10 +110,10 @@\n            debug=\"true\" \n            optimize=\"false\" \n            deprecation=\"true\" \n-           target=\"1.6\" \n+           target=\"1.8\" \n            verbose=\"false\" \n            fork=\"false\" \n-           source=\"1.6\">\n+           source=\"1.8\">\n       <src>\n         <pathelement location=\"${maven.build.testDir.0}\"/>\n       </src>\n",
+    "agent_log": "{\"type\":\"result\",\"subtype\":\"success\",\"is_error\":true,\"api_error_status\":429,\"duration_ms\":354,\"duration_api_ms\":0,\"num_turns\":1,\"result\":\"You've hit your session limit \u00b7 resets 5:10am (UTC)\",\"stop_reason\":\"stop_sequence\",\"session_id\":\"6c44d9d2-2f9e-44af-84a1-c502008b1b1c\",\"total_cost_usd\":0,\"usage\":{\"input_tokens\":0,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"output_tokens\":0,\"server_tool_use\":{\"web_search_requests\":0,\"web_fetch_requests\":0},\"service_tier\":\"standard\",\"cache_creation\":{\"ephemeral_1h_input_tokens\":0,\"ephemeral_5m_input_tokens\":0},\"inference_geo\":\"\",\"iterations\":[],\"speed\":\"standard\"},\"modelUsage\":{},\"permission_denials\":[],\"terminal_reason\":\"completed\",\"fast_mode_state\":\"off\",\"uuid\":\"f61025f3-4bfb-4f3d-b8df-b792202ef4b6\"}\n",
+    "agent_stderr": "",
+    "judge_reasoning": "judge failed\n",
+    "verify_log": "Running ant (compile.tests)................................................ OK\nRunning ant (run.dev.tests)................................................ OK\nFailing tests: 1\n  - org.jsoup.nodes.DocumentTypeTest::testRoundTrip\n",
+    "baseline_failing_tests": [
+      "org.jsoup.nodes.DocumentTypeTest::testRoundTrip"
+    ],
+    "compile_log": "Running ant (compile)...................................................... OK\nRunning ant (compile.tests)................................................ OK\n",
+    "agent_modified_files": [
+      "maven-build.xml"
+    ],
+    "canonical_modified_files": [
+      "src/main/java/org/jsoup/nodes/DocumentType.java",
+      "src/main/java/org/jsoup/parser/HtmlTreeBuilderState.java",
+      "src/main/java/org/jsoup/parser/Token.java",
+      "src/main/java/org/jsoup/parser/TokeniserState.java",
+      "src/main/java/org/jsoup/parser/XmlTreeBuilder.java"
+    ],
+    "agent_modified_prod_files": [],
+    "file_overlap": [],
+    "missed_canonical": [
+      "src/main/java/org/jsoup/nodes/DocumentType.java",
+      "src/main/java/org/jsoup/parser/HtmlTreeBuilderState.java",
+      "src/main/java/org/jsoup/parser/Token.java",
+      "src/main/java/org/jsoup/parser/TokeniserState.java",
+      "src/main/java/org/jsoup/parser/XmlTreeBuilder.java"
+    ],
+    "extra_prod_files": [],
+    "fix_locality_score": 0.0,
+    "test_pass_strict": false
+  },
+  {
+    "bug": "Jsoup-58",
+    "condition": "C1",
+    "model": "claude-sonnet-4-6",
+    "model_default_used": false,
+    "started_at": "2026-06-01T04:26:05+00:00",
+    "duration_seconds": 468,
+    "tool_calls": 29,
+    "compile_fail": false,
+    "primary_pass": false,
+    "test_pass": false,
+    "baseline_failing_count": 2,
+    "agent_induced_regressions": [],
+    "regressed_tests": [],
+    "diagnosis_quality": 0,
+    "agent_exit_code": 1,
+    "bug_reproduced_pretest": true,
+    "agent_patch": "diff --git a/maven-build.xml b/maven-build.xml\nindex 849871c7..73b0656d 100644\n--- a/maven-build.xml\n+++ b/maven-build.xml\n@@ -71,10 +71,10 @@\n            debug=\"true\" \n            optimize=\"false\" \n            deprecation=\"true\" \n-           target=\"1.6\" \n+           target=\"1.8\" \n            verbose=\"false\" \n            fork=\"false\" \n-           source=\"1.6\">\n+           source=\"1.8\">\n       <src>\n         <pathelement location=\"${maven.build.srcDir.0}\"/>\n       </src>\n@@ -110,10 +110,10 @@\n            debug=\"true\" \n            optimize=\"false\" \n            deprecation=\"true\" \n-           target=\"1.6\" \n+           target=\"1.8\" \n            verbose=\"false\" \n            fork=\"false\" \n-           source=\"1.6\">\n+           source=\"1.8\">\n       <src>\n         <pathelement location=\"${maven.build.testDir.0}\"/>\n       </src>\ndiff --git a/src/main/java/org/jsoup/safety/Cleaner.java b/src/main/java/org/jsoup/safety/Cleaner.java\nindex 7e0eb28d..434fadba 100644\n--- a/src/main/java/org/jsoup/safety/Cleaner.java\n+++ b/src/main/java/org/jsoup/safety/Cleaner.java\n@@ -75,6 +75,11 @@ public class Cleaner {\n \n         Document clean = Document.createShell(dirtyDocument.baseUri());\n         int numDiscarded = copySafeNodes(dirtyDocument.body(), clean.body());\n+        try {\n+            java.io.PrintWriter pw = new java.io.PrintWriter(new java.io.FileWriter(\"/tmp/crochet_debug.txt\", true));\n+            pw.println(\"DEBUG isValid: body=[\" + dirtyDocument.body().html() + \"] head=[\" + dirtyDocument.head().html() + \"] docChildNodes=\" + dirtyDocument.childNodeSize() + \" numDiscarded=\" + numDiscarded + \" result=\" + (numDiscarded == 0));\n+            pw.flush(); pw.close();\n+        } catch (Exception e) { e.printStackTrace(); }\n         return numDiscarded == 0;\n     }\n \n",
+    "agent_log": "{\"type\":\"result\",\"subtype\":\"success\",\"is_error\":true,\"api_error_status\":429,\"duration_ms\":466807,\"duration_api_ms\":453145,\"num_turns\":29,\"result\":\"You've hit your session limit \u00b7 resets 5:10am (UTC)\",\"stop_reason\":\"stop_sequence\",\"session_id\":\"7ca0c8d3-df50-4def-a026-41d36a02a374\",\"total_cost_usd\":0.8315841,\"usage\":{\"input_tokens\":25,\"cache_creation_input_tokens\":45500,\"cache_read_input_tokens\":887797,\"output_tokens\":26303,\"server_tool_use\":{\"web_search_requests\":0,\"web_fetch_requests\":0},\"service_tier\":\"standard\",\"cache_creation\":{\"ephemeral_1h_input_tokens\":45500,\"ephemeral_5m_input_tokens\":0},\"inference_geo\":\"not_available\",\"iterations\":[{\"input_tokens\":1,\"output_tokens\":1993,\"cache_read_input_tokens\":58376,\"cache_creation_input_tokens\":383,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":383},\"type\":\"message\"}],\"speed\":\"standard\"},\"modelUsage\":{\"claude-sonnet-4-6\":{\"inputTokens\":25,\"outputTokens\":26303,\"cacheReadInputTokens\":887797,\"cacheCreationInputTokens\":45500,\"webSearchRequests\":0,\"costUSD\":0.8315841,\"contextWindow\":200000,\"maxOutputTokens\":32000}},\"permission_denials\":[],\"terminal_reason\":\"completed\",\"fast_mode_state\":\"off\",\"uuid\":\"14200cf9-b930-4819-913a-d71069e728cc\"}\n",
+    "agent_stderr": "",
+    "judge_reasoning": "judge failed\n",
+    "verify_log": "Running ant (compile.tests)................................................ OK\nRunning ant (run.dev.tests)................................................ OK\nFailing tests: 1\n  - org.jsoup.safety.CleanerTest::testIsValidBodyHtml\n",
+    "baseline_failing_tests": [
+      "org.jsoup.safety.CleanerTest::testIsValidBodyHtml",
+      "org.jsoup.safety.CleanerTest::testIsValidDocument"
+    ],
+    "compile_log": "Running ant (compile)...................................................... OK\nRunning ant (compile.tests)................................................ OK\n",
+    "agent_modified_files": [
+      "maven-build.xml",
+      "src/main/java/org/jsoup/safety/Cleaner.java"
+    ],
+    "canonical_modified_files": [
+      "src/main/java/org/jsoup/Jsoup.java",
+      "src/main/java/org/jsoup/parser/Parser.java",
+      "src/main/java/org/jsoup/safety/Cleaner.java"
+    ],
+    "agent_modified_prod_files": [
+      "src/main/java/org/jsoup/safety/Cleaner.java"
+    ],
+    "file_overlap": [
+      "src/main/java/org/jsoup/safety/Cleaner.java"
+    ],
+    "missed_canonical": [
+      "src/main/java/org/jsoup/Jsoup.java",
+      "src/main/java/org/jsoup/parser/Parser.java"
+    ],
+    "extra_prod_files": [],
+    "fix_locality_score": 0.5,
+    "test_pass_strict": false
+  },
+  {
+    "bug": "Jsoup-58",
+    "condition": "C2",
+    "model": "claude-sonnet-4-6",
+    "model_default_used": false,
+    "started_at": "2026-06-01T04:27:38+00:00",
+    "duration_seconds": 400,
+    "tool_calls": 33,
+    "compile_fail": false,
+    "primary_pass": true,
+    "test_pass": true,
+    "baseline_failing_count": 1,
+    "agent_induced_regressions": [],
+    "regressed_tests": [],
+    "diagnosis_quality": 0,
+    "agent_exit_code": 1,
+    "bug_reproduced_pretest": true,
+    "agent_patch": "diff --git a/maven-build.xml b/maven-build.xml\nindex 849871c7..73b0656d 100644\n--- a/maven-build.xml\n+++ b/maven-build.xml\n@@ -71,10 +71,10 @@\n            debug=\"true\" \n            optimize=\"false\" \n            deprecation=\"true\" \n-           target=\"1.6\" \n+           target=\"1.8\" \n            verbose=\"false\" \n            fork=\"false\" \n-           source=\"1.6\">\n+           source=\"1.8\">\n       <src>\n         <pathelement location=\"${maven.build.srcDir.0}\"/>\n       </src>\n@@ -110,10 +110,10 @@\n            debug=\"true\" \n            optimize=\"false\" \n            deprecation=\"true\" \n-           target=\"1.6\" \n+           target=\"1.8\" \n            verbose=\"false\" \n            fork=\"false\" \n-           source=\"1.6\">\n+           source=\"1.8\">\n       <src>\n         <pathelement location=\"${maven.build.testDir.0}\"/>\n       </src>\ndiff --git a/src/main/java/org/jsoup/Jsoup.java b/src/main/java/org/jsoup/Jsoup.java\nindex d25c1869..13392e8a 100644\n--- a/src/main/java/org/jsoup/Jsoup.java\n+++ b/src/main/java/org/jsoup/Jsoup.java\n@@ -1,6 +1,9 @@\n package org.jsoup;\n \n import org.jsoup.nodes.Document;\n+import org.jsoup.nodes.Element;\n+import org.jsoup.nodes.Node;\n+import org.jsoup.parser.ParseErrorList;\n import org.jsoup.parser.Parser;\n import org.jsoup.safety.Cleaner;\n import org.jsoup.safety.Whitelist;\n@@ -247,7 +250,14 @@ public class Jsoup {\n      @see #clean(String, org.jsoup.safety.Whitelist) \n      */\n     public static boolean isValid(String bodyHtml, Whitelist whitelist) {\n-        return new Cleaner(whitelist).isValid(parseBodyFragment(bodyHtml, \"\"));\n+        ParseErrorList errors = ParseErrorList.tracking(1);\n+        Document doc = Document.createShell(\"\");\n+        Element body = doc.body();\n+        Node[] nodes = Parser.parseFragment(bodyHtml, body, \"\", errors).toArray(new Node[0]);\n+        if (errors.size() > 0) return false;\n+        for (int i = nodes.length - 1; i > 0; i--) nodes[i].remove();\n+        for (Node node : nodes) body.appendChild(node);\n+        return new Cleaner(whitelist).isValid(doc);\n     }\n     \n }\ndiff --git a/src/main/java/org/jsoup/parser/Parser.java b/src/main/java/org/jsoup/parser/Parser.java\nindex 197219b1..f8571f20 100644\n--- a/src/main/java/org/jsoup/parser/Parser.java\n+++ b/src/main/java/org/jsoup/parser/Parser.java\n@@ -115,6 +115,11 @@ public class Parser {\n         return treeBuilder.parseFragment(fragmentHtml, context, baseUri, ParseErrorList.noTracking(), treeBuilder.defaultSettings());\n     }\n \n+    public static List<Node> parseFragment(String fragmentHtml, Element context, String baseUri, ParseErrorList errors) {\n+        HtmlTreeBuilder treeBuilder = new HtmlTreeBuilder();\n+        return treeBuilder.parseFragment(fragmentHtml, context, baseUri, errors, treeBuilder.defaultSettings());\n+    }\n+\n     /**\n      * Parse a fragment of HTML into a list of nodes. The context element, if supplied, supplies parsing context.\n      *\n",
+    "agent_log": "{\"type\":\"result\",\"subtype\":\"success\",\"is_error\":true,\"api_error_status\":429,\"duration_ms\":399601,\"duration_api_ms\":372965,\"num_turns\":33,\"result\":\"You've hit your session limit \u00b7 resets 5:10am (UTC)\",\"stop_reason\":\"stop_sequence\",\"session_id\":\"3a7a3439-5127-4153-85f6-17f5d39c12a3\",\"total_cost_usd\":0.9156753000000002,\"usage\":{\"input_tokens\":31,\"cache_creation_input_tokens\":48878,\"cache_read_input_tokens\":1256766,\"output_tokens\":23684,\"server_tool_use\":{\"web_search_requests\":0,\"web_fetch_requests\":0},\"service_tier\":\"standard\",\"cache_creation\":{\"ephemeral_1h_input_tokens\":48878,\"ephemeral_5m_input_tokens\":0},\"inference_geo\":\"not_available\",\"iterations\":[{\"input_tokens\":1,\"output_tokens\":1068,\"cache_read_input_tokens\":61954,\"cache_creation_input_tokens\":183,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":183},\"type\":\"message\"}],\"speed\":\"standard\"},\"modelUsage\":{\"claude-sonnet-4-6\":{\"inputTokens\":31,\"outputTokens\":23684,\"cacheReadInputTokens\":1256766,\"cacheCreationInputTokens\":48878,\"webSearchRequests\":0,\"costUSD\":0.9156753000000002,\"contextWindow\":200000,\"maxOutputTokens\":32000}},\"permission_denials\":[],\"terminal_reason\":\"completed\",\"fast_mode_state\":\"off\",\"uuid\":\"9d25e7cc-b848-49c7-a7ca-ab62876ee4bb\"}\n",
+    "agent_stderr": "",
+    "judge_reasoning": "judge failed\n",
+    "verify_log": "Running ant (compile.tests)................................................ OK\nRunning ant (run.dev.tests)................................................ OK\nFailing tests: 1\n  - org.jsoup.safety.CleanerTest::testIsValidBodyHtml\n",
+    "baseline_failing_tests": [
+      "org.jsoup.safety.CleanerTest::testIsValidDocument"
+    ],
+    "compile_log": "Running ant (compile)...................................................... OK\nRunning ant (compile.tests)................................................ OK\n",
+    "agent_modified_files": [
+      "maven-build.xml",
+      "src/main/java/org/jsoup/Jsoup.java",
+      "src/main/java/org/jsoup/parser/Parser.java"
+    ],
+    "canonical_modified_files": [
+      "src/main/java/org/jsoup/Jsoup.java",
+      "src/main/java/org/jsoup/parser/Parser.java",
+      "src/main/java/org/jsoup/safety/Cleaner.java"
+    ],
+    "agent_modified_prod_files": [
+      "src/main/java/org/jsoup/Jsoup.java",
+      "src/main/java/org/jsoup/parser/Parser.java"
+    ],
+    "file_overlap": [
+      "src/main/java/org/jsoup/Jsoup.java",
+      "src/main/java/org/jsoup/parser/Parser.java"
+    ],
+    "missed_canonical": [
+      "src/main/java/org/jsoup/safety/Cleaner.java"
+    ],
+    "extra_prod_files": [],
+    "fix_locality_score": 0.5,
+    "test_pass_strict": true
+  },
+  {
+    "bug": "Jsoup-58",
+    "condition": "C3",
+    "model": "claude-sonnet-4-6",
+    "model_default_used": false,
+    "started_at": "2026-06-01T04:29:02+00:00",
+    "duration_seconds": 311,
+    "tool_calls": 22,
+    "compile_fail": false,
+    "primary_pass": false,
+    "test_pass": false,
+    "baseline_failing_count": 2,
+    "agent_induced_regressions": [],
+    "regressed_tests": [],
+    "diagnosis_quality": 0,
+    "agent_exit_code": 1,
+    "bug_reproduced_pretest": true,
+    "agent_patch": "diff --git a/maven-build.xml b/maven-build.xml\nindex 849871c7..73b0656d 100644\n--- a/maven-build.xml\n+++ b/maven-build.xml\n@@ -71,10 +71,10 @@\n            debug=\"true\" \n            optimize=\"false\" \n            deprecation=\"true\" \n-           target=\"1.6\" \n+           target=\"1.8\" \n            verbose=\"false\" \n            fork=\"false\" \n-           source=\"1.6\">\n+           source=\"1.8\">\n       <src>\n         <pathelement location=\"${maven.build.srcDir.0}\"/>\n       </src>\n@@ -110,10 +110,10 @@\n            debug=\"true\" \n            optimize=\"false\" \n            deprecation=\"true\" \n-           target=\"1.6\" \n+           target=\"1.8\" \n            verbose=\"false\" \n            fork=\"false\" \n-           source=\"1.6\">\n+           source=\"1.8\">\n       <src>\n         <pathelement location=\"${maven.build.testDir.0}\"/>\n       </src>\n",
+    "agent_log": "{\"type\":\"result\",\"subtype\":\"success\",\"is_error\":true,\"api_error_status\":429,\"duration_ms\":310067,\"duration_api_ms\":298356,\"num_turns\":22,\"result\":\"You've hit your session limit \u00b7 resets 5:10am (UTC)\",\"stop_reason\":\"stop_sequence\",\"session_id\":\"ec475249-9621-4610-92ed-ed7584f2b30f\",\"total_cost_usd\":0.6462576000000001,\"usage\":{\"input_tokens\":18,\"cache_creation_input_tokens\":43450,\"cache_read_input_tokens\":673337,\"output_tokens\":18751,\"server_tool_use\":{\"web_search_requests\":0,\"web_fetch_requests\":0},\"service_tier\":\"standard\",\"cache_creation\":{\"ephemeral_1h_input_tokens\":43450,\"ephemeral_5m_input_tokens\":0},\"inference_geo\":\"not_available\",\"iterations\":[{\"input_tokens\":1,\"output_tokens\":4090,\"cache_read_input_tokens\":54850,\"cache_creation_input_tokens\":1859,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":1859},\"type\":\"message\"}],\"speed\":\"standard\"},\"modelUsage\":{\"claude-sonnet-4-6\":{\"inputTokens\":18,\"outputTokens\":18751,\"cacheReadInputTokens\":673337,\"cacheCreationInputTokens\":43450,\"webSearchRequests\":0,\"costUSD\":0.6462576000000001,\"contextWindow\":200000,\"maxOutputTokens\":32000}},\"permission_denials\":[],\"terminal_reason\":\"completed\",\"fast_mode_state\":\"off\",\"uuid\":\"3ac3203e-17c2-4065-8627-c6f703149095\"}\n",
+    "agent_stderr": "",
+    "judge_reasoning": "judge failed\n",
+    "verify_log": "Running ant (compile.tests)................................................ OK\nRunning ant (run.dev.tests)................................................ OK\nFailing tests: 1\n  - org.jsoup.safety.CleanerTest::testIsValidBodyHtml\n",
+    "baseline_failing_tests": [
+      "org.jsoup.safety.CleanerTest::testIsValidBodyHtml",
+      "org.jsoup.safety.CleanerTest::testIsValidDocument"
+    ],
+    "compile_log": "Running ant (compile)...................................................... OK\nRunning ant (compile.tests)................................................ OK\n",
+    "agent_modified_files": [
+      "maven-build.xml"
+    ],
+    "canonical_modified_files": [
+      "src/main/java/org/jsoup/Jsoup.java",
+      "src/main/java/org/jsoup/parser/Parser.java",
+      "src/main/java/org/jsoup/safety/Cleaner.java"
+    ],
+    "agent_modified_prod_files": [],
+    "file_overlap": [],
+    "missed_canonical": [
+      "src/main/java/org/jsoup/Jsoup.java",
+      "src/main/java/org/jsoup/parser/Parser.java",
+      "src/main/java/org/jsoup/safety/Cleaner.java"
+    ],
+    "extra_prod_files": [],
+    "fix_locality_score": 0.0,
+    "test_pass_strict": false
+  },
+  {
+    "bug": "Jsoup-71",
+    "condition": "C1",
+    "model": "claude-sonnet-4-6",
+    "model_default_used": false,
+    "started_at": "2026-06-01T04:34:38+00:00",
+    "duration_seconds": 2,
+    "tool_calls": 1,
+    "compile_fail": false,
+    "primary_pass": false,
+    "test_pass": false,
+    "baseline_failing_count": 2,
+    "agent_induced_regressions": [],
+    "regressed_tests": [],
+    "diagnosis_quality": 0,
+    "agent_exit_code": 1,
+    "bug_reproduced_pretest": true,
+    "agent_patch": "diff --git a/maven-build.xml b/maven-build.xml\nindex 769e6014..f6a35990 100644\n--- a/maven-build.xml\n+++ b/maven-build.xml\n@@ -78,10 +78,10 @@\n            debug=\"true\" \n            optimize=\"false\" \n            deprecation=\"true\" \n-           target=\"1.7\" \n+           target=\"1.8\" \n            verbose=\"false\" \n            fork=\"false\" \n-           source=\"1.7\">\n+           source=\"1.8\">\n       <src>\n         <pathelement location=\"${maven.build.srcDir.0}\"/>\n       </src>\n@@ -117,10 +117,10 @@\n            debug=\"true\" \n            optimize=\"false\" \n            deprecation=\"true\" \n-           target=\"1.7\" \n+           target=\"1.8\" \n            verbose=\"false\" \n            fork=\"false\" \n-           source=\"1.7\">\n+           source=\"1.8\">\n       <src>\n         <pathelement location=\"${maven.build.testDir.0}\"/>\n       </src>\n",
+    "agent_log": "{\"type\":\"result\",\"subtype\":\"success\",\"is_error\":true,\"api_error_status\":429,\"duration_ms\":507,\"duration_api_ms\":0,\"num_turns\":1,\"result\":\"You've hit your session limit \u00b7 resets 5:10am (UTC)\",\"stop_reason\":\"stop_sequence\",\"session_id\":\"0c98190a-9fb7-41f4-a4da-8612ef7e430c\",\"total_cost_usd\":0,\"usage\":{\"input_tokens\":0,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"output_tokens\":0,\"server_tool_use\":{\"web_search_requests\":0,\"web_fetch_requests\":0},\"service_tier\":\"standard\",\"cache_creation\":{\"ephemeral_1h_input_tokens\":0,\"ephemeral_5m_input_tokens\":0},\"inference_geo\":\"\",\"iterations\":[],\"speed\":\"standard\"},\"modelUsage\":{},\"permission_denials\":[],\"terminal_reason\":\"completed\",\"fast_mode_state\":\"off\",\"uuid\":\"30bf878a-76d9-4e22-8b5e-acfd6342c816\"}\n",
+    "agent_stderr": "",
+    "judge_reasoning": "judge failed\n",
+    "verify_log": "Running ant (compile.tests)................................................ OK\nRunning ant (run.dev.tests)................................................ OK\nFailing tests: 1\n  - org.jsoup.select.SelectorTest::splitOnBr\n",
+    "baseline_failing_tests": [
+      "org.jsoup.select.SelectorTest::splitOnBr",
+      "org.jsoup.select.SelectorTest::textAsElements"
+    ],
+    "compile_log": "Running ant (compile)...................................................... OK\nRunning ant (compile.tests)................................................ OK\n",
+    "agent_modified_files": [
+      "maven-build.xml"
+    ],
+    "canonical_modified_files": [
+      "src/main/java/org/jsoup/select/Evaluator.java",
+      "src/main/java/org/jsoup/select/QueryParser.java"
+    ],
+    "agent_modified_prod_files": [],
+    "file_overlap": [],
+    "missed_canonical": [
+      "src/main/java/org/jsoup/select/Evaluator.java",
+      "src/main/java/org/jsoup/select/QueryParser.java"
+    ],
+    "extra_prod_files": [],
+    "fix_locality_score": 0.0,
+    "test_pass_strict": false
+  },
+  {
+    "bug": "Jsoup-71",
+    "condition": "C2",
+    "model": "claude-sonnet-4-6",
+    "model_default_used": false,
+    "started_at": "2026-06-01T04:34:56+00:00",
+    "duration_seconds": 2,
+    "tool_calls": 1,
+    "compile_fail": false,
+    "primary_pass": false,
+    "test_pass": false,
+    "baseline_failing_count": 2,
+    "agent_induced_regressions": [],
+    "regressed_tests": [],
+    "diagnosis_quality": 0,
+    "agent_exit_code": 1,
+    "bug_reproduced_pretest": true,
+    "agent_patch": "diff --git a/maven-build.xml b/maven-build.xml\nindex 769e6014..f6a35990 100644\n--- a/maven-build.xml\n+++ b/maven-build.xml\n@@ -78,10 +78,10 @@\n            debug=\"true\" \n            optimize=\"false\" \n            deprecation=\"true\" \n-           target=\"1.7\" \n+           target=\"1.8\" \n            verbose=\"false\" \n            fork=\"false\" \n-           source=\"1.7\">\n+           source=\"1.8\">\n       <src>\n         <pathelement location=\"${maven.build.srcDir.0}\"/>\n       </src>\n@@ -117,10 +117,10 @@\n            debug=\"true\" \n            optimize=\"false\" \n            deprecation=\"true\" \n-           target=\"1.7\" \n+           target=\"1.8\" \n            verbose=\"false\" \n            fork=\"false\" \n-           source=\"1.7\">\n+           source=\"1.8\">\n       <src>\n         <pathelement location=\"${maven.build.testDir.0}\"/>\n       </src>\n",
+    "agent_log": "{\"type\":\"result\",\"subtype\":\"success\",\"is_error\":true,\"api_error_status\":429,\"duration_ms\":373,\"duration_api_ms\":0,\"num_turns\":1,\"result\":\"You've hit your session limit \u00b7 resets 5:10am (UTC)\",\"stop_reason\":\"stop_sequence\",\"session_id\":\"5fc96d29-9844-4a16-8f77-74d14e13755c\",\"total_cost_usd\":0,\"usage\":{\"input_tokens\":0,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"output_tokens\":0,\"server_tool_use\":{\"web_search_requests\":0,\"web_fetch_requests\":0},\"service_tier\":\"standard\",\"cache_creation\":{\"ephemeral_1h_input_tokens\":0,\"ephemeral_5m_input_tokens\":0},\"inference_geo\":\"\",\"iterations\":[],\"speed\":\"standard\"},\"modelUsage\":{},\"permission_denials\":[],\"terminal_reason\":\"completed\",\"fast_mode_state\":\"off\",\"uuid\":\"53f0784d-4a6c-4e00-935e-597ca9e20434\"}\n",
+    "agent_stderr": "",
+    "judge_reasoning": "judge failed\n",
+    "verify_log": "Running ant (compile.tests)................................................ OK\nRunning ant (run.dev.tests)................................................ OK\nFailing tests: 1\n  - org.jsoup.select.SelectorTest::splitOnBr\n",
+    "baseline_failing_tests": [
+      "org.jsoup.select.SelectorTest::splitOnBr",
+      "org.jsoup.select.SelectorTest::textAsElements"
+    ],
+    "compile_log": "Running ant (compile)...................................................... OK\nRunning ant (compile.tests)................................................ OK\n",
+    "agent_modified_files": [
+      "maven-build.xml"
+    ],
+    "canonical_modified_files": [
+      "src/main/java/org/jsoup/select/Evaluator.java",
+      "src/main/java/org/jsoup/select/QueryParser.java"
+    ],
+    "agent_modified_prod_files": [],
+    "file_overlap": [],
+    "missed_canonical": [
+      "src/main/java/org/jsoup/select/Evaluator.java",
+      "src/main/java/org/jsoup/select/QueryParser.java"
+    ],
+    "extra_prod_files": [],
+    "fix_locality_score": 0.0,
+    "test_pass_strict": false
+  },
+  {
+    "bug": "Jsoup-71",
+    "condition": "C3",
+    "model": "claude-sonnet-4-6",
+    "model_default_used": false,
+    "started_at": "2026-06-01T04:35:00+00:00",
+    "duration_seconds": 1,
+    "tool_calls": 1,
+    "compile_fail": false,
+    "primary_pass": false,
+    "test_pass": false,
+    "baseline_failing_count": 2,
+    "agent_induced_regressions": [],
+    "regressed_tests": [],
+    "diagnosis_quality": 0,
+    "agent_exit_code": 1,
+    "bug_reproduced_pretest": true,
+    "agent_patch": "diff --git a/maven-build.xml b/maven-build.xml\nindex 769e6014..f6a35990 100644\n--- a/maven-build.xml\n+++ b/maven-build.xml\n@@ -78,10 +78,10 @@\n            debug=\"true\" \n            optimize=\"false\" \n            deprecation=\"true\" \n-           target=\"1.7\" \n+           target=\"1.8\" \n            verbose=\"false\" \n            fork=\"false\" \n-           source=\"1.7\">\n+           source=\"1.8\">\n       <src>\n         <pathelement location=\"${maven.build.srcDir.0}\"/>\n       </src>\n@@ -117,10 +117,10 @@\n            debug=\"true\" \n            optimize=\"false\" \n            deprecation=\"true\" \n-           target=\"1.7\" \n+           target=\"1.8\" \n            verbose=\"false\" \n            fork=\"false\" \n-           source=\"1.7\">\n+           source=\"1.8\">\n       <src>\n         <pathelement location=\"${maven.build.testDir.0}\"/>\n       </src>\n",
+    "agent_log": "{\"type\":\"result\",\"subtype\":\"success\",\"is_error\":true,\"api_error_status\":429,\"duration_ms\":370,\"duration_api_ms\":0,\"num_turns\":1,\"result\":\"You've hit your session limit \u00b7 resets 5:10am (UTC)\",\"stop_reason\":\"stop_sequence\",\"session_id\":\"669a6181-85af-4b56-a628-e8fc135a612d\",\"total_cost_usd\":0,\"usage\":{\"input_tokens\":0,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"output_tokens\":0,\"server_tool_use\":{\"web_search_requests\":0,\"web_fetch_requests\":0},\"service_tier\":\"standard\",\"cache_creation\":{\"ephemeral_1h_input_tokens\":0,\"ephemeral_5m_input_tokens\":0},\"inference_geo\":\"\",\"iterations\":[],\"speed\":\"standard\"},\"modelUsage\":{},\"permission_denials\":[],\"terminal_reason\":\"completed\",\"fast_mode_state\":\"off\",\"uuid\":\"867b2d3a-e8ae-4df3-82f8-614749deb06d\"}\n",
+    "agent_stderr": "",
+    "judge_reasoning": "judge failed\n",
+    "verify_log": "Running ant (compile.tests)................................................ OK\nRunning ant (run.dev.tests)................................................ OK\nFailing tests: 1\n  - org.jsoup.select.SelectorTest::splitOnBr\n",
+    "baseline_failing_tests": [
+      "org.jsoup.select.SelectorTest::splitOnBr",
+      "org.jsoup.select.SelectorTest::textAsElements"
+    ],
+    "compile_log": "Running ant (compile)...................................................... OK\nRunning ant (compile.tests)................................................ OK\n",
+    "agent_modified_files": [
+      "maven-build.xml"
+    ],
+    "canonical_modified_files": [
+      "src/main/java/org/jsoup/select/Evaluator.java",
+      "src/main/java/org/jsoup/select/QueryParser.java"
+    ],
+    "agent_modified_prod_files": [],
+    "file_overlap": [],
+    "missed_canonical": [
+      "src/main/java/org/jsoup/select/Evaluator.java",
+      "src/main/java/org/jsoup/select/QueryParser.java"
+    ],
+    "extra_prod_files": [],
+    "fix_locality_score": 0.0,
+    "test_pass_strict": false
+  },
+  {
+    "bug": "Jsoup-87",
+    "condition": "C1",
+    "model": "claude-sonnet-4-6",
+    "model_default_used": false,
+    "started_at": "2026-06-01T04:21:07+00:00",
+    "duration_seconds": 438,
+    "tool_calls": 62,
+    "compile_fail": false,
+    "primary_pass": true,
+    "test_pass": true,
+    "baseline_failing_count": 0,
+    "agent_induced_regressions": [],
+    "regressed_tests": [],
+    "diagnosis_quality": 4,
+    "agent_exit_code": 0,
+    "bug_reproduced_pretest": true,
+    "agent_patch": "diff --git a/maven-build.xml b/maven-build.xml\nindex 26f86396..9ac77d10 100644\n--- a/maven-build.xml\n+++ b/maven-build.xml\n@@ -78,10 +78,10 @@\n            debug=\"true\" \n            optimize=\"false\" \n            deprecation=\"true\" \n-           target=\"1.7\" \n+           target=\"1.8\" \n            verbose=\"false\" \n            fork=\"false\" \n-           source=\"1.7\">\n+           source=\"1.8\">\n       <src>\n         <pathelement location=\"${maven.build.srcDir.0}\"/>\n       </src>\n@@ -117,10 +117,10 @@\n            debug=\"true\" \n            optimize=\"false\" \n            deprecation=\"true\" \n-           target=\"1.7\" \n+           target=\"1.8\" \n            verbose=\"false\" \n            fork=\"false\" \n-           source=\"1.7\">\n+           source=\"1.8\">\n       <src>\n         <pathelement location=\"${maven.build.testDir.0}\"/>\n       </src>\ndiff --git a/src/main/java/org/jsoup/nodes/Element.java b/src/main/java/org/jsoup/nodes/Element.java\nindex 96521207..51d95bd9 100644\n--- a/src/main/java/org/jsoup/nodes/Element.java\n+++ b/src/main/java/org/jsoup/nodes/Element.java\n@@ -135,8 +135,11 @@ public class Element extends Node {\n     /**\n      * Get the normalized name of this Element's tag. This will always be the lowercased version of the tag, regardless\n      * of the tag case preserving setting of the parser.\n-     * @return\n+     * @return the normalized tag name\n      */\n+    public String normalName() {\n+        return tag.normalName();\n+    }\n \n     /**\n      * Change the tag of this element. For example, convert a {@code <span>} to a {@code <div>} with\ndiff --git a/src/main/java/org/jsoup/parser/HtmlTreeBuilder.java b/src/main/java/org/jsoup/parser/HtmlTreeBuilder.java\nindex 1bffec76..8b61eb8b 100644\n--- a/src/main/java/org/jsoup/parser/HtmlTreeBuilder.java\n+++ b/src/main/java/org/jsoup/parser/HtmlTreeBuilder.java\n@@ -312,7 +312,7 @@ public class HtmlTreeBuilder extends TreeBuilder {\n     Element getFromStack(String elName) {\n         for (int pos = stack.size() -1; pos >= 0; pos--) {\n             Element next = stack.get(pos);\n-            if (next.nodeName().equals(elName)) {\n+            if (next.normalName().equals(elName)) {\n                 return next;\n             }\n         }\n@@ -334,7 +334,7 @@ public class HtmlTreeBuilder extends TreeBuilder {\n         for (int pos = stack.size() -1; pos >= 0; pos--) {\n             Element next = stack.get(pos);\n             stack.remove(pos);\n-            if (next.nodeName().equals(elName))\n+            if (next.normalName().equals(elName))\n                 break;\n         }\n     }\n@@ -473,7 +473,7 @@ public class HtmlTreeBuilder extends TreeBuilder {\n         // don't walk too far up the tree\n \n         for (int pos = bottom; pos >= top; pos--) {\n-            final String elName = stack.get(pos).nodeName();\n+            final String elName = stack.get(pos).normalName();\n             if (inSorted(elName, targetNames))\n                 return true;\n             if (inSorted(elName, baseTypes))\n@@ -514,7 +514,7 @@ public class HtmlTreeBuilder extends TreeBuilder {\n     boolean inSelectScope(String targetName) {\n         for (int pos = stack.size() -1; pos >= 0; pos--) {\n             Element el = stack.get(pos);\n-            String elName = el.nodeName();\n+            String elName = el.normalName();\n             if (elName.equals(targetName))\n                 return true;\n             if (!inSorted(elName, TagSearchSelectScope)) // all elements except\n@@ -686,7 +686,7 @@ public class HtmlTreeBuilder extends TreeBuilder {\n             Element next = formattingElements.get(pos);\n             if (next == null) // scope marker\n                 break;\n-            else if (next.nodeName().equals(nodeName))\n+            else if (next.normalName().equals(nodeName))\n                 return next;\n         }\n         return null;\ndiff --git a/src/main/java/org/jsoup/parser/HtmlTreeBuilderState.java b/src/main/java/org/jsoup/parser/HtmlTreeBuilderState.java\nindex b51991f4..dc0c313f 100644\n--- a/src/main/java/org/jsoup/parser/HtmlTreeBuilderState.java\n+++ b/src/main/java/org/jsoup/parser/HtmlTreeBuilderState.java\n@@ -571,7 +571,7 @@ enum HtmlTreeBuilderState {\n                                 tb.error(this);\n                                 tb.removeFromActiveFormattingElements(formatEl);\n                                 return true;\n-                            } else if (!tb.inScope(formatEl.nodeName())) {\n+                            } else if (!tb.inScope(formatEl.normalName())) {\n                                 tb.error(this);\n                                 return false;\n                             } else if (tb.currentElement() != formatEl)\n@@ -595,7 +595,7 @@ enum HtmlTreeBuilderState {\n                                 }\n                             }\n                             if (furthestBlock == null) {\n-                                tb.popStackToClose(formatEl.nodeName());\n+                                tb.popStackToClose(formatEl.normalName());\n                                 tb.removeFromActiveFormattingElements(formatEl);\n                                 return true;\n                             }\n@@ -765,13 +765,13 @@ enum HtmlTreeBuilderState {\n         }\n \n         boolean anyOtherEndTag(Token t, HtmlTreeBuilder tb) {\n-            String name = tb.settings.normalizeTag(t.asEndTag().name());\n+            String name = t.asEndTag().normalName();\n             ArrayList<Element> stack = tb.getStack();\n             for (int pos = stack.size() -1; pos >= 0; pos--) {\n                 Element node = stack.get(pos);\n-                if (node.nodeName().equals(name)) {\n+                if (node.normalName().equals(name)) {\n                     tb.generateImpliedEndTags(name);\n-                    if (!name.equals(tb.currentElement().nodeName()))\n+                    if (!name.equals(tb.currentElement().normalName()))\n                         tb.error(this);\n                     tb.popStackToClose(name);\n                     break;\ndiff --git a/src/main/java/org/jsoup/parser/Tag.java b/src/main/java/org/jsoup/parser/Tag.java\nindex 25488df2..a90a058a 100644\n--- a/src/main/java/org/jsoup/parser/Tag.java\n+++ b/src/main/java/org/jsoup/parser/Tag.java\n@@ -1,6 +1,7 @@\n package org.jsoup.parser;\n \n import org.jsoup.helper.Validate;\n+import org.jsoup.internal.Normalizer;\n \n import java.util.HashMap;\n import java.util.Map;\n@@ -40,6 +41,9 @@ public class Tag {\n      * Get this tag's normalized (lowercased) name.\n      * @return the tag's normal name.\n      */\n+    public String normalName() {\n+        return Normalizer.lowerCase(tagName);\n+    }\n \n     /**\n      * Get a Tag by name. If not previously defined (unknown), returns a new generic tag, that can do anything.\n",
+    "agent_log": "{\"type\":\"result\",\"subtype\":\"success\",\"is_error\":false,\"api_error_status\":null,\"duration_ms\":436781,\"duration_api_ms\":407047,\"ttft_ms\":2311,\"num_turns\":62,\"result\":\"`Failing tests: 0`\\n\\nDIAGNOSIS COMPLETE\\n\\nThe root cause was two missing method implementations. In `Tag.java` and `Element.java`, the `normalName()` methods had Javadoc comments describing what they should do (return the lowercase/normalized tag name regardless of case-preserving parse settings) but had **no implementation bodies** \u2014 the method declarations were entirely absent. This caused several internal comparisons in `HtmlTreeBuilder` and `HtmlTreeBuilderState` to break when using `ParseSettings.preserveCase`.\\n\\nSpecifically, when parsing `<A>ONE <A>Two</A></A>` with case preservation, the `<A>` element was stored in the active formatting elements list with `nodeName()` = `\\\"A\\\"` (uppercase). When the second `<A>` was encountered, `getActiveFormattingElement(\\\"a\\\")` searched for an element whose `nodeName()` equaled the lowercase string `\\\"a\\\"` \u2014 the comparison `\\\"A\\\".equals(\\\"a\\\")` returned false, so the method returned `null`. The parser therefore could not detect the already-open `<A>` element, skipped the \\\"links can't nest\\\" enforcement, and allowed the illegal nesting.\\n\\nThe fix adds `normalName()` to `Tag` (returning `Normalizer.lowerCase(tagName)`) and to `Element` (delegating to `tag.normalName()`), then updates all the internal stack and formatting-element lookup methods (`getActiveFormattingElement`, `getFromStack`, `popStackToClose`, `inSpecificScope`, `inSelectScope`, and `anyOtherEndTag`) to compare against normalized (lowercase) names so they work correctly regardless of whether case preservation is active.\",\"stop_reason\":\"end_turn\",\"session_id\":\"084a45e2-f10e-4a2c-b1a0-c40f72ba6fe8\",\"total_cost_usd\":1.25589615,\"usage\":{\"input_tokens\":55,\"cache_creation_input_tokens\":50999,\"cache_read_input_tokens\":2288683,\"output_tokens\":25192,\"server_tool_use\":{\"web_search_requests\":0,\"web_fetch_requests\":0},\"service_tier\":\"standard\",\"cache_creation\":{\"ephemeral_1h_input_tokens\":50999,\"ephemeral_5m_input_tokens\":0},\"inference_geo\":\"not_available\",\"iterations\":[{\"input_tokens\":1,\"output_tokens\":392,\"cache_read_input_tokens\":63977,\"cache_creation_input_tokens\":281,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":281},\"type\":\"message\"}],\"speed\":\"standard\"},\"modelUsage\":{\"claude-sonnet-4-6\":{\"inputTokens\":55,\"outputTokens\":25192,\"cacheReadInputTokens\":2288683,\"cacheCreationInputTokens\":50999,\"webSearchRequests\":0,\"costUSD\":1.25589615,\"contextWindow\":200000,\"maxOutputTokens\":32000}},\"permission_denials\":[],\"terminal_reason\":\"completed\",\"fast_mode_state\":\"off\",\"uuid\":\"64498545-b6f8-4cb3-86ac-c8b9e789d86e\"}\n",
+    "agent_stderr": "",
+    "judge_reasoning": "The agent correctly identified the right subsystem and mechanism: case-preserving mode causes case-sensitive name comparisons (e.g., getActiveFormattingElement comparing nodeName 'A' against 'a') to fail, so the parser skips the link-nesting enforcement \u2014 closely matching the ground truth about the <a> tree builder state not applying the adoption agency algorithm in case-preserving mode. It loses a point because the framing that normalName() bodies were 'entirely absent' is a likely mischaracterization (the real issue is comparisons not using normalized names), introducing minor imprecision about the exact mechanism while still being correct at the method level.\n",
+    "verify_log": "Running ant (compile.tests)................................................ OK\nRunning ant (run.dev.tests)................................................ OK\nFailing tests: 1\n  - org.jsoup.parser.HtmlParserTest::preservedCaseLinksCantNest\n",
+    "baseline_failing_tests": [],
+    "compile_log": "Running ant (compile)...................................................... OK\nRunning ant (compile.tests)................................................ OK\n",
+    "agent_modified_files": [
+      "maven-build.xml",
+      "src/main/java/org/jsoup/nodes/Element.java",
+      "src/main/java/org/jsoup/parser/HtmlTreeBuilder.java",
+      "src/main/java/org/jsoup/parser/HtmlTreeBuilderState.java",
+      "src/main/java/org/jsoup/parser/Tag.java"
+    ],
+    "canonical_modified_files": [
+      "src/main/java/org/jsoup/nodes/Element.java",
+      "src/main/java/org/jsoup/parser/HtmlTreeBuilder.java",
+      "src/main/java/org/jsoup/parser/HtmlTreeBuilderState.java",
+      "src/main/java/org/jsoup/parser/Tag.java"
+    ],
+    "agent_modified_prod_files": [
+      "src/main/java/org/jsoup/nodes/Element.java",
+      "src/main/java/org/jsoup/parser/HtmlTreeBuilder.java",
+      "src/main/java/org/jsoup/parser/HtmlTreeBuilderState.java",
+      "src/main/java/org/jsoup/parser/Tag.java"
+    ],
+    "file_overlap": [
+      "src/main/java/org/jsoup/nodes/Element.java",
+      "src/main/java/org/jsoup/parser/HtmlTreeBuilder.java",
+      "src/main/java/org/jsoup/parser/HtmlTreeBuilderState.java",
+      "src/main/java/org/jsoup/parser/Tag.java"
+    ],
+    "missed_canonical": [],
+    "extra_prod_files": [],
+    "fix_locality_score": 1.0,
+    "test_pass_strict": true
+  },
+  {
+    "bug": "Jsoup-87",
+    "condition": "C2",
+    "model": "claude-sonnet-4-6",
+    "model_default_used": false,
+    "started_at": "2026-06-01T04:21:07+00:00",
+    "duration_seconds": 362,
+    "tool_calls": 49,
+    "compile_fail": false,
+    "primary_pass": true,
+    "test_pass": true,
+    "baseline_failing_count": 0,
+    "agent_induced_regressions": [],
+    "regressed_tests": [],
+    "diagnosis_quality": 5,
+    "agent_exit_code": 0,
+    "bug_reproduced_pretest": true,
+    "agent_patch": "diff --git a/maven-build.xml b/maven-build.xml\nindex 26f86396..9ac77d10 100644\n--- a/maven-build.xml\n+++ b/maven-build.xml\n@@ -78,10 +78,10 @@\n            debug=\"true\" \n            optimize=\"false\" \n            deprecation=\"true\" \n-           target=\"1.7\" \n+           target=\"1.8\" \n            verbose=\"false\" \n            fork=\"false\" \n-           source=\"1.7\">\n+           source=\"1.8\">\n       <src>\n         <pathelement location=\"${maven.build.srcDir.0}\"/>\n       </src>\n@@ -117,10 +117,10 @@\n            debug=\"true\" \n            optimize=\"false\" \n            deprecation=\"true\" \n-           target=\"1.7\" \n+           target=\"1.8\" \n            verbose=\"false\" \n            fork=\"false\" \n-           source=\"1.7\">\n+           source=\"1.8\">\n       <src>\n         <pathelement location=\"${maven.build.testDir.0}\"/>\n       </src>\ndiff --git a/src/main/java/org/jsoup/parser/HtmlTreeBuilder.java b/src/main/java/org/jsoup/parser/HtmlTreeBuilder.java\nindex 1bffec76..2bc950fa 100644\n--- a/src/main/java/org/jsoup/parser/HtmlTreeBuilder.java\n+++ b/src/main/java/org/jsoup/parser/HtmlTreeBuilder.java\n@@ -686,7 +686,7 @@ public class HtmlTreeBuilder extends TreeBuilder {\n             Element next = formattingElements.get(pos);\n             if (next == null) // scope marker\n                 break;\n-            else if (next.nodeName().equals(nodeName))\n+            else if (next.nodeName().equalsIgnoreCase(nodeName))\n                 return next;\n         }\n         return null;\n",
+    "agent_log": "{\"type\":\"result\",\"subtype\":\"success\",\"is_error\":false,\"api_error_status\":null,\"duration_ms\":361224,\"duration_api_ms\":340128,\"ttft_ms\":5754,\"num_turns\":49,\"result\":\"All tests pass.\\n\\nDIAGNOSIS COMPLETE\\n\\nThe root cause was a case-sensitive string comparison in `HtmlTreeBuilder.getActiveFormattingElement()` (line 689). This method searches the active formatting elements list for an element whose `nodeName()` matches the given name. The search name is always lowercase (derived via `normalName()`), but when `ParseSettings.preserveCase` is active, elements are stored with their original case (e.g., \\\"A\\\" instead of \\\"a\\\"). The comparison `next.nodeName().equals(nodeName)` \u2014 `\\\"A\\\".equals(\\\"a\\\")` \u2014 returned false, so the method returned null when it should have found the existing `<A>` element. This caused the nesting-prevention logic (which auto-closes an open `<a>` before inserting a new one) to be skipped entirely, allowing `<A>` to incorrectly nest inside itself. The fix changes the comparison to `equalsIgnoreCase`, so case-preserved element names are matched correctly against the normalized (lowercase) search key.\",\"stop_reason\":\"end_turn\",\"session_id\":\"4ffdd441-d75d-42b8-b1d1-c53d3cce0123\",\"total_cost_usd\":0.9460918499999998,\"usage\":{\"input_tokens\":46,\"cache_creation_input_tokens\":42755,\"cache_read_input_tokens\":1694142,\"output_tokens\":18492,\"server_tool_use\":{\"web_search_requests\":0,\"web_fetch_requests\":0},\"service_tier\":\"standard\",\"cache_creation\":{\"ephemeral_1h_input_tokens\":42755,\"ephemeral_5m_input_tokens\":0},\"inference_geo\":\"not_available\",\"iterations\":[{\"input_tokens\":1,\"output_tokens\":238,\"cache_read_input_tokens\":55849,\"cache_creation_input_tokens\":165,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":165},\"type\":\"message\"}],\"speed\":\"standard\"},\"modelUsage\":{\"claude-sonnet-4-6\":{\"inputTokens\":46,\"outputTokens\":18492,\"cacheReadInputTokens\":1694142,\"cacheCreationInputTokens\":42755,\"webSearchRequests\":0,\"costUSD\":0.9460918499999998,\"contextWindow\":200000,\"maxOutputTokens\":32000}},\"permission_denials\":[],\"terminal_reason\":\"completed\",\"fast_mode_state\":\"off\",\"uuid\":\"0eb4b055-e3be-477d-b1fe-1cde3a674749\"}\n",
+    "agent_stderr": "",
+    "judge_reasoning": "The agent precisely identified the root cause as a case-sensitive comparison in getActiveFormattingElement() (line 689) that fails when preserveCase stores elements like 'A' but the search key is lowercase 'a', causing the nesting-prevention (adoption-agency-style auto-close) logic to be skipped \u2014 exactly matching the ground-truth that link nesting is incorrectly allowed in case-preserving mode. The diagnosis names the specific method, line, variable (nodeName comparison), and the correct mechanism (equalsIgnoreCase fix).\n",
+    "verify_log": "Running ant (compile.tests)................................................ OK\nRunning ant (run.dev.tests)................................................ OK\nFailing tests: 1\n  - org.jsoup.parser.HtmlParserTest::preservedCaseLinksCantNest\n",
+    "baseline_failing_tests": [],
+    "compile_log": "Running ant (compile)...................................................... OK\nRunning ant (compile.tests)................................................ OK\n",
+    "agent_modified_files": [
+      "maven-build.xml",
+      "src/main/java/org/jsoup/parser/HtmlTreeBuilder.java"
+    ],
+    "canonical_modified_files": [
+      "src/main/java/org/jsoup/nodes/Element.java",
+      "src/main/java/org/jsoup/parser/HtmlTreeBuilder.java",
+      "src/main/java/org/jsoup/parser/HtmlTreeBuilderState.java",
+      "src/main/java/org/jsoup/parser/Tag.java"
+    ],
+    "agent_modified_prod_files": [
+      "src/main/java/org/jsoup/parser/HtmlTreeBuilder.java"
+    ],
+    "file_overlap": [
+      "src/main/java/org/jsoup/parser/HtmlTreeBuilder.java"
+    ],
+    "missed_canonical": [
+      "src/main/java/org/jsoup/nodes/Element.java",
+      "src/main/java/org/jsoup/parser/HtmlTreeBuilderState.java",
+      "src/main/java/org/jsoup/parser/Tag.java"
+    ],
+    "extra_prod_files": [],
+    "fix_locality_score": 0.5,
+    "test_pass_strict": true
+  },
+  {
+    "bug": "Jsoup-87",
+    "condition": "C3",
+    "model": "claude-sonnet-4-6",
+    "model_default_used": false,
+    "started_at": "2026-06-01T04:21:07+00:00",
+    "duration_seconds": 270,
+    "tool_calls": 48,
+    "compile_fail": false,
+    "primary_pass": true,
+    "test_pass": true,
+    "baseline_failing_count": 0,
+    "agent_induced_regressions": [],
+    "regressed_tests": [],
+    "diagnosis_quality": 4,
+    "agent_exit_code": 0,
+    "bug_reproduced_pretest": true,
+    "agent_patch": "diff --git a/maven-build.xml b/maven-build.xml\nindex 26f86396..9ac77d10 100644\n--- a/maven-build.xml\n+++ b/maven-build.xml\n@@ -78,10 +78,10 @@\n            debug=\"true\" \n            optimize=\"false\" \n            deprecation=\"true\" \n-           target=\"1.7\" \n+           target=\"1.8\" \n            verbose=\"false\" \n            fork=\"false\" \n-           source=\"1.7\">\n+           source=\"1.8\">\n       <src>\n         <pathelement location=\"${maven.build.srcDir.0}\"/>\n       </src>\n@@ -117,10 +117,10 @@\n            debug=\"true\" \n            optimize=\"false\" \n            deprecation=\"true\" \n-           target=\"1.7\" \n+           target=\"1.8\" \n            verbose=\"false\" \n            fork=\"false\" \n-           source=\"1.7\">\n+           source=\"1.8\">\n       <src>\n         <pathelement location=\"${maven.build.testDir.0}\"/>\n       </src>\ndiff --git a/src/main/java/org/jsoup/parser/HtmlTreeBuilder.java b/src/main/java/org/jsoup/parser/HtmlTreeBuilder.java\nindex 1bffec76..1a665842 100644\n--- a/src/main/java/org/jsoup/parser/HtmlTreeBuilder.java\n+++ b/src/main/java/org/jsoup/parser/HtmlTreeBuilder.java\n@@ -312,7 +312,7 @@ public class HtmlTreeBuilder extends TreeBuilder {\n     Element getFromStack(String elName) {\n         for (int pos = stack.size() -1; pos >= 0; pos--) {\n             Element next = stack.get(pos);\n-            if (next.nodeName().equals(elName)) {\n+            if (next.tag().normalName().equals(elName)) {\n                 return next;\n             }\n         }\n@@ -686,7 +686,7 @@ public class HtmlTreeBuilder extends TreeBuilder {\n             Element next = formattingElements.get(pos);\n             if (next == null) // scope marker\n                 break;\n-            else if (next.nodeName().equals(nodeName))\n+            else if (next.tag().normalName().equals(nodeName))\n                 return next;\n         }\n         return null;\ndiff --git a/src/main/java/org/jsoup/parser/Tag.java b/src/main/java/org/jsoup/parser/Tag.java\nindex 25488df2..88e54311 100644\n--- a/src/main/java/org/jsoup/parser/Tag.java\n+++ b/src/main/java/org/jsoup/parser/Tag.java\n@@ -40,6 +40,9 @@ public class Tag {\n      * Get this tag's normalized (lowercased) name.\n      * @return the tag's normal name.\n      */\n+    public String normalName() {\n+        return tagName.toLowerCase();\n+    }\n \n     /**\n      * Get a Tag by name. If not previously defined (unknown), returns a new generic tag, that can do anything.\n",
+    "agent_log": "{\"type\":\"result\",\"subtype\":\"success\",\"is_error\":false,\"api_error_status\":null,\"duration_ms\":268704,\"duration_api_ms\":246091,\"ttft_ms\":2479,\"num_turns\":48,\"result\":\"All tests pass.\\n\\nDIAGNOSIS COMPLETE\\n\\nThe root cause was a missing `normalName()` method in `Tag.java`. The Javadoc comment for the method was present (lines 39\u201342) but the method body had been deleted. This method is supposed to return the lowercase (normalized) tag name. Because it was missing, `HtmlTreeBuilder.getActiveFormattingElement(\\\"a\\\")` compared the search string `\\\"a\\\"` against `next.nodeName()`, which returns `\\\"A\\\"` (the preserved-case name) when `ParseSettings.preserveCase` is active. The comparison `\\\"A\\\".equals(\\\"a\\\")` fails, so no existing `<A>` active formatting element is ever found. As a result, when a second `<A>` start tag is encountered, the parser doesn't auto-close the first one (as the HTML5 spec requires for non-nestable tags like `<a>`), producing nested `<A>` elements instead of siblings. The fix restores `normalName()` to `Tag` (returning `tagName.toLowerCase()`) and updates `getActiveFormattingElement` and `getFromStack` to compare against the normalized name so they work correctly regardless of whether case is preserved.\",\"stop_reason\":\"end_turn\",\"session_id\":\"9cf40eef-cc1d-4180-9113-1b2e588ed468\",\"total_cost_usd\":0.8451991500000001,\"usage\":{\"input_tokens\":46,\"cache_creation_input_tokens\":37217,\"cache_read_input_tokens\":1663908,\"output_tokens\":13755,\"server_tool_use\":{\"web_search_requests\":0,\"web_fetch_requests\":0},\"service_tier\":\"standard\",\"cache_creation\":{\"ephemeral_1h_input_tokens\":37217,\"ephemeral_5m_input_tokens\":0},\"inference_geo\":\"not_available\",\"iterations\":[{\"input_tokens\":1,\"output_tokens\":277,\"cache_read_input_tokens\":50316,\"cache_creation_input_tokens\":160,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":160},\"type\":\"message\"}],\"speed\":\"standard\"},\"modelUsage\":{\"claude-sonnet-4-6\":{\"inputTokens\":46,\"outputTokens\":13755,\"cacheReadInputTokens\":1663908,\"cacheCreationInputTokens\":37217,\"webSearchRequests\":0,\"costUSD\":0.8451991500000001,\"contextWindow\":200000,\"maxOutputTokens\":32000}},\"permission_denials\":[],\"terminal_reason\":\"completed\",\"fast_mode_state\":\"off\",\"uuid\":\"ad97a3aa-0166-4885-a956-ca1d061c24ea\"}\n",
+    "agent_stderr": "",
+    "judge_reasoning": "The agent correctly identified the case-preserving (preserveCase) mode as the trigger and pinpointed that the failed name comparison in getActiveFormattingElement prevents the first <a> from being auto-closed, producing nested links \u2014 matching the ground-truth symptom precisely. It frames the fix around restoring normalName() and normalizing comparisons rather than the HTML5 adoption agency algorithm per se, but the mechanism (case-sensitive name match failing under preserveCase) aligns closely with the root cause, with only minor imprecision about whether a deleted method vs. comparison logic is the canonical defect.\n",
+    "verify_log": "Running ant (compile.tests)................................................ OK\nRunning ant (run.dev.tests)................................................ OK\nFailing tests: 1\n  - org.jsoup.parser.HtmlParserTest::preservedCaseLinksCantNest\n",
+    "baseline_failing_tests": [],
+    "compile_log": "Running ant (compile)...................................................... OK\nRunning ant (compile.tests)................................................ OK\n",
+    "agent_modified_files": [
+      "maven-build.xml",
+      "src/main/java/org/jsoup/parser/HtmlTreeBuilder.java",
+      "src/main/java/org/jsoup/parser/Tag.java"
+    ],
+    "canonical_modified_files": [
+      "src/main/java/org/jsoup/nodes/Element.java",
+      "src/main/java/org/jsoup/parser/HtmlTreeBuilder.java",
+      "src/main/java/org/jsoup/parser/HtmlTreeBuilderState.java",
+      "src/main/java/org/jsoup/parser/Tag.java"
+    ],
+    "agent_modified_prod_files": [
+      "src/main/java/org/jsoup/parser/HtmlTreeBuilder.java",
+      "src/main/java/org/jsoup/parser/Tag.java"
+    ],
+    "file_overlap": [
+      "src/main/java/org/jsoup/parser/HtmlTreeBuilder.java",
+      "src/main/java/org/jsoup/parser/Tag.java"
+    ],
+    "missed_canonical": [
+      "src/main/java/org/jsoup/nodes/Element.java",
+      "src/main/java/org/jsoup/parser/HtmlTreeBuilderState.java"
+    ],
+    "extra_prod_files": [],
+    "fix_locality_score": 0.5,
+    "test_pass_strict": true
+  }
+]

@@ -21,5 +21,34 @@
   "judge_reasoning": "The agent correctly identified the right subsystem and mechanism: case-preserving mode causes case-sensitive name comparisons (e.g., getActiveFormattingElement comparing nodeName 'A' against 'a') to fail, so the parser skips the link-nesting enforcement \u2014 closely matching the ground truth about the <a> tree builder state not applying the adoption agency algorithm in case-preserving mode. It loses a point because the framing that normalName() bodies were 'entirely absent' is a likely mischaracterization (the real issue is comparisons not using normalized names), introducing minor imprecision about the exact mechanism while still being correct at the method level.\n",
   "verify_log": "Running ant (compile.tests)................................................ OK\nRunning ant (run.dev.tests)................................................ OK\nFailing tests: 1\n  - org.jsoup.parser.HtmlParserTest::preservedCaseLinksCantNest\n",
   "baseline_failing_tests": [],
-  "compile_log": "Running ant (compile)...................................................... OK\nRunning ant (compile.tests)................................................ OK\n"
+  "compile_log": "Running ant (compile)...................................................... OK\nRunning ant (compile.tests)................................................ OK\n",
+  "agent_modified_files": [
+    "maven-build.xml",
+    "src/main/java/org/jsoup/nodes/Element.java",
+    "src/main/java/org/jsoup/parser/HtmlTreeBuilder.java",
+    "src/main/java/org/jsoup/parser/HtmlTreeBuilderState.java",
+    "src/main/java/org/jsoup/parser/Tag.java"
+  ],
+  "canonical_modified_files": [
+    "src/main/java/org/jsoup/nodes/Element.java",
+    "src/main/java/org/jsoup/parser/HtmlTreeBuilder.java",
+    "src/main/java/org/jsoup/parser/HtmlTreeBuilderState.java",
+    "src/main/java/org/jsoup/parser/Tag.java"
+  ],
+  "agent_modified_prod_files": [
+    "src/main/java/org/jsoup/nodes/Element.java",
+    "src/main/java/org/jsoup/parser/HtmlTreeBuilder.java",
+    "src/main/java/org/jsoup/parser/HtmlTreeBuilderState.java",
+    "src/main/java/org/jsoup/parser/Tag.java"
+  ],
+  "file_overlap": [
+    "src/main/java/org/jsoup/nodes/Element.java",
+    "src/main/java/org/jsoup/parser/HtmlTreeBuilder.java",
+    "src/main/java/org/jsoup/parser/HtmlTreeBuilderState.java",
+    "src/main/java/org/jsoup/parser/Tag.java"
+  ],
+  "missed_canonical": [],
+  "extra_prod_files": [],
+  "fix_locality_score": 1.0,
+  "test_pass_strict": true
 }

@@ -23,5 +23,27 @@
   "baseline_failing_tests": [
     "org.jsoup.nodes.DocumentTypeTest::testRoundTrip"
   ],
-  "compile_log": "Running ant (compile)...................................................... OK\nRunning ant (compile.tests)................................................ OK\n"
+  "compile_log": "Running ant (compile)...................................................... OK\nRunning ant (compile.tests)................................................ OK\n",
+  "agent_modified_files": [
+    "maven-build.xml"
+  ],
+  "canonical_modified_files": [
+    "src/main/java/org/jsoup/nodes/DocumentType.java",
+    "src/main/java/org/jsoup/parser/HtmlTreeBuilderState.java",
+    "src/main/java/org/jsoup/parser/Token.java",
+    "src/main/java/org/jsoup/parser/TokeniserState.java",
+    "src/main/java/org/jsoup/parser/XmlTreeBuilder.java"
+  ],
+  "agent_modified_prod_files": [],
+  "file_overlap": [],
+  "missed_canonical": [
+    "src/main/java/org/jsoup/nodes/DocumentType.java",
+    "src/main/java/org/jsoup/parser/HtmlTreeBuilderState.java",
+    "src/main/java/org/jsoup/parser/Token.java",
+    "src/main/java/org/jsoup/parser/TokeniserState.java",
+    "src/main/java/org/jsoup/parser/XmlTreeBuilder.java"
+  ],
+  "extra_prod_files": [],
+  "fix_locality_score": 0.0,
+  "test_pass_strict": false
 }
