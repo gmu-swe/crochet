@@ -3,7 +3,7 @@
 | Bug         |    C1    |    C2    |    C3    | Score |
 |-------------|----------|----------|----------|-------|
 | Lang-1      |   PASS   |   PASS   |   PASS   | 3/3   |
-| Lang-10     |   PASS   |   PASS   |   FAIL   | 2/3   |
+| Lang-10     |   PASS   |   PASS   |   TOUT   | 2/3   |  [t]
 | Lang-26     |   PASS   |   PASS   |   PASS   | 3/3   |
 | Time-4      |   PASS   |   PASS   |   PASS   | 3/3   |
 | Time-11     |   PASS   |   PASS   |   PASS   | 3/3   |
@@ -11,10 +11,10 @@
 | Math-27     |   PASS   |   PASS   |   PASS   | 3/3   |
 | Math-3      |   PASS   |   PASS   |   PASS   | 3/3   |
 | Math-10     |   PASS   |   PASS   |   PASS   | 3/3   |
-| Closure-1   |   PASS   |   PASS   |   PASS   | 3/3   |
+| Closure-1   |   FAIL   |   PASS   |   FAIL   | 1/3   |
 | Closure-10  |   PASS   |   PASS   |   PASS   | 3/3   |
 |-------------|----------|----------|----------|-------|
-| TOTAL       |  11/11   |  11/11   |  10/11   |       |
+| TOTAL       |  10/11   |  11/11   |   9/11   |       |
 
 **Wall-clock:** 0s (0m 0s)
 
@@ -31,4 +31,4 @@ CFAIL = agent patch introduced a compilation error (distinct from test failing t
 FAIL without CFAIL = code compiled, but target test still fails.
 
 ## Anomalies
-Lang-10: C1=PASS C3=FAIL -- Crochet TTD underperforms baseline
+Lang-10: C1=PASS C3=TOUT -- Crochet TTD underperforms baseline

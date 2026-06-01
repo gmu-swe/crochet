@@ -1,0 +1,29 @@
+{
+  "bug": "Closure-148",
+  "condition": "C1",
+  "started_at": "2026-05-21T12:48:13+00:00",
+  "duration_seconds": 247,
+  "tool_calls": 38,
+  "compile_fail": false,
+  "primary_pass": true,
+  "test_pass": true,
+  "baseline_failing_count": 5,
+  "agent_induced_regressions": [],
+  "regressed_tests": [],
+  "diagnosis_quality": 2,
+  "agent_exit_code": 0,
+  "bug_reproduced_pretest": true,
+  "agent_patch": "diff --git a/build.xml b/build.xml\nindex 262193460..e5677325f 100644\n--- a/build.xml\n+++ b/build.xml\n@@ -14,8 +14,8 @@\n  limitations under the License.\n -->\n <project name=\"compiler\" basedir=\".\" default=\"jar\">\n-<property name=\"ant.build.javac.target\" value=\"1.6\"/>\n-<property name=\"ant.build.javac.source\" value=\"1.6\"/>\n+<property name=\"ant.build.javac.target\" value=\"1.8\"/>\n+<property name=\"ant.build.javac.source\" value=\"1.8\"/>\n \n   <!-- define other variables -->\n   <property name=\"src.dir\" value=\"${basedir}/src\" />\ndiff --git a/src/com/google/javascript/jscomp/PeepholeFoldConstants.java b/src/com/google/javascript/jscomp/PeepholeFoldConstants.java\nindex 1df9098b5..f3d958362 100644\n--- a/src/com/google/javascript/jscomp/PeepholeFoldConstants.java\n+++ b/src/com/google/javascript/jscomp/PeepholeFoldConstants.java\n@@ -179,6 +179,9 @@ public class PeepholeFoldConstants extends AbstractPeepholeOptimization {\n       case Token.ARRAYLIT:\n         typeNameString = \"object\";\n         break;\n+      case Token.VOID:\n+        typeNameString = \"undefined\";\n+        break;\n       case Token.NAME:\n         // We assume here that programs don't change the value of the\n         // keyword undefined to something other than the value undefined.\n",
+  "agent_log": "{\"type\":\"result\",\"subtype\":\"success\",\"is_error\":false,\"api_error_status\":null,\"duration_ms\":245855,\"duration_api_ms\":179288,\"ttft_ms\":2047,\"num_turns\":38,\"result\":\"Test passes. Final diagnosis:\\n\\nDIAGNOSIS COMPLETE\\n\\nThe root cause was a missing case in the switch statement of `tryFoldTypeof` in `src/com/google/javascript/jscomp/PeepholeFoldConstants.java`. The method handles `typeof` expressions over literal arguments and maps each AST node type to its `typeof` string (\\\"string\\\", \\\"number\\\", \\\"boolean\\\", \\\"object\\\", \\\"undefined\\\"). The `NodeUtil.isLiteralValue` gate already returns true for `Token.VOID` nodes (since `void` expressions are immutable and always evaluate to `undefined`), so `typeof void 0` reached the switch \u2014 but no `case Token.VOID` existed, so `typeNameString` stayed null and the expression was left unfolded. The test `fold(\\\"x = typeof void 0\\\", \\\"x = \\\\\\\"undefined\\\\\\\"\\\")` therefore failed because the source remained `typeof void 0` instead of being folded to `\\\"undefined\\\"`. The fix adds a `case Token.VOID: typeNameString = \\\"undefined\\\";` arm so that `void <literal>` operands are folded the same way as the `undefined` identifier already was.\",\"stop_reason\":\"end_turn\",\"session_id\":\"2a36fb0f-bd01-8ee3-03ae-f73725ceb1a2\",\"total_cost_usd\":1.0623575,\"usage\":{\"input_tokens\":47,\"cache_creation_input_tokens\":25924,\"cache_read_input_tokens\":1282395,\"output_tokens\":10356,\"server_tool_use\":{\"web_search_requests\":0,\"web_fetch_requests\":0},\"service_tier\":\"standard\",\"cache_creation\":{\"ephemeral_1h_input_tokens\":25924,\"ephemeral_5m_input_tokens\":0},\"inference_geo\":\"\",\"iterations\":[{\"input_tokens\":1,\"output_tokens\":379,\"cache_read_input_tokens\":44180,\"cache_creation_input_tokens\":243,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":243},\"type\":\"message\"}],\"speed\":\"standard\"},\"modelUsage\":{\"claude-opus-4-7[1m]\":{\"inputTokens\":47,\"outputTokens\":10356,\"cacheReadInputTokens\":1282395,\"cacheCreationInputTokens\":25924,\"webSearchRequests\":0,\"costUSD\":1.0623575,\"contextWindow\":1000000,\"maxOutputTokens\":64000}},\"permission_denials\":[],\"terminal_reason\":\"completed\",\"fast_mode_state\":\"off\",\"uuid\":\"7007c9f7-5aca-4bbb-b2fb-26991ab45987\"}\n",
+  "agent_stderr": "",
+  "judge_reasoning": "The ground-truth fix concerns unsafe folding of typeof on potentially undeclared names (since typeof on undeclared variables returns 'undefined' without throwing). The agent instead diagnosed a missing Token.VOID case for folding 'typeof void 0', which is in the same method (tryFoldTypeof) but addresses the opposite problem \u2014 adding more folding rather than restricting unsafe folding. Wrong root cause, but located in the correct method.\n",
+  "verify_log": "Running ant (compile.tests)................................................ OK\nRunning ant (run.dev.tests)................................................ OK\nFailing tests: 1\n  - com.google.javascript.jscomp.PeepholeFoldConstantsTest::testFoldTypeof\n",
+  "baseline_failing_tests": [
+    "com.google.javascript.jscomp.SourceMapTest::testGoldenOutput0",
+    "com.google.javascript.jscomp.SourceMapTest::testGoldenOutput1",
+    "com.google.javascript.jscomp.SourceMapTest::testGoldenOutput2",
+    "com.google.javascript.jscomp.SourceMapTest::testGoldenOutput3",
+    "com.google.javascript.jscomp.SourceMapTest::testGoldenOutput4"
+  ],
+  "compile_log": "Running ant (compile)...................................................... OK\nRunning ant (compile.tests)................................................ OK\n"
+}

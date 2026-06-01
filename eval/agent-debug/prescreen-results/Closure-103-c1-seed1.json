@@ -1,0 +1,25 @@
+{
+  "bug": "Closure-103",
+  "condition": "C1",
+  "started_at": "2026-05-21T12:37:41+00:00",
+  "duration_seconds": 70,
+  "tool_calls": 14,
+  "compile_fail": false,
+  "primary_pass": true,
+  "test_pass": true,
+  "baseline_failing_count": 1,
+  "agent_induced_regressions": [],
+  "regressed_tests": [],
+  "diagnosis_quality": 5,
+  "agent_exit_code": 0,
+  "bug_reproduced_pretest": true,
+  "agent_patch": "diff --git a/build.xml b/build.xml\nindex 3ba402cd6..fb87c8c15 100644\n--- a/build.xml\n+++ b/build.xml\n@@ -14,8 +14,8 @@\n  limitations under the License.\n -->\n <project name=\"compiler\" basedir=\".\" default=\"jar\">\n-<property name=\"ant.build.javac.target\" value=\"1.6\"/>\n-<property name=\"ant.build.javac.source\" value=\"1.6\"/>\n+<property name=\"ant.build.javac.target\" value=\"1.8\"/>\n+<property name=\"ant.build.javac.source\" value=\"1.8\"/>\n \n   <!-- define other variables -->\n   <property name=\"src.dir\" value=\"${basedir}/src\" />\ndiff --git a/src/com/google/javascript/jscomp/ControlFlowAnalysis.java b/src/com/google/javascript/jscomp/ControlFlowAnalysis.java\nindex 3b67af32f..f39d851a7 100644\n--- a/src/com/google/javascript/jscomp/ControlFlowAnalysis.java\n+++ b/src/com/google/javascript/jscomp/ControlFlowAnalysis.java\n@@ -891,6 +891,8 @@ final class ControlFlowAnalysis implements Callback, CompilerPass {\n       case Token.ASSIGN:\n       case Token.INC:\n       case Token.DEC:\n+      case Token.INSTANCEOF:\n+      case Token.IN:\n         return true;\n       case Token.FUNCTION:\n         return false;\n",
+  "agent_log": "{\"type\":\"result\",\"subtype\":\"success\",\"is_error\":false,\"api_error_status\":null,\"duration_ms\":69037,\"duration_api_ms\":54282,\"ttft_ms\":2358,\"num_turns\":14,\"result\":\"Test passes.\\n\\nDIAGNOSIS COMPLETE\\n\\nThe root cause was in `ControlFlowAnalysis.mayThrowException(Node n)` at line 884 of `src/com/google/javascript/jscomp/ControlFlowAnalysis.java`. This method enumerates the AST node types whose evaluation may raise an exception so the control flow graph can add an edge from that node to the surrounding `catch` block. The switch listed `CALL`, `GETPROP`, `GETELEM`, `THROW`, `NEW`, `ASSIGN`, `INC`, and `DEC`, but omitted `INSTANCEOF` (and `IN`), even though `x instanceof y` throws a `TypeError` when `y` is not callable. Because the analyzer believed `instanceof` could not throw, no CFG edge was created from the `if (value instanceof type) ...` expression to the `catch (e) {}` block, leaving the catch unreachable in the graph. `CheckUnreachableCode` then flagged the catch body as unreachable code, failing the test. Adding `Token.INSTANCEOF` (and `Token.IN`, which has the same throwing semantics) to the switch restores the exception edge, the catch block becomes reachable, and the test passes.\",\"stop_reason\":\"end_turn\",\"session_id\":\"8ad47315-a29b-9538-1224-0333e59e4995\",\"total_cost_usd\":0.35055349999999996,\"usage\":{\"input_tokens\":18,\"cache_creation_input_tokens\":13238,\"cache_read_input_tokens\":397602,\"output_tokens\":2757,\"server_tool_use\":{\"web_search_requests\":0,\"web_fetch_requests\":0},\"service_tier\":\"standard\",\"cache_creation\":{\"ephemeral_1h_input_tokens\":13238,\"ephemeral_5m_input_tokens\":0},\"inference_geo\":\"\",\"iterations\":[{\"input_tokens\":1,\"output_tokens\":424,\"cache_read_input_tokens\":31518,\"cache_creation_input_tokens\":219,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":219},\"type\":\"message\"}],\"speed\":\"standard\"},\"modelUsage\":{\"claude-opus-4-7[1m]\":{\"inputTokens\":18,\"outputTokens\":2757,\"cacheReadInputTokens\":397602,\"cacheCreationInputTokens\":13238,\"webSearchRequests\":0,\"costUSD\":0.35055349999999996,\"contextWindow\":1000000,\"maxOutputTokens\":64000}},\"permission_denials\":[],\"terminal_reason\":\"completed\",\"fast_mode_state\":\"off\",\"uuid\":\"a898f5f7-7d75-4496-a143-42cbbc53f513\"}\n",
+  "agent_stderr": "",
+  "judge_reasoning": "The agent correctly identified that the bug stems from instanceof not being recognized as potentially throwing, causing the CFG to miss the exception edge to the catch block, which then makes CheckUnreachableCode flag reachable code as unreachable. The diagnosis precisely names the method (ControlFlowAnalysis.mayThrowException), the file/line, the missing tokens (INSTANCEOF and IN), and explains the exact mechanism matching the ground-truth summary.\n",
+  "verify_log": "Running ant (compile.tests)................................................ OK\nRunning ant (run.dev.tests)................................................ OK\nFailing tests: 1\n  - com.google.javascript.jscomp.CheckUnreachableCodeTest::testInstanceOfThrowsException\n",
+  "baseline_failing_tests": [
+    "com.google.javascript.jscomp.DisambiguatePropertiesTest::testSupertypeReferenceOfSubtypeProperty"
+  ],
+  "compile_log": "Running ant (compile)...................................................... OK\nRunning ant (compile.tests)................................................ OK\n"
+}

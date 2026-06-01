@@ -357,16 +357,41 @@ CROCHET_DEBUG_JAR="$(_find_jar "$CROCHET_REPO/crochet-debug/target" "crochet-deb
 [[ -z "$CROCHET_DEBUG_JAR" ]] && CROCHET_DEBUG_JAR="$CROCHET_REPO/crochet-debug/target/crochet-debug-2.0.0-SNAPSHOT-standalone.jar"
 
 PROMPT_FILE="$WORKDIR/prompt.md"
-sed \
-    -e "s|{{BUG_ID}}|$BUG_ID|g" \
-    -e "s|{{PROJECT}}|$PROJECT|g" \
-    -e "s|{{FAILING_TEST}}|$FAILING_TEST|g" \
-    -e "s|{{FIX_SUMMARY}}|$FIX_SUMMARY|g" \
-    -e "s|{{WORKDIR}}|$BUGGY_WORKDIR|g" \
-    -e "s|{{MAX_TOOL_CALLS}}|$MAX_TOOL_CALLS|g" \
-    -e "s|{{CROCHET_AGENT_JAR}}|$CROCHET_AGENT_JAR|g" \
-    -e "s|{{CROCHET_DEBUG_JAR}}|$CROCHET_DEBUG_JAR|g" \
-    "$PROMPT_TEMPLATE" > "$PROMPT_FILE"
+
+# Phase VI methodology fix: do NOT pass FIX_SUMMARY (the ground-truth bug
+# description) into the agent prompt — that's leakage and was confounding
+# Phase I/II/III. Pass the test's actual failure output instead, which is
+# what a human debugger would see when the test fails. The judge prompt
+# still uses FIX_SUMMARY (legitimate use — scoring against ground truth).
+TEST_FAILURE_OUTPUT=$(python3 -c "
+import sys
+log = open('$VERIFY_LOG').read()
+# Truncate to keep prompt size bounded. Real D4J failure logs are usually
+# small (~50 lines) but Closure can spit out megabytes of compiler trace
+# from the failing test. 8 KB is enough for the assertion + a few frames.
+if len(log) > 8000:
+    log = log[:4000] + '\n\n[... output truncated ...]\n\n' + log[-4000:]
+sys.stdout.write(log)
+")
+echo "$TEST_FAILURE_OUTPUT" > "$WORKDIR/test-failure-output.txt"
+
+# Use python for the substitution because the failure output may contain
+# characters that break sed (`|`, `&`, newlines, leading whitespace).
+python3 - <<PYEOF > "$PROMPT_FILE"
+import sys
+tmpl = open("$PROMPT_TEMPLATE").read()
+failure = open("$WORKDIR/test-failure-output.txt").read().rstrip()
+out = (tmpl
+       .replace("{{BUG_ID}}", "$BUG_ID")
+       .replace("{{PROJECT}}", "$PROJECT")
+       .replace("{{FAILING_TEST}}", "$FAILING_TEST")
+       .replace("{{TEST_FAILURE_OUTPUT}}", failure)
+       .replace("{{WORKDIR}}", "$BUGGY_WORKDIR")
+       .replace("{{MAX_TOOL_CALLS}}", "$MAX_TOOL_CALLS")
+       .replace("{{CROCHET_AGENT_JAR}}", "$CROCHET_AGENT_JAR")
+       .replace("{{CROCHET_DEBUG_JAR}}", "$CROCHET_DEBUG_JAR"))
+sys.stdout.write(out)
+PYEOF
 
 # ── Step 5: Determine allowed tools per condition ─────────────────────────────
 case "$CONDITION" in

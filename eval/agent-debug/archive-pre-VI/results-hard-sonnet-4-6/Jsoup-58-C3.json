@@ -1,0 +1,46 @@
+{
+  "bug": "Jsoup-58",
+  "condition": "C3",
+  "model": "claude-sonnet-4-6",
+  "model_default_used": false,
+  "started_at": "2026-05-21T19:41:58+00:00",
+  "duration_seconds": 224,
+  "tool_calls": 20,
+  "compile_fail": false,
+  "primary_pass": false,
+  "test_pass": false,
+  "baseline_failing_count": 2,
+  "agent_induced_regressions": [],
+  "regressed_tests": [],
+  "diagnosis_quality": 1,
+  "agent_exit_code": 1,
+  "bug_reproduced_pretest": true,
+  "agent_patch": "diff --git a/maven-build.xml b/maven-build.xml\nindex 849871c7..73b0656d 100644\n--- a/maven-build.xml\n+++ b/maven-build.xml\n@@ -71,10 +71,10 @@\n            debug=\"true\" \n            optimize=\"false\" \n            deprecation=\"true\" \n-           target=\"1.6\" \n+           target=\"1.8\" \n            verbose=\"false\" \n            fork=\"false\" \n-           source=\"1.6\">\n+           source=\"1.8\">\n       <src>\n         <pathelement location=\"${maven.build.srcDir.0}\"/>\n       </src>\n@@ -110,10 +110,10 @@\n            debug=\"true\" \n            optimize=\"false\" \n            deprecation=\"true\" \n-           target=\"1.6\" \n+           target=\"1.8\" \n            verbose=\"false\" \n            fork=\"false\" \n-           source=\"1.6\">\n+           source=\"1.8\">\n       <src>\n         <pathelement location=\"${maven.build.testDir.0}\"/>\n       </src>\n",
+  "agent_log": "{\"type\":\"result\",\"subtype\":\"success\",\"is_error\":true,\"api_error_status\":429,\"duration_ms\":222752,\"duration_api_ms\":207454,\"num_turns\":20,\"result\":\"You've hit your session limit \u00b7 resets 10:40pm (UTC)\",\"stop_reason\":\"stop_sequence\",\"session_id\":\"c6fdda87-fcff-435a-88fe-ac7ac1850959\",\"total_cost_usd\":0.40532835,\"usage\":{\"input_tokens\":13,\"cache_creation_input_tokens\":29977,\"cache_read_input_tokens\":338702,\"output_tokens\":12751,\"server_tool_use\":{\"web_search_requests\":0,\"web_fetch_requests\":0},\"service_tier\":\"standard\",\"cache_creation\":{\"ephemeral_1h_input_tokens\":29977,\"ephemeral_5m_input_tokens\":0},\"inference_geo\":\"\",\"iterations\":[{\"input_tokens\":1,\"output_tokens\":355,\"cache_read_input_tokens\":35578,\"cache_creation_input_tokens\":7722,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":7722},\"type\":\"message\"}],\"speed\":\"standard\"},\"modelUsage\":{\"claude-sonnet-4-6\":{\"inputTokens\":13,\"outputTokens\":12751,\"cacheReadInputTokens\":338702,\"cacheCreationInputTokens\":29977,\"webSearchRequests\":0,\"costUSD\":0.40532835,\"contextWindow\":200000,\"maxOutputTokens\":32000}},\"permission_denials\":[],\"terminal_reason\":\"completed\",\"fast_mode_state\":\"off\",\"uuid\":\"9dcd8050-9711-468c-9392-e6f0ac6c6394\"}\n",
+  "agent_stderr": "",
+  "judge_reasoning": "The agent produced no diagnosis \u2014 the session hit its usage limit before any analysis was provided. There is no content to evaluate against the ground-truth fix.\n",
+  "verify_log": "Running ant (compile.tests)................................................ OK\nRunning ant (run.dev.tests)................................................ OK\nFailing tests: 1\n  - org.jsoup.safety.CleanerTest::testIsValidBodyHtml\n",
+  "baseline_failing_tests": [
+    "org.jsoup.safety.CleanerTest::testIsValidBodyHtml",
+    "org.jsoup.safety.CleanerTest::testIsValidDocument"
+  ],
+  "compile_log": "Running ant (compile)...................................................... OK\nRunning ant (compile.tests)................................................ OK\n",
+  "agent_modified_files": [
+    "maven-build.xml"
+  ],
+  "canonical_modified_files": [
+    "src/main/java/org/jsoup/Jsoup.java",
+    "src/main/java/org/jsoup/parser/Parser.java",
+    "src/main/java/org/jsoup/safety/Cleaner.java"
+  ],
+  "agent_modified_prod_files": [],
+  "file_overlap": [],
+  "missed_canonical": [
+    "src/main/java/org/jsoup/Jsoup.java",
+    "src/main/java/org/jsoup/parser/Parser.java",
+    "src/main/java/org/jsoup/safety/Cleaner.java"
+  ],
+  "extra_prod_files": [],
+  "fix_locality_score": 0.0,
+  "test_pass_strict": false
+}

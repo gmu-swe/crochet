@@ -1,8 +1,8 @@
 {
   "bug": "Lang-10",
   "condition": "C3",
-  "started_at": "2026-05-22T01:15:21.241688Z",
-  "duration_seconds": 900,
+  "started_at": "2026-06-01T02:32:48.650071Z",
+  "duration_seconds": 600,
   "tool_calls": 0,
   "test_pass": false,
   "timeout": true,
@@ -14,5 +14,5 @@
   "agent_exit_code": 124,
   "agent_patch": "",
   "agent_log": "",
-  "judge_reasoning": "Trial timed out after 900s"
+  "judge_reasoning": "Trial timed out after 600s"
 }
