@@ -7,8 +7,15 @@ You are a debugging agent. Your goal is to identify and fix the root cause of a 
 - **Bug ID:** {{BUG_ID}}
 - **Project:** {{PROJECT}}
 - **Failing test:** {{FAILING_TEST}}
-- **Bug description:** {{FIX_SUMMARY}}
 - **Worktree directory:** {{WORKDIR}}
+
+## Test failure output
+
+When the failing test runs on the buggy version, Defects4J reports:
+
+```
+{{TEST_FAILURE_OUTPUT}}
+```
 
 ## Your task
 
